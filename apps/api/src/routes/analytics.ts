@@ -209,6 +209,8 @@ analytics.get('/dashboard/html', async (c) => {
       border-radius: 4px 4px 0 0;
       min-width: 8px;
       position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
     }
     .bar:hover { background: #2563eb; }
     .bar-label {
@@ -220,6 +222,33 @@ analytics.get('/dashboard/html', async (c) => {
       color: #666;
       white-space: nowrap;
     }
+    .tooltip {
+      position: fixed;
+      background: #1f2937;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 1000;
+      white-space: nowrap;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+      transform: translateX(-50%);
+    }
+    .tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      margin-left: -5px;
+      border-width: 5px;
+      border-style: solid;
+      border-color: #1f2937 transparent transparent transparent;
+    }
+    .tooltip .date { font-weight: 600; margin-bottom: 2px; }
+    .tooltip .count { color: #93c5fd; }
   </style>
 </head>
 <body>
@@ -253,7 +282,7 @@ analytics.get('/dashboard/html', async (c) => {
         return stats.dailyActiveHistory
           .map(
             (d) => `
-          <div class="bar" style="height: ${(d.count / maxCount) * 100}%" title="${d.date}: ${d.count} users">
+          <div class="bar" style="height: ${(d.count / maxCount) * 100}%" data-date="${d.date}" data-count="${d.count}">
             <span class="bar-label">${d.date.slice(5)}</span>
           </div>
         `
@@ -283,6 +312,36 @@ analytics.get('/dashboard/html', async (c) => {
     ${stats.topOS.map((o) => `<tr><td>${o.os}</td><td>${o.count}</td></tr>`).join('')}
     ${stats.topOS.length === 0 ? '<tr><td colspan="2">No data yet</td></tr>' : ''}
   </table>
+
+  <div class="tooltip" id="tooltip">
+    <div class="date"></div>
+    <div class="count"></div>
+  </div>
+
+  <script>
+    const tooltip = document.getElementById('tooltip');
+    const bars = document.querySelectorAll('.bar');
+
+    bars.forEach(bar => {
+      bar.addEventListener('mouseenter', (e) => {
+        const date = bar.dataset.date;
+        const count = bar.dataset.count;
+        tooltip.querySelector('.date').textContent = date;
+        tooltip.querySelector('.count').textContent = count + ' active users';
+        tooltip.style.opacity = '1';
+      });
+
+      bar.addEventListener('mousemove', (e) => {
+        const rect = bar.getBoundingClientRect();
+        tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+        tooltip.style.top = (rect.top - tooltip.offsetHeight - 10) + 'px';
+      });
+
+      bar.addEventListener('mouseleave', () => {
+        tooltip.style.opacity = '0';
+      });
+    });
+  </script>
 </body>
 </html>`;
 

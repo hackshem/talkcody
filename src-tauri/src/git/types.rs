@@ -133,6 +133,7 @@ pub struct FileDiff {
 /// Represents information about a commit
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct CommitInfo {
     /// Commit hash
     pub hash: String,

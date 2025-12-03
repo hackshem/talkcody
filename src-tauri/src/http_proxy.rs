@@ -438,7 +438,7 @@ pub async fn stream_fetch(
     }
 
     // Log response headers
-    let content_type = response
+    let _content_type = response
         .headers()
         .get("content-type")
         .and_then(|v| v.to_str().ok())
@@ -459,7 +459,7 @@ pub async fn stream_fetch(
             match chunk_result {
                 Ok(Some(Ok(chunk))) => {
                     chunk_count += 1;
-                    let chunk_size = chunk.len();
+                    let _chunk_size = chunk.len();
 
                     // Emit chunk to frontend
                     if let Err(e) = window_clone.emit(

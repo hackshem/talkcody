@@ -182,6 +182,7 @@ vi.mock('../lib/models', () => ({
   CLAUDE_HAIKU: 'claude-haiku-4.5',
   GPT5: 'gpt-5',
   GPT5_MINI: 'gpt-5-mini',
+  GPT51_CODE_MAX: 'gpt-51-codex-max',
   CODE_STARL: 'codestral',
   GROK_CODE_FAST: 'grok-code-fast-1',
   GLM_46: 'glm-4.6',

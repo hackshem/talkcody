@@ -1,17 +1,15 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 
 declare const document: Document;
 
 describe('useTheme', () => {
-  let setMock: ReturnType<typeof vi.fn>;
-  let getMock: ReturnType<typeof vi.fn>;
-
   beforeEach(async () => {
-    setMock = vi.fn();
-    getMock = vi.fn();
-
     vi.resetModules();
+
+    // Clear localStorage
+    localStorage.clear();
 
     // jsdom does not implement matchMedia
     Object.defineProperty(window, 'matchMedia', {
@@ -28,51 +26,74 @@ describe('useTheme', () => {
       })),
     });
 
-    vi.doMock('@/stores/settings-store', () => ({
-      settingsManager: {
-        set: setMock,
-        get: getMock,
-      },
-    }));
-
-    // re-import after mocks
-    const mod = await import('./use-theme');
-    Object.assign(globalThis, { useTheme: mod.useTheme });
-
     document.documentElement.className = '';
   });
 
   afterEach(() => {
     document.documentElement.className = '';
+    localStorage.clear();
     vi.clearAllMocks();
   });
 
-  it('applies saved light theme on init', async () => {
-    getMock.mockResolvedValueOnce('light');
+  // Create wrapper with custom ThemeProvider
+  async function createWrapper() {
+    const { ThemeProvider } = await import('@/components/theme-provider');
+    return function Wrapper({ children }: { children: ReactNode }) {
+      return <ThemeProvider defaultTheme="system">{children}</ThemeProvider>;
+    };
+  }
+
+  it('initializes theme from localStorage', async () => {
+    localStorage.setItem('theme', 'light');
 
     const { useTheme } = await import('./use-theme');
-    const { result } = renderHook(() => useTheme());
+    const wrapper = await createWrapper();
+    const { result } = renderHook(() => useTheme(), { wrapper });
 
-    await act(async () => {});
+    expect(result.current.theme).toBe('light');
+  });
 
-    expect(document.documentElement.classList.contains('light')).toBe(true);
-    expect(document.documentElement.classList.contains('dark')).toBe(false);
-    expect(result.current.resolvedTheme).toBe('light');
+  it('setTheme writes to localStorage', async () => {
+    const { useTheme } = await import('./use-theme');
+    const wrapper = await createWrapper();
+    const { result } = renderHook(() => useTheme(), { wrapper });
+
+    act(() => {
+      result.current.setTheme('dark');
+    });
+
+    // Should persist to localStorage
+    expect(localStorage.getItem('theme')).toBe('dark');
   });
 
   it('toggleTheme switches between light and dark', async () => {
-    getMock.mockResolvedValueOnce('light');
+    // Set initial theme to light
+    localStorage.setItem('theme', 'light');
 
     const { useTheme } = await import('./use-theme');
-    const { result } = renderHook(() => useTheme());
+    const wrapper = await createWrapper();
+    const { result } = renderHook(() => useTheme(), { wrapper });
+
+    // Wait for initial render
     await act(async () => {});
 
-    await act(async () => {
+    act(() => {
       result.current.toggleTheme();
     });
 
-    expect(document.documentElement.classList.contains('dark')).toBe(true);
-    expect(document.documentElement.classList.contains('light')).toBe(false);
-    expect(setMock).toHaveBeenCalledWith('theme', 'dark');
+    // Should have toggled to dark
+    expect(localStorage.getItem('theme')).toBe('dark');
+  });
+
+  it('applies theme class to document element', async () => {
+    localStorage.setItem('theme', 'dark');
+
+    const { useTheme } = await import('./use-theme');
+    const wrapper = await createWrapper();
+    renderHook(() => useTheme(), { wrapper });
+
+    await waitFor(() => {
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+    });
   });
 });

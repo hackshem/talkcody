@@ -1,11 +1,11 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getCurrent as getCurrentDeepLinkUrls, onOpenUrl } from '@tauri-apps/plugin-deep-link';
-import { ThemeProvider } from 'next-themes';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { InitializationScreen } from '@/components/initialization-screen';
 import { MainContent } from '@/components/main-content';
 import { NavigationSidebar } from '@/components/navigation-sidebar';
 import { OnboardingWizard } from '@/components/onboarding';
+import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { UpdateNotification } from '@/components/update-notification';
 import { UiNavigationProvider, useUiNavigation } from '@/contexts/ui-navigation';
@@ -24,6 +24,9 @@ function AppContent() {
   const { activeView, setActiveView } = useUiNavigation();
   const { handleOAuthCallback } = useAuthStore();
   const { isMainWindow } = useWindowContext();
+
+  // Initialize theme sync from database to localStorage
+  useTheme();
 
   // Initialization state
   const [isInitializing, setIsInitializing] = useState(true);
@@ -301,16 +304,9 @@ function AppContent() {
   );
 }
 
-function ThemeInitializer() {
-  // Invoke useTheme once to ensure persisted theme is applied at startup
-  useTheme();
-  return null;
-}
-
 function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-      <ThemeInitializer />
+    <ThemeProvider defaultTheme="system">
       <WindowProvider>
         <RepositoryStoreProvider>
           <UiNavigationProvider>

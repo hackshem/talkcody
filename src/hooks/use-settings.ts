@@ -6,14 +6,13 @@ export type SettingKey =
   | 'assistantId'
   | 'project'
   | 'is_think'
-  | 'theme'
   | 'language'
   | 'mode'
   | 'apiKey';
 
 export type SettingValue<T extends SettingKey> = T extends 'is_think'
   ? boolean
-  : T extends 'model' | 'assistantId' | 'project' | 'theme' | 'language' | 'apiKey' | 'mode'
+  : T extends 'model' | 'assistantId' | 'project' | 'language' | 'apiKey' | 'mode'
     ? string
     : never;
 
@@ -52,7 +51,6 @@ export function useSettings<T extends SettingKey>(keys: readonly T[]): UseSettin
   const assistantId = useSettingsStore((state) => state.assistantId);
   const project = useSettingsStore((state) => state.project);
   const is_think = useSettingsStore((state) => state.is_think);
-  const theme = useSettingsStore((state) => state.theme);
   const language = useSettingsStore((state) => state.language);
   const loading = useSettingsStore((state) => state.loading);
   const error = useSettingsStore((state) => state.error);
@@ -62,7 +60,6 @@ export function useSettings<T extends SettingKey>(keys: readonly T[]): UseSettin
   const setAssistantId = useSettingsStore((state) => state.setAssistantId);
   const setProject = useSettingsStore((state) => state.setProject);
   const setIsThink = useSettingsStore((state) => state.setIsThink);
-  const setTheme = useSettingsStore((state) => state.setTheme);
   const setLanguage = useSettingsStore((state) => state.setLanguage);
 
   // Build full settings object
@@ -71,7 +68,6 @@ export function useSettings<T extends SettingKey>(keys: readonly T[]): UseSettin
     assistantId,
     project,
     is_think,
-    theme,
     language,
     mode: '', // mode is deprecated but kept for compatibility
     apiKey: '', // apiKey is deprecated but kept for compatibility
@@ -100,7 +96,6 @@ export function useSettings<T extends SettingKey>(keys: readonly T[]): UseSettin
       else if (key === 'assistantId') await setAssistantId(value as string);
       else if (key === 'project') await setProject(value as string);
       else if (key === 'is_think') await setIsThink(value as boolean);
-      else if (key === 'theme') await setTheme(value as string);
       else if (key === 'language') await setLanguage(value as string);
     }
   };
@@ -111,7 +106,6 @@ export function useSettings<T extends SettingKey>(keys: readonly T[]): UseSettin
     setAssistantId,
     setProject,
     setIsThink,
-    setTheme,
     setLanguage,
     setMode: async () => {}, // deprecated
     setApiKey: async () => {}, // deprecated

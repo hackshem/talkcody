@@ -23,7 +23,6 @@ function generateDefaultApiKeySettings(): Record<string, string> {
 // All settings managed by the store
 interface SettingsState {
   // UI Settings
-  theme: string;
   language: string;
   onboarding_completed: boolean;
 
@@ -69,7 +68,6 @@ interface SettingsActions {
   getBatch: (keys: readonly string[]) => Record<string, string>;
 
   // UI Settings
-  setTheme: (theme: string) => Promise<void>;
   setLanguage: (language: string) => Promise<void>;
 
   // AI Settings
@@ -128,7 +126,6 @@ type SettingsStore = SettingsState & SettingsActions;
 
 // Default settings
 const DEFAULT_SETTINGS: Omit<SettingsState, 'loading' | 'error' | 'isInitialized'> = {
-  theme: 'system',
   language: 'en',
   onboarding_completed: false,
   model: '',
@@ -182,7 +179,6 @@ class SettingsDatabase {
     if (!this.db) return;
 
     const defaultSettings: Record<string, string> = {
-      theme: 'system',
       language: 'en',
       agentId: 'planner',
       is_think: 'false',
@@ -292,7 +288,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
       // Load all settings from database
       const keys = [
-        'theme',
         'language',
         'model',
         'assistantId',
@@ -356,7 +351,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       }
 
       set({
-        theme: rawSettings.theme || 'system',
         language: rawSettings.language || 'en',
         onboarding_completed: rawSettings.onboarding_completed === 'true',
         model: rawSettings.model || '',
@@ -429,11 +423,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   // UI Settings
-  setTheme: async (theme: string) => {
-    await settingsDb.set('theme', theme);
-    set({ theme });
-  },
-
   setLanguage: async (language: string) => {
     await settingsDb.set('language', language);
     set({ language });
@@ -765,3 +754,6 @@ export const settingsManager = {
     useSettingsStore.getState().setAllShortcuts(shortcuts),
   resetShortcutsToDefault: () => useSettingsStore.getState().resetShortcutsToDefault(),
 };
+
+// Export settingsDb for direct database access (used by ThemeProvider before store initialization)
+export { settingsDb };

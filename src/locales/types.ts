@@ -131,6 +131,12 @@ export interface LocaleDefinition {
       switchSuccess: string;
       switchFailed: string;
     };
+    modelSelector: {
+      title: string;
+      description: string;
+      currentModel: string;
+      noModels: string;
+    };
     toolbar: {
       model: string;
       planMode: string;

@@ -133,6 +133,12 @@ const zh: LocaleDefinition = {
       switchSuccess: '模型已切换',
       switchFailed: '切换模型失败，请重试。',
     },
+    modelSelector: {
+      title: 'AI 模型',
+      description: '选择对话使用的 AI 模型。不同模型具有不同的能力和性能特点。',
+      currentModel: '当前模型',
+      noModels: '无可用模型，请在设置中配置 API 密钥。',
+    },
     toolbar: {
       model: '模型',
       planMode: '计划模式',

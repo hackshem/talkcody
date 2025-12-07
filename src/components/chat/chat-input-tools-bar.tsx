@@ -2,6 +2,7 @@
 
 import { CurrentFileButton } from './current-file-button';
 import { McpSelectorButton } from './mcp-selector-button';
+import { ModelSelectorButton } from './model-selector-button';
 import { SkillsSelectorButton } from './skills-selector-button';
 import { ToolSelectorButton } from './tool-selector-button';
 
@@ -21,6 +22,7 @@ export function ChatInputToolsBar({
       <ToolSelectorButton />
       <SkillsSelectorButton conversationId={conversationId} />
       <McpSelectorButton />
+      <ModelSelectorButton />
       {onAddCurrentFile && <CurrentFileButton disabled={disabled} onAddFile={onAddCurrentFile} />}
     </div>
   );

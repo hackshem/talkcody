@@ -20,6 +20,7 @@ export function getDocLinks() {
       skills: `${BASE_URL}/features/skills`,
       agents: `${BASE_URL}/features/ai-agents`,
       mcpServers: `${BASE_URL}/features/mcp-servers`,
+      models: `${BASE_URL}/configuration/model-settings`,
     },
 
     // Configuration

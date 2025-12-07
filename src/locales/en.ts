@@ -135,6 +135,13 @@ const en: LocaleDefinition = {
       switchSuccess: 'Model switched',
       switchFailed: 'Failed to switch model. Please try again.',
     },
+    modelSelector: {
+      title: 'Main Model',
+      description:
+        'Select the Main AI model for conversations. Different models have different capabilities and performance.',
+      currentModel: 'Current model',
+      noModels: 'No models available. Please configure API keys in settings.',
+    },
     toolbar: {
       model: 'Model',
       planMode: 'Plan Mode',

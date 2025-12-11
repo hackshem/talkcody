@@ -66,6 +66,10 @@ packages/shared/src/**/*.d.ts.map
 # ESLint cache
 .eslintcache
 
+# Playwright test output
+playwright-report/
+test-results/
+
 coverage/
 ~/*
 ~/.bun/

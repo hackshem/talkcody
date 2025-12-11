@@ -139,6 +139,57 @@ const DANGEROUS_COMMANDS = [
   'truncate',
 ];
 
+// Commands where output IS the result - need full output
+const OUTPUT_IS_RESULT_PATTERNS = [
+  /^git\s+(status|log|diff|show|branch|remote|config|rev-parse|ls-files|blame|describe|tag)/,
+  /^(ls|dir|find|tree|exa|lsd)\b/,
+  /^(cat|head|tail|grep|rg|ag|ack|sed|awk)\b/,
+  /^(curl|wget|http|httpie)\b/,
+  /^(echo|printf)\b/,
+  /^(pwd|whoami|hostname|uname|id|groups)\b/,
+  /^(env|printenv|set)\b/,
+  /^(which|where|type|command)\b/,
+  /^(jq|yq|xq)\b/, // JSON/YAML processors
+  /^(wc|sort|uniq|cut|tr|column)\b/, // Text processing
+  /^(date|cal|uptime)\b/,
+  /^(df|du|free|top|ps|lsof)\b/, // System info
+  /^(npm\s+(list|ls|outdated|view|info|search))\b/,
+  /^(yarn\s+(list|info|why))\b/,
+  /^(bun\s+(pm\s+ls|pm\s+cache))\b/,
+  /^(cargo\s+(tree|metadata|search))\b/,
+  /^(pip\s+(list|show|freeze))\b/,
+  /^(docker\s+(ps|images|inspect|logs))\b/,
+];
+
+// Build/test commands - minimal output on success
+const BUILD_TEST_PATTERNS = [
+  /^(npm|yarn|pnpm|bun)\s+(run\s+)?(test|build|lint|check|typecheck|tsc|compile)/,
+  /^(cargo|rustc)\s+(test|build|check|clippy)/,
+  /^(go)\s+(test|build|vet)/,
+  /^(pytest|jest|vitest|mocha|ava|tap)\b/,
+  /^(make|cmake|ninja)\b/,
+  /^(tsc|eslint|prettier|biome)\b/,
+  /^(gradle|mvn|ant)\b/,
+  /^(dotnet)\s+(build|test|run)/,
+];
+
+type OutputStrategy = 'full' | 'minimal' | 'default';
+
+/**
+ * Determine output strategy based on command type
+ */
+function getOutputStrategy(command: string): OutputStrategy {
+  const trimmedCommand = command.trim();
+
+  if (OUTPUT_IS_RESULT_PATTERNS.some((re) => re.test(trimmedCommand))) {
+    return 'full';
+  }
+  if (BUILD_TEST_PATTERNS.some((re) => re.test(trimmedCommand))) {
+    return 'minimal';
+  }
+  return 'default';
+}
+
 /**
  * BashExecutor - handles bash command execution with safety checks
  */
@@ -248,6 +299,10 @@ export class BashExecutor {
 
   /**
    * Format execution result
+   * Optimizes output based on command type:
+   * - 'full': Commands where output IS the result (git, ls, cat, etc.) - return all output (up to 500 lines)
+   * - 'minimal': Build/test commands - on success return minimal confirmation, on failure return full error
+   * - 'default': Other commands - return last 30 lines on success
    */
   private formatResult(result: TauriShellResult, command: string): BashResult {
     // Success determination:
@@ -255,29 +310,79 @@ export class BashExecutor {
     // - If timed_out (max timeout), it's a warning but could still be considered success
     // - Otherwise, command is successful only if exit code is 0
     const isSuccess = result.idle_timed_out || result.timed_out || result.code === 0;
+    const strategy = getOutputStrategy(command);
 
     let message: string;
+    let output: string | undefined;
+    let error: string | undefined;
+
     if (result.idle_timed_out) {
       message = `Command running in background (idle timeout after 5s). PID: ${result.pid ?? 'unknown'}`;
+      output = this.truncateOutput(result.stdout, 100);
+      error = result.stderr || undefined;
     } else if (result.timed_out) {
       message = `Command timed out after max timeout. PID: ${result.pid ?? 'unknown'}`;
+      output = this.truncateOutput(result.stdout, 100);
+      error = result.stderr || undefined;
     } else if (result.code === 0) {
+      // Success handling based on strategy
       message = 'Command executed successfully';
+
+      switch (strategy) {
+        case 'full':
+          // Output IS the result - return full output (up to 500 lines)
+          output = this.truncateOutput(result.stdout, 1000);
+          break;
+        case 'minimal':
+          // Build/test success - minimal output
+          output = result.stdout.trim() ? '(output truncated on success)' : undefined;
+          break;
+        default:
+          // Default: return last 500 lines
+          output = this.truncateOutput(result.stdout, 1000);
+          break;
+      }
+      error = result.stderr || undefined;
     } else {
+      // Failure: always show full error information regardless of strategy
       message = `Command failed with exit code ${result.code}`;
+      if (result.stderr && result.stderr.trim()) {
+        error = result.stderr;
+        // Also include stdout if it contains useful info
+        if (result.stdout.trim()) {
+          output = this.truncateOutput(result.stdout, 50);
+        }
+      } else {
+        output = this.truncateOutput(result.stdout, 50);
+        error = undefined;
+      }
     }
 
     return {
       success: isSuccess,
       command,
       message,
-      output: result.stdout,
-      error: result.stderr || undefined,
+      output,
+      error,
       exit_code: result.code,
       timed_out: result.timed_out,
       idle_timed_out: result.idle_timed_out,
       pid: result.pid,
     };
+  }
+
+  /**
+   * Truncate output to last N lines
+   */
+  private truncateOutput(stdout: string, maxLines: number): string | undefined {
+    if (!stdout.trim()) {
+      return undefined;
+    }
+    const lines = stdout.split('\n');
+    if (lines.length > maxLines) {
+      return `... (${lines.length - maxLines} lines truncated)\n${lines.slice(-maxLines).join('\n')}`;
+    }
+    return stdout;
   }
 
   /**

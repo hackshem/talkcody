@@ -4,8 +4,8 @@ import { commandRegistry } from '@/services/commands/command-registry';
 import { terminalService } from '@/services/terminal-service';
 import { useAgentStore } from '@/stores/agent-store';
 import { useAuthStore } from '@/stores/auth-store';
-import { useModelStore } from '@/stores/model-store';
 import { usePlanModeStore } from '@/stores/plan-mode-store';
+import { useProviderStore } from '@/stores/provider-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useSkillsStore } from '@/stores/skills-store';
 
@@ -73,15 +73,15 @@ class InitializationManager {
       await settingsStore.initialize();
       logger.info('[InitManager] ✓ Settings initialized');
 
-      // CRITICAL PATH: Load models (needed for chat UI)
+      // CRITICAL PATH: Load providers and models (needed for chat UI)
       // Auth uses fast init - only checks token, no network request
-      logger.info('[InitManager] Critical path: Models & Auth (fast)...');
-      const modelStore = useModelStore.getState();
+      logger.info('[InitManager] Critical path: Providers & Auth (fast)...');
+      const providerStore = useProviderStore.getState();
       const authStore = useAuthStore.getState();
 
       await Promise.all([
-        modelStore.loadModels().then(() => {
-          logger.info('[InitManager] ✓ Models loaded');
+        providerStore.initialize().then(() => {
+          logger.info('[InitManager] ✓ Providers & Models loaded');
         }),
         authStore.initAuthFast().then(() => {
           logger.info('[InitManager] ✓ Auth initialized (fast, no network)');

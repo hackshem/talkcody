@@ -24,6 +24,33 @@ vi.mock('@/services/ai-provider-service', () => ({
   },
 }));
 
+// Mock provider store
+const mockProviderStore = {
+  getProviderModel: vi.fn(() => ({
+    languageModel: {
+      provider: 'test',
+      modelId: 'test-model',
+    },
+    modelConfig: {
+      name: 'Test Model',
+      context_length: 128000,
+    },
+    providerId: 'test-provider',
+    modelKey: 'test-model',
+  })),
+  isModelAvailable: vi.fn(() => true),
+  availableModels: [],
+  apiKeys: {},
+  providers: new Map(),
+  customProviders: {},
+};
+
+vi.mock('@/stores/provider-store', () => ({
+  useProviderStore: {
+    getState: vi.fn(() => mockProviderStore),
+  },
+}));
+
 vi.mock('@/stores/settings-store', () => ({
   settingsManager: {
     getCurrentRootPath: vi.fn(() => '/test/path'),

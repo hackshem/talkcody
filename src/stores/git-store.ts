@@ -93,8 +93,6 @@ export const useGitStore = create<GitStore>((set, get) => ({
         gitService.getAllFileStatuses(repositoryPath),
       ]);
 
-      logger.info(`Git status refreshed for ${repositoryPath}`);
-      logger.info(`Loaded ${Object.keys(fileStatuses).length} file statuses`);
       if (Object.keys(fileStatuses).length > 0) {
         logger.debug('Sample file paths in status map:', Object.keys(fileStatuses).slice(0, 5));
       }
@@ -218,7 +216,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
     // Check if already fetching this file
     if (fetchingPromises.has(filePath)) {
       logger.debug(`Fetch already in progress for ${filePath}, waiting...`);
-      return fetchingPromises.get(filePath)!;
+      return fetchingPromises.get(filePath) as Promise<LineChange[]>;
     }
 
     // Cache miss - fetch from backend

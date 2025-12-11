@@ -4,7 +4,6 @@ export const GEMINI_25_FLASH_LITE = 'gemini-2.5-flash-lite';
 export const CODE_STARL = 'codestral';
 export const CLAUDE_HAIKU = 'claude-haiku-4.5';
 export const GROK_CODE_FAST = 'grok-code-fast-1';
-export const GLM_46 = 'glm-4.6';
 export const NANO_BANANA_PRO = 'gemini-3-pro-image';
 export const SCRIBE_V2_REALTIME = 'scribe-v2-realtime';
 
@@ -73,21 +72,6 @@ export type { ProviderIds as ProviderType } from '@/providers';
 
 // Re-export ModelConfig from types
 export type { ModelConfig } from '@/types/models';
-
-export function supportsImageOutput(model: string): boolean {
-  const modelKey = model.split('@')[0] || model;
-  return MODEL_CONFIGS[modelKey as keyof typeof MODEL_CONFIGS]?.imageOutput === true;
-}
-
-export function supportsImageInput(model: string): boolean {
-  const modelKey = model.split('@')[0] || model;
-  return MODEL_CONFIGS[modelKey as keyof typeof MODEL_CONFIGS]?.imageInput === true;
-}
-
-export function supportsAudioInput(model: string): boolean {
-  const modelKey = model.split('@')[0] || model;
-  return MODEL_CONFIGS[modelKey as keyof typeof MODEL_CONFIGS]?.audioInput === true;
-}
 
 // Get providers for a model
 export function getProvidersForModel(model: string): ProviderConfig[] {

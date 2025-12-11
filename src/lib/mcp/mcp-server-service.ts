@@ -17,9 +17,9 @@ export class MCPServerService {
     try {
       await this.db.execute(
         `INSERT INTO mcp_servers (
-          id, name, url, protocol, api_key, headers, stdio_command, stdio_args,
+          id, name, url, protocol, api_key, headers, stdio_command, stdio_args, stdio_env,
           is_enabled, is_built_in, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
         [
           data.id,
           data.name,
@@ -29,6 +29,7 @@ export class MCPServerService {
           JSON.stringify(data.headers || {}),
           data.stdio_command || null,
           JSON.stringify(data.stdio_args || []),
+          JSON.stringify(data.stdio_env || {}),
           data.is_enabled ?? true,
           data.is_built_in ?? false,
           now,
@@ -59,6 +60,7 @@ export class MCPServerService {
         headers: row.headers ? JSON.parse(row.headers) : {},
         stdio_command: row.stdio_command,
         stdio_args: row.stdio_args ? JSON.parse(row.stdio_args) : [],
+        stdio_env: row.stdio_env ? JSON.parse(row.stdio_env) : {},
         is_enabled: Boolean(row.is_enabled),
         is_built_in: Boolean(row.is_built_in),
         created_at: row.created_at,
@@ -85,6 +87,7 @@ export class MCPServerService {
         headers: row.headers ? JSON.parse(row.headers) : {},
         stdio_command: row.stdio_command,
         stdio_args: row.stdio_args ? JSON.parse(row.stdio_args) : [],
+        stdio_env: row.stdio_env ? JSON.parse(row.stdio_env) : {},
         is_enabled: Boolean(row.is_enabled),
         is_built_in: Boolean(row.is_built_in),
         created_at: row.created_at,
@@ -114,6 +117,7 @@ export class MCPServerService {
         headers: row.headers ? JSON.parse(row.headers) : {},
         stdio_command: row.stdio_command,
         stdio_args: row.stdio_args ? JSON.parse(row.stdio_args) : [],
+        stdio_env: row.stdio_env ? JSON.parse(row.stdio_env) : {},
         is_enabled: Boolean(row.is_enabled),
         is_built_in: Boolean(row.is_built_in),
         created_at: row.created_at,
@@ -160,6 +164,10 @@ export class MCPServerService {
     if (data.stdio_args !== undefined) {
       updateFields.push(`stdio_args = $${paramIndex++}`);
       values.push(JSON.stringify(data.stdio_args));
+    }
+    if (data.stdio_env !== undefined) {
+      updateFields.push(`stdio_env = $${paramIndex++}`);
+      values.push(JSON.stringify(data.stdio_env));
     }
     if (data.is_enabled !== undefined) {
       updateFields.push(`is_enabled = $${paramIndex++}`);

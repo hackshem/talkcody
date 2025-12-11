@@ -5,7 +5,7 @@ import { GROK_CODE_FAST } from '@/lib/models';
 import { providerRegistry } from '@/providers';
 import type { TursoClient } from '@/services/database/turso-client';
 import { databaseService } from '@/services/database-service';
-import type { ApiKeySettings } from '@/types/api-keys';
+import type { ApiKeySettings, CustomProviderApiKeys } from '@/types/api-keys';
 import type { ShortcutAction, ShortcutConfig, ShortcutSettings } from '@/types/shortcuts';
 import { DEFAULT_SHORTCUTS } from '@/types/shortcuts';
 
@@ -50,6 +50,9 @@ interface SettingsState {
 
   // Shortcuts
   shortcuts: ShortcutSettings;
+
+  // What's New
+  last_seen_version: string;
 
   // Internal state
   loading: boolean;
@@ -100,6 +103,11 @@ interface SettingsActions {
   setProviderBaseUrl: (providerId: string, baseUrl: string) => Promise<void>;
   getProviderBaseUrl: (providerId: string) => string | undefined;
 
+  // Custom Provider API Keys
+  setCustomProviderApiKey: (providerId: string, apiKey: string) => Promise<void>;
+  getCustomProviderApiKey: (providerId: string) => string | undefined;
+  getCustomProviderApiKeys: () => Promise<CustomProviderApiKeys>;
+
   // Use Coding Plan
   setProviderUseCodingPlan: (providerId: string, useCodingPlan: boolean) => Promise<void>;
   getProviderUseCodingPlan: (providerId: string) => boolean | undefined;
@@ -110,6 +118,10 @@ interface SettingsActions {
   getAllShortcuts: () => ShortcutSettings;
   setAllShortcuts: (shortcuts: ShortcutSettings) => Promise<void>;
   resetShortcutsToDefault: () => Promise<void>;
+
+  // What's New
+  setLastSeenVersion: (version: string) => Promise<void>;
+  getLastSeenVersion: () => string;
 
   // Convenience getters
   getModel: () => string;
@@ -143,6 +155,7 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'loading' | 'error' | 'isInitialized
   model_type_transcription: '',
   apiKeys: {} as ApiKeySettings,
   shortcuts: DEFAULT_SHORTCUTS,
+  last_seen_version: '',
 };
 
 // Database persistence layer
@@ -199,6 +212,7 @@ class SettingsDatabase {
       shortcut_fileSearch: JSON.stringify(DEFAULT_SHORTCUTS.fileSearch),
       shortcut_saveFile: JSON.stringify(DEFAULT_SHORTCUTS.saveFile),
       shortcut_openModelSettings: JSON.stringify(DEFAULT_SHORTCUTS.openModelSettings),
+      last_seen_version: '',
     };
 
     const now = Date.now();
@@ -303,10 +317,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         'model_type_image_generator',
         'model_type_transcription',
         'onboarding_completed',
+        'last_seen_version',
       ];
 
       // Add API key keys
-      for (const provider of providerRegistry.getAllProviders()) {
+      const allProviders = providerRegistry.getAllProviders();
+      logger.debug('[initialize] Loading API keys for providers', {
+        providerCount: allProviders.length,
+        providerIds: allProviders.map((p) => p.id),
+      });
+      for (const provider of allProviders) {
         keys.push(`api_key_${provider.id}`);
       }
 
@@ -319,11 +339,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
       // Parse API keys
       const apiKeys: Partial<ApiKeySettings> = {};
-      for (const provider of providerRegistry.getAllProviders()) {
+      for (const provider of allProviders) {
         const key = provider.id as keyof ApiKeySettings;
         const value = rawSettings[`api_key_${provider.id}`];
         apiKeys[key] = value || undefined;
       }
+      logger.debug('[initialize] Parsed API keys', {
+        apiKeyCount: Object.keys(apiKeys).length,
+        keysWithValues: Object.keys(apiKeys).filter((k) => apiKeys[k as keyof ApiKeySettings])
+          .length,
+      });
 
       // Parse shortcuts
       const shortcuts: Partial<ShortcutSettings> = {};
@@ -354,6 +379,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         model_type_transcription: rawSettings.model_type_transcription || '',
         apiKeys: apiKeys as ApiKeySettings,
         shortcuts: shortcuts as ShortcutSettings,
+        last_seen_version: rawSettings.last_seen_version || '',
         loading: false,
         isInitialized: true,
       });
@@ -529,14 +555,14 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   getApiKeys: () => {
     const apiKeys = get().apiKeys;
-    // logger.info('[getApiKeys] Retrieved API keys from store', {
-    //   totalKeys: Object.keys(apiKeys).length,
-    //   keysWithValues: Object.keys(apiKeys).filter((k) => apiKeys[k as keyof ApiKeySettings]).length,
-    //   keyStructure: Object.keys(apiKeys).map((k) => ({
-    //     key: k,
-    //     hasValue: !!apiKeys[k as keyof ApiKeySettings],
-    //   })),
-    // });
+    logger.debug('[getApiKeys] Retrieved API keys from store', {
+      totalKeys: Object.keys(apiKeys).length,
+      keysWithValues: Object.keys(apiKeys).filter((k) => apiKeys[k as keyof ApiKeySettings]).length,
+      keyStructure: Object.keys(apiKeys).map((k) => ({
+        key: k,
+        hasValue: !!apiKeys[k as keyof ApiKeySettings],
+      })),
+    });
     return apiKeys;
   },
 
@@ -572,6 +598,41 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     // We need to get this from the database directly since we don't cache it in state
     // For now, we'll return empty string and let the component handle async loading
     return undefined;
+  },
+
+  // Custom Provider API Keys
+  setCustomProviderApiKey: async (providerId: string, apiKey: string) => {
+    await settingsDb.set(`custom_api_key_${providerId}`, apiKey);
+    logger.info('Updated custom provider API key', {
+      provider: providerId,
+      hasKey: !!apiKey,
+    });
+  },
+
+  getCustomProviderApiKey: (providerId: string) => {
+    // We need to get this from the database directly since we don't cache it in state
+    // For now, we'll return undefined and let the component handle async loading
+    return undefined;
+  },
+
+  getCustomProviderApiKeys: async () => {
+    // Get custom provider configurations and extract API keys
+    try {
+      const { customProviderService } = await import('@/services/custom-provider-service');
+      const config = await customProviderService.getCustomProviders();
+
+      const apiKeys: CustomProviderApiKeys = {};
+      for (const [providerId, provider] of Object.entries(config.providers)) {
+        if (provider.apiKey) {
+          apiKeys[providerId] = provider.apiKey;
+        }
+      }
+
+      return apiKeys;
+    } catch (error) {
+      logger.warn('Failed to get custom provider API keys:', error);
+      return {};
+    }
   },
 
   // Use Coding Plan
@@ -622,6 +683,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   resetShortcutsToDefault: async () => {
     await get().setAllShortcuts(DEFAULT_SHORTCUTS);
+  },
+
+  // What's New
+  setLastSeenVersion: async (version: string) => {
+    await settingsDb.set('last_seen_version', version);
+    set({ last_seen_version: version });
+  },
+
+  getLastSeenVersion: () => {
+    return get().last_seen_version;
   },
 
   // Convenience getters
@@ -715,6 +786,15 @@ export const settingsManager = {
     return useSettingsStore.getState().getProviderBaseUrl(providerId);
   },
 
+  // Custom Provider API Keys
+  setCustomProviderApiKey: (providerId: string, apiKey: string) =>
+    useSettingsStore.getState().setCustomProviderApiKey(providerId, apiKey),
+  getCustomProviderApiKey: async (providerId: string) => {
+    await settingsDb.initialize();
+    return settingsDb.get(`custom_api_key_${providerId}`);
+  },
+  getCustomProviderApiKeys: () => useSettingsStore.getState().getCustomProviderApiKeys(),
+
   // Use Coding Plan
   setProviderUseCodingPlan: (providerId: string, useCodingPlan: boolean) =>
     useSettingsStore.getState().setProviderUseCodingPlan(providerId, useCodingPlan),
@@ -739,6 +819,10 @@ export const settingsManager = {
   setAllShortcuts: (shortcuts: ShortcutSettings) =>
     useSettingsStore.getState().setAllShortcuts(shortcuts),
   resetShortcutsToDefault: () => useSettingsStore.getState().resetShortcutsToDefault(),
+
+  // What's New
+  setLastSeenVersion: (version: string) => useSettingsStore.getState().setLastSeenVersion(version),
+  getLastSeenVersion: () => useSettingsStore.getState().getLastSeenVersion(),
 };
 
 // Export settingsDb for direct database access (used by ThemeProvider before store initialization)

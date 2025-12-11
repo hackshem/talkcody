@@ -1,5 +1,5 @@
 {
-  "version": "2025-12-03T09:04:36.255Z",
+  "version": "2025-12-11T02:03:46.626Z",
   "models": {
     "gpt-5-nano": {
       "name": "GPT-5 Nano",
@@ -16,7 +16,9 @@
       },
       "pricing": {
         "input": "0.00000005",
-        "output": "0.0000004"
+        "output": "0.0000004",
+        "cachedInput": "0.00000001",
+        "cacheCreation": "0"
       },
       "context_length": 400000
     },
@@ -35,7 +37,8 @@
       },
       "pricing": {
         "input": "0.00000125",
-        "output": "0.00001"
+        "output": "0.00001",
+        "cachedInput": "0.000000125"
       },
       "context_length": 400000
     },
@@ -54,7 +57,9 @@
       },
       "pricing": {
         "input": "0.00000025",
-        "output": "0.000002"
+        "output": "0.000002",
+        "cachedInput": "0.00000003",
+        "cacheCreation": "0"
       },
       "context_length": 400000
     },
@@ -73,7 +78,8 @@
       },
       "pricing": {
         "input": "0.00000125",
-        "output": "0.00001"
+        "output": "0.00001",
+        "cachedInput": "0.000000125"
       },
       "context_length": 400000
     },
@@ -92,7 +98,8 @@
       },
       "pricing": {
         "input": "0.00000025",
-        "output": "0.000002"
+        "output": "0.000002",
+        "cachedInput": "0.000000025"
       },
       "context_length": 400000
     },
@@ -111,7 +118,8 @@
       },
       "pricing": {
         "input": "0.0000003",
-        "output": "0.0000025"
+        "output": "0.0000025",
+        "cachedInput": "0.00000003"
       },
       "context_length": 1048576
     },
@@ -130,7 +138,8 @@
       },
       "pricing": {
         "input": "0.00000125",
-        "output": "0.00001"
+        "output": "0.00001",
+        "cachedInput": "0.000000125"
       },
       "context_length": 1048576
     },
@@ -149,7 +158,8 @@
       },
       "pricing": {
         "input": "0.000002",
-        "output": "0.000012"
+        "output": "0.000012",
+        "cachedInput": "0.0000002"
       },
       "context_length": 1048576
     },
@@ -168,7 +178,8 @@
       },
       "pricing": {
         "input": "0.0000001",
-        "output": "0.0000004"
+        "output": "0.0000004",
+        "cachedInput": "0.00000001"
       },
       "context_length": 1048576
     },
@@ -187,7 +198,9 @@
       },
       "pricing": {
         "input": "0.000005",
-        "output": "0.000025"
+        "output": "0.000025",
+        "cachedInput": "0.0000005",
+        "cacheCreation": "0.00000625"
       },
       "context_length": 200000
     },
@@ -206,7 +219,9 @@
       },
       "pricing": {
         "input": "0.000003",
-        "output": "0.000015"
+        "output": "0.000015",
+        "cachedInput": "0.0000003",
+        "cacheCreation": "0.00000375"
       },
       "context_length": 1000000
     },
@@ -225,7 +240,9 @@
       },
       "pricing": {
         "input": "0.000001",
-        "output": "0.000005"
+        "output": "0.000005",
+        "cachedInput": "0.0000001",
+        "cacheCreation": "0.00000125"
       },
       "context_length": 200000
     },
@@ -261,15 +278,18 @@
       "name": "Kimi K2 Thinking",
       "providers": [
         "aiGateway",
-        "openRouter"
+        "openRouter",
+        "moonshot"
       ],
       "providerMappings": {
         "aiGateway": "moonshotai/kimi-k2-thinking",
-        "openRouter": "moonshotai/kimi-k2-thinking"
+        "openRouter": "moonshotai/kimi-k2-thinking",
+        "moonshot": "kimi-k2-thinking-turbo"
       },
       "pricing": {
-        "input": "0.0000006",
-        "output": "0.0000025"
+        "input": "0.00000047",
+        "output": "0.000002",
+        "cachedInput": "0.000000141"
       },
       "context_length": 262144
     },
@@ -287,7 +307,8 @@
       },
       "pricing": {
         "input": "0.00000028",
-        "output": "0.00000042"
+        "output": "0.00000042",
+        "cachedInput": "0.000000028"
       },
       "context_length": 163840
     },
@@ -303,7 +324,8 @@
       },
       "pricing": {
         "input": "0.0000002",
-        "output": "0.0000015"
+        "output": "0.0000015",
+        "cachedInput": "0.00000002"
       },
       "context_length": 256000
     },
@@ -320,12 +342,14 @@
       },
       "pricing": {
         "input": "0.0000002",
-        "output": "0.0000005"
+        "output": "0.0000005",
+        "cachedInput": "0.00000005"
       },
       "context_length": 2000000
     },
     "glm-4.6": {
       "name": "GLM 4.6",
+      "imageInput": true,
       "providers": [
         "zhipu",
         "openRouter",
@@ -340,12 +364,35 @@
       },
       "pricing": {
         "input": "0.00000045",
-        "output": "0.0000018"
+        "output": "0.0000018",
+        "cachedInput": "0.00000011"
       },
       "context_length": 202752
     },
+    "glm-4.6v": {
+      "name": "GLM 4.6 V",
+      "imageInput": true,
+      "providers": [
+        "zhipu",
+        "openRouter",
+        "aiGateway",
+        "ollama"
+      ],
+      "providerMappings": {
+        "zhipu": "glm-4.6v",
+        "aiGateway": "zai/glm-4.6v",
+        "openRouter": "z-ai/glm-4.6v"
+      },
+      "pricing": {
+        "input": "0.0000003",
+        "output": "0.0000009",
+        "cachedInput": "0.00000005"
+      },
+      "context_length": 131072
+    },
     "minimax-m2": {
       "name": "MiniMax 2",
+      "imageInput": true,
       "providers": [
         "MiniMax",
         "aiGateway",

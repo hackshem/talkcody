@@ -7,6 +7,8 @@ import type { AgentDefinition } from '@/types/agent';
 import type { ApiKeySettings, AvailableModel } from '@/types/api-keys';
 import { MODEL_TYPE_SETTINGS_KEYS } from '@/types/model-types';
 import { agentRegistry } from './agents/agent-registry';
+import { customModelService } from './custom-model-service';
+import { customProviderService } from './custom-provider-service';
 import { modelSyncService } from './model-sync-service';
 import { modelTypeService } from './model-type-service';
 
@@ -33,7 +35,7 @@ export class ModelService {
     const apiKeys = await this.getApiKeys();
     const availableModels: AvailableModel[] = [];
 
-    // Iterate through all models
+    // Iterate through all built-in models
     for (const [modelKey, modelConfig] of Object.entries(MODEL_CONFIGS)) {
       if (!modelConfig) continue;
 
@@ -56,6 +58,49 @@ export class ModelService {
           priority: provider.priority,
         });
       }
+    }
+
+    // Add custom models
+    try {
+      const customModelsConfig = await customModelService.getCustomModels();
+      const enabledCustomProviders = await customProviderService.getEnabledCustomProviders();
+      const customProviderIds = new Set(enabledCustomProviders.map((p) => p.id));
+
+      for (const [modelKey, modelConfig] of Object.entries(customModelsConfig.models)) {
+        // Custom models have explicit providers, check if provider is available
+        for (const providerId of modelConfig.providers) {
+          // Check if it's a built-in provider with API key, or an enabled custom provider
+          const isBuiltInWithKey = this.hasApiKeyForProvider(providerId, apiKeys);
+          const isCustomProviderEnabled = customProviderIds.has(providerId);
+
+          if (isBuiltInWithKey || isCustomProviderEnabled) {
+            // Get provider name from built-in config or custom provider
+            let providerName = providerId;
+            const builtInConfig = PROVIDER_CONFIGS[providerId as keyof typeof PROVIDER_CONFIGS];
+            if (builtInConfig) {
+              providerName = builtInConfig.name;
+            } else {
+              const customProvider = enabledCustomProviders.find((p) => p.id === providerId);
+              if (customProvider) {
+                providerName = customProvider.name;
+              }
+            }
+
+            availableModels.push({
+              key: modelKey,
+              name: modelConfig.name,
+              provider: providerId,
+              providerName,
+              imageInput: modelConfig.imageInput ?? false,
+              imageOutput: modelConfig.imageOutput ?? false,
+              audioInput: modelConfig.audioInput ?? false,
+              priority: 100, // Custom models have lower priority than built-in
+            });
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to load custom models:', error);
     }
 
     // Sort by priority (lower number = higher priority) then by name
@@ -161,10 +206,30 @@ export class ModelService {
   async isModelAvailable(modelIdentifier: string): Promise<boolean> {
     const { modelKey, providerId } = this.parseModelIdentifier(modelIdentifier);
 
+    logger.debug(
+      `isModelAvailable: modelIdentifier=${modelIdentifier}, modelKey=${modelKey}, providerId=${providerId}`
+    );
+
     if (providerId) {
-      // Check specific provider
+      // Check specific provider - could be built-in or custom provider
       const apiKeys = await this.getApiKeys();
-      return this.hasApiKeyForProvider(providerId, apiKeys);
+      const hasBuiltInKey = this.hasApiKeyForProvider(providerId, apiKeys);
+      logger.debug(`isModelAvailable: hasBuiltInKey=${hasBuiltInKey}`);
+      if (hasBuiltInKey) {
+        return true;
+      }
+
+      // Check if it's an enabled custom provider
+      const enabledCustomProviders = await customProviderService.getEnabledCustomProviders();
+      const isCustomProviderEnabled = enabledCustomProviders.some((p) => p.id === providerId);
+      logger.debug(
+        `isModelAvailable: enabledCustomProviders=${enabledCustomProviders.map((p) => p.id).join(',')}, isCustomProviderEnabled=${isCustomProviderEnabled}`
+      );
+      if (isCustomProviderEnabled) {
+        return true;
+      }
+
+      return false;
     }
 
     // Check if any provider is available
@@ -179,14 +244,26 @@ export class ModelService {
     const { modelKey, providerId } = this.parseModelIdentifier(modelIdentifier);
 
     if (providerId) {
-      // Check specific provider
+      // Check specific provider - could be built-in or custom provider
       let apiKeys: ApiKeySettings;
       try {
         apiKeys = settingsManager.getApiKeysSync();
       } catch {
         apiKeys = {};
       }
-      return this.hasApiKeyForProvider(providerId, apiKeys);
+      const hasBuiltInKey = this.hasApiKeyForProvider(providerId, apiKeys);
+      if (hasBuiltInKey) {
+        return true;
+      }
+
+      // Check if it's an enabled custom provider (from cache)
+      const enabledCustomProviders = customProviderService.getEnabledCustomProvidersSync();
+      const isCustomProviderEnabled = enabledCustomProviders.some((p) => p.id === providerId);
+      if (isCustomProviderEnabled) {
+        return true;
+      }
+
+      return false;
     }
 
     // Check if any provider is available

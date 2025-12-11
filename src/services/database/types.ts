@@ -207,6 +207,7 @@ export interface MCPServer {
   headers?: Record<string, string>;
   stdio_command?: string;
   stdio_args?: string[];
+  stdio_env?: Record<string, string>;
   is_enabled: boolean;
   is_built_in: boolean;
   created_at: number;
@@ -222,6 +223,7 @@ export interface CreateMCPServerData {
   headers?: Record<string, string>;
   stdio_command?: string;
   stdio_args?: string[];
+  stdio_env?: Record<string, string>;
   is_enabled?: boolean;
   is_built_in?: boolean;
 }
@@ -234,6 +236,7 @@ export interface UpdateMCPServerData {
   headers?: Record<string, string>;
   stdio_command?: string;
   stdio_args?: string[];
+  stdio_env?: Record<string, string>;
   is_enabled?: boolean;
 }
 

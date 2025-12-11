@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useLocale } from '@/hooks/use-locale';
 import { getDocLinks } from '@/lib/doc-links';
 import { logger } from '@/lib/logger';
-import { useModelStore } from '@/stores/model-store';
+import { useProviderStore } from '@/stores/provider-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import type { AvailableModel } from '@/types/api-keys';
 
@@ -19,7 +19,9 @@ export function ModelSelectorButton() {
   const [open, setOpen] = useState(false);
 
   // Get available models from store
-  const { availableModels, isLoading, loadModels } = useModelStore();
+  const availableModels = useProviderStore((state) => state.availableModels);
+  const isLoading = useProviderStore((state) => state.isLoading);
+  const loadModels = useProviderStore((state) => state.initialize);
 
   // Get current model setting
   const modelTypeMain = useSettingsStore((state) => state.model_type_main);

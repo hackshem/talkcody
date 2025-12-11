@@ -6,23 +6,41 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { streamFetch } from '@/lib/tauri-fetch';
-import type { ProviderDefinition, ProviderRegistry } from './types';
+import type { ProviderRegistry } from './types';
 
 export const PROVIDER_CONFIGS: ProviderRegistry = {
-  aiGateway: {
-    id: 'aiGateway',
-    name: 'Vercel AI Gateway',
-    priority: 0,
-    apiKeyName: 'AI_GATEWAY_API_KEY',
+  MiniMax: {
+    id: 'MiniMax',
+    name: 'MiniMax',
+    priority: 2,
+    apiKeyName: 'MINIMAX_API_KEY',
     required: false,
-    type: 'custom',
+    type: 'openai-compatible',
+    supportsCodingPlan: true,
     createProvider: (apiKey: string) =>
-      createGateway({
-        headers: {
-          'http-referer': 'https://talkcody.com',
-          'x-title': 'TalkCody',
-        },
+      createOpenAICompatible({
         apiKey,
+        name: 'MINIMAX',
+        baseURL: 'https://api.minimaxi.com/v1',
+        fetch: streamFetch as typeof fetch,
+      }),
+  },
+
+  zhipu: {
+    id: 'zhipu',
+    name: 'Zhipu AI',
+    priority: 2,
+    apiKeyName: 'ZHIPU_API_KEY',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4/',
+    required: false,
+    type: 'openai-compatible',
+    supportsCodingPlan: true,
+    codingPlanBaseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
+    createProvider: (apiKey: string, baseUrl?: string) =>
+      createOpenAICompatible({
+        apiKey,
+        name: 'zhipu',
+        baseURL: baseUrl || 'https://open.bigmodel.cn/api/paas/v4/',
         fetch: streamFetch as typeof fetch,
       }),
   },
@@ -46,6 +64,24 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
             enabled: true,
           },
         },
+        fetch: streamFetch as typeof fetch,
+      }),
+  },
+
+  aiGateway: {
+    id: 'aiGateway',
+    name: 'Vercel AI Gateway',
+    priority: 0,
+    apiKeyName: 'AI_GATEWAY_API_KEY',
+    required: false,
+    type: 'custom',
+    createProvider: (apiKey: string) =>
+      createGateway({
+        headers: {
+          'http-referer': 'https://talkcody.com',
+          'x-title': 'TalkCody',
+        },
+        apiKey,
         fetch: streamFetch as typeof fetch,
       }),
   },
@@ -84,6 +120,13 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
       createAnthropic({
         apiKey,
         ...(baseUrl && { baseURL: baseUrl }),
+        // Add Authorization header for third-party APIs that use Bearer token auth
+        // Official Anthropic API uses x-api-key (handled by SDK), third-party APIs often use Bearer
+        ...(baseUrl && {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+        }),
         // Use Tauri fetch to bypass webview CORS restrictions
         // This works for both official Anthropic API and third-party compatible APIs
         fetch: streamFetch as typeof fetch,
@@ -103,39 +146,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
         apiKey,
         name: 'deepseek',
         baseURL: baseUrl || 'https://api.deepseek.com/v1/',
-        fetch: streamFetch as typeof fetch,
-      }),
-  },
-
-  zhipu: {
-    id: 'zhipu',
-    name: 'Zhipu AI',
-    priority: 2,
-    apiKeyName: 'ZHIPU_API_KEY',
-    baseUrl: 'https://open.bigmodel.cn/api/paas/v4/',
-    required: false,
-    type: 'openai-compatible',
-    createProvider: (apiKey: string, baseUrl?: string) =>
-      createOpenAICompatible({
-        apiKey,
-        name: 'zhipu',
-        baseURL: baseUrl || 'https://open.bigmodel.cn/api/paas/v4/',
-        fetch: streamFetch as typeof fetch,
-      }),
-  },
-
-  MiniMax: {
-    id: 'MiniMax',
-    name: 'MiniMax',
-    priority: 2,
-    apiKeyName: 'MINIMAX_API_KEY',
-    required: false,
-    type: 'openai-compatible',
-    createProvider: (apiKey: string) =>
-      createOpenAICompatible({
-        apiKey,
-        name: 'MINIMAX',
-        baseURL: 'https://api.minimaxi.com/v1',
         fetch: streamFetch as typeof fetch,
       }),
   },
@@ -188,6 +198,24 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
       }),
   },
 
+  moonshot: {
+    id: 'moonshot',
+    name: 'Moonshot',
+    priority: 2,
+    apiKeyName: 'MOONSHOT_API_KEY',
+    required: false,
+    type: 'openai-compatible',
+    supportsCodingPlan: true,
+    codingPlanBaseUrl: 'https://api.kimi.com/coding/v1',
+    createProvider: (apiKey: string) =>
+      createOpenAICompatible({
+        apiKey,
+        name: 'moonshot',
+        baseURL: 'https://api.moonshot.cn/v1',
+        fetch: streamFetch as typeof fetch,
+      }),
+  },
+
   tavily: {
     id: 'tavily',
     name: 'Tavily Web Search',
@@ -214,15 +242,7 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
 export type ProviderIds = keyof typeof PROVIDER_CONFIGS;
 export const PROVIDER_IDS = Object.keys(PROVIDER_CONFIGS) as ProviderIds[];
 
-// Helper functions
-export function getProviderDefinition(id: string): ProviderDefinition | undefined {
-  return PROVIDER_CONFIGS[id as ProviderIds];
-}
-
-export function getAllProviderDefinitions(): ProviderDefinition[] {
-  return Object.values(PROVIDER_CONFIGS);
-}
-
-export function getProviderApiKeyName(id: string): string | undefined {
-  return getProviderDefinition(id)?.apiKeyName;
-}
+// Providers that support Coding Plan feature
+export const PROVIDERS_WITH_CODING_PLAN = Object.entries(PROVIDER_CONFIGS)
+  .filter(([_, config]) => config.supportsCodingPlan)
+  .map(([id]) => id);

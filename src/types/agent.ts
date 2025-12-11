@@ -38,6 +38,7 @@ export interface MessageAttachment {
 export interface ConvertMessagesOptions {
   rootPath?: string;
   systemPrompt?: string;
+  model?: string;
 }
 
 export interface AgentLoopOptions {

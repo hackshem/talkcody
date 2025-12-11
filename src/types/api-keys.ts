@@ -1,12 +1,16 @@
 // src/types/api-keys.ts
 import type { ProviderDefinition, ProviderIds } from '@/providers';
+import type { CustomProviderConfig } from '@/types/custom-provider';
 
 // Re-export ProviderDefinition as ProviderConfig for backward compatibility
 export type ProviderConfig = ProviderDefinition;
 
-// Generate ApiKeySettings from provider definitions
+// Generate ApiKeySettings from provider definitions (including custom providers)
 export type ApiKeySettings = {
-  [K in ProviderIds]?: string;
+  [K in ProviderIds | string]?: string; // Include custom provider IDs
+} & {
+  // Custom provider API keys
+  [K in `custom_${string}`]?: string;
 };
 
 export interface ModelProviderMapping {
@@ -23,4 +27,9 @@ export interface AvailableModel {
   imageOutput: boolean;
   audioInput: boolean;
   priority: number;
+}
+
+// Custom provider API key mapping
+export interface CustomProviderApiKeys {
+  [providerId: string]: string;
 }

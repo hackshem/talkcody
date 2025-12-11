@@ -22,10 +22,10 @@ import { commandExecutor } from '@/services/commands/command-executor';
 import { databaseService } from '@/services/database-service';
 import { executionService } from '@/services/execution-service';
 import { messageService } from '@/services/message-service';
-import { modelService } from '@/services/model-service';
 import { previewSystemPrompt } from '@/services/prompt/preview';
 import { getValidatedWorkspaceRoot } from '@/services/workspace-root-service';
 import { useExecutionStore } from '@/stores/execution-store';
+import { modelService } from '@/stores/provider-store';
 import { settingsManager, useSettingsStore } from '@/stores/settings-store';
 import { useTaskStore } from '@/stores/task-store';
 import type { MessageAttachment, UIMessage } from '@/types/agent';
@@ -300,9 +300,7 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
           }
         }
 
-        logger.info('Using system prompt:', systemPrompt);
         const tools = agent?.tools ?? {};
-        logger.info('Using tools:', Object.keys(tools));
 
         // Use executionService for proper message persistence
         await executionService.startExecution(

@@ -87,6 +87,10 @@ TalkCody uses a two-tier architecture with React 19 + TypeScript frontend and Ta
 
 Check out our **[ROADMAP](https://talkcody.com/docs/open-source/roadmap)** to see what we are working on and the future direction of TalkCody.
 
+## Changelog
+
+See **[CHANGELOG](https://talkcody.com/docs/changelog)** for version history and release notes.
+
 ## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.

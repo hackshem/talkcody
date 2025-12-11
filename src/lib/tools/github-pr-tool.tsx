@@ -60,6 +60,13 @@ export interface GitHubPRResult {
   data?: GitHubPRInfo | GitHubPRFile[] | string | GitHubPRComment[];
   rateLimitRemaining?: number;
   error?: string;
+  pagination?: {
+    page: number;
+    perPage: number;
+    hasMore: boolean;
+    totalReturned: number;
+  };
+  filteredBy?: string;
 }
 
 // Parse GitHub PR URL to extract owner, repo, and PR number
@@ -86,6 +93,23 @@ function getGitHubHeaders(acceptType?: string): Record<string, string> {
     'User-Agent': 'TalkCody-GitHub-PR-Tool',
     'X-GitHub-Api-Version': '2022-11-28',
   };
+}
+
+// Match filename against a glob-like pattern
+function matchFilename(filename: string, pattern: string): boolean {
+  // Convert glob pattern to regex
+  // *.ts -> matches any .ts file
+  // src/** -> matches anything under src/
+  // src/*.ts -> matches .ts files directly in src/
+  const regexPattern = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape special regex chars except * and ?
+    .replace(/\*\*/g, '<<<GLOBSTAR>>>') // Temporarily replace **
+    .replace(/\*/g, '[^/]*') // * matches anything except /
+    .replace(/<<<GLOBSTAR>>>/g, '.*') // ** matches anything including /
+    .replace(/\?/g, '[^/]'); // ? matches single char except /
+
+  const regex = new RegExp(`^${regexPattern}$`);
+  return regex.test(filename);
 }
 
 // Fetch PR basic information
@@ -122,20 +146,31 @@ async function fetchPRInfo(
   }
 }
 
-// Fetch PR changed files
+// Fetch PR changed files with pagination support
 async function fetchPRFiles(
   owner: string,
   repo: string,
-  prNumber: number
-): Promise<{ data?: GitHubPRFile[]; rateLimitRemaining?: number; error?: string }> {
+  prNumber: number,
+  options?: { page?: number; perPage?: number; filenameFilter?: string }
+): Promise<{
+  data?: GitHubPRFile[];
+  rateLimitRemaining?: number;
+  error?: string;
+  pagination?: { page: number; perPage: number; hasMore: boolean; totalReturned: number };
+  filteredBy?: string;
+}> {
   try {
-    const response = await fetchWithTimeout(
-      `${GITHUB_API_BASE}/repos/${owner}/${repo}/pulls/${prNumber}/files`,
-      {
-        headers: getGitHubHeaders(),
-        timeout: 30000,
-      }
-    );
+    const page = options?.page || 1;
+    const perPage = Math.min(options?.perPage || 30, 100); // Max 100 per GitHub API
+
+    const url = new URL(`${GITHUB_API_BASE}/repos/${owner}/${repo}/pulls/${prNumber}/files`);
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('per_page', String(perPage));
+
+    const response = await fetchWithTimeout(url.toString(), {
+      headers: getGitHubHeaders(),
+      timeout: 30000,
+    });
 
     const rateLimitRemaining = parseInt(response.headers.get('X-RateLimit-Remaining') || '0', 10);
 
@@ -147,8 +182,30 @@ async function fetchPRFiles(
       };
     }
 
-    const data = (await response.json()) as GitHubPRFile[];
-    return { data, rateLimitRemaining };
+    let data = (await response.json()) as GitHubPRFile[];
+
+    // Apply filename filter if provided
+    let filteredBy: string | undefined;
+    if (options?.filenameFilter) {
+      data = data.filter((file) => matchFilename(file.filename, options.filenameFilter!));
+      filteredBy = options.filenameFilter;
+    }
+
+    // Check if there are more pages (GitHub returns Link header)
+    const linkHeader = response.headers.get('Link');
+    const hasMore = linkHeader ? linkHeader.includes('rel="next"') : false;
+
+    return {
+      data,
+      rateLimitRemaining,
+      pagination: {
+        page,
+        perPage,
+        hasMore,
+        totalReturned: data.length,
+      },
+      filteredBy,
+    };
   } catch (error) {
     return {
       error: `Failed to fetch PR files: ${error instanceof Error ? error.message : String(error)}`,
@@ -156,13 +213,53 @@ async function fetchPRFiles(
   }
 }
 
-// Fetch PR diff
+// Fetch PR diff - supports filename filter by using files endpoint
 async function fetchPRDiff(
   owner: string,
   repo: string,
-  prNumber: number
-): Promise<{ data?: string; rateLimitRemaining?: number; error?: string }> {
+  prNumber: number,
+  options?: { filenameFilter?: string; page?: number; perPage?: number }
+): Promise<{
+  data?: string;
+  rateLimitRemaining?: number;
+  error?: string;
+  pagination?: { page: number; perPage: number; hasMore: boolean; totalReturned: number };
+  filteredBy?: string;
+}> {
   try {
+    // If filename filter is provided, use files endpoint and extract patches
+    if (options?.filenameFilter) {
+      const filesResult = await fetchPRFiles(owner, repo, prNumber, {
+        page: options.page,
+        perPage: options.perPage,
+        filenameFilter: options.filenameFilter,
+      });
+
+      if (filesResult.error) {
+        return { error: filesResult.error, rateLimitRemaining: filesResult.rateLimitRemaining };
+      }
+
+      // Combine patches from filtered files into a single diff string
+      const diffParts: string[] = [];
+      for (const file of filesResult.data || []) {
+        if (file.patch) {
+          diffParts.push(`diff --git a/${file.filename} b/${file.filename}`);
+          diffParts.push(`--- a/${file.filename}`);
+          diffParts.push(`+++ b/${file.filename}`);
+          diffParts.push(file.patch);
+          diffParts.push(''); // Empty line between files
+        }
+      }
+
+      return {
+        data: diffParts.join('\n'),
+        rateLimitRemaining: filesResult.rateLimitRemaining,
+        pagination: filesResult.pagination,
+        filteredBy: filesResult.filteredBy,
+      };
+    }
+
+    // No filter - fetch full diff
     const response = await fetchWithTimeout(
       `${GITHUB_API_BASE}/repos/${owner}/${repo}/pulls/${prNumber}`,
       {
@@ -230,18 +327,45 @@ This tool works cross-platform without requiring the gh CLI.
 
 Actions:
 - info: Get PR metadata (title, author, state, branch info, stats)
-- files: Get list of changed files with patch content
-- diff: Get the complete diff for the PR
+- files: Get list of changed files with patch content (supports pagination and filename filter)
+- diff: Get the diff for the PR (supports filename filter to get specific files only)
 - comments: Get review comments on the PR
+
+Pagination (for files/diff actions):
+- page: Page number (starts from 1)
+- perPage: Items per page (max 100, default 30)
+
+Filename filter (for files/diff actions):
+- filenameFilter: Glob pattern to filter files (e.g., "*.ts", "src/**", "src/*.tsx")
+
+Examples:
+- Get first 30 files: { action: "files", page: 1 }
+- Get only .ts files: { action: "files", filenameFilter: "*.ts" }
+- Get diff for src folder only: { action: "diff", filenameFilter: "src/**" }
 
 Note: For public repositories only. Rate limited to 60 requests/hour without authentication.`,
   inputSchema: z.object({
     url: z.string().describe('Full GitHub PR URL (e.g., https://github.com/owner/repo/pull/123)'),
     action: z.enum(['info', 'files', 'diff', 'comments']).describe('The type of PR data to fetch'),
+    page: z
+      .number()
+      .optional()
+      .describe('Page number for pagination (starts from 1). Only for files/diff actions.'),
+    perPage: z
+      .number()
+      .max(100)
+      .optional()
+      .describe('Items per page (max 100, default 30). Only for files/diff actions.'),
+    filenameFilter: z
+      .string()
+      .optional()
+      .describe(
+        'Glob pattern to filter files (e.g., "*.ts", "src/**"). Only for files/diff actions.'
+      ),
   }),
   canConcurrent: true,
   hidden: true,
-  execute: async ({ url, action }): Promise<GitHubPRResult> => {
+  execute: async ({ url, action, page, perPage, filenameFilter }): Promise<GitHubPRResult> => {
     const parsed = parseGitHubPRUrl(url);
 
     if (!parsed) {
@@ -269,7 +393,7 @@ Note: For public repositories only. Rate limited to 60 requests/hour without aut
       }
 
       case 'files': {
-        const result = await fetchPRFiles(owner, repo, prNumber);
+        const result = await fetchPRFiles(owner, repo, prNumber, { page, perPage, filenameFilter });
         return {
           success: !result.error,
           action,
@@ -277,11 +401,13 @@ Note: For public repositories only. Rate limited to 60 requests/hour without aut
           data: result.data,
           rateLimitRemaining: result.rateLimitRemaining,
           error: result.error,
+          pagination: result.pagination,
+          filteredBy: result.filteredBy,
         };
       }
 
       case 'diff': {
-        const result = await fetchPRDiff(owner, repo, prNumber);
+        const result = await fetchPRDiff(owner, repo, prNumber, { filenameFilter, page, perPage });
         return {
           success: !result.error,
           action,
@@ -289,6 +415,8 @@ Note: For public repositories only. Rate limited to 60 requests/hour without aut
           data: result.data,
           rateLimitRemaining: result.rateLimitRemaining,
           error: result.error,
+          pagination: result.pagination,
+          filteredBy: result.filteredBy,
         };
       }
 

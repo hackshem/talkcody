@@ -853,12 +853,6 @@ pub fn run() {
                         app_state.window_registry.cleanup_all_watchers();
                     }
 
-                    // Close database connection to release file handles
-                    if let Some(db) = window.try_state::<Arc<Database>>() {
-                        log::info!("Closing database connection on app exit");
-                        db.inner().close_sync();
-                    }
-
                     log::info!("Resource cleanup completed");
                 }
             }
@@ -874,6 +868,12 @@ pub fn run() {
                 // Send session_end synchronously before exit
                 if let Some(analytics_state) = app_handle.try_state::<AnalyticsState>() {
                     analytics::send_session_end_sync(analytics_state.inner());
+                }
+
+                // Close database connection to release file handles
+                if let Some(db) = app_handle.try_state::<Arc<Database>>() {
+                    log::info!("Closing database connection on app exit");
+                    db.inner().close_sync();
                 }
 
                 log::info!("session_end sent, app will exit now");

@@ -42,6 +42,9 @@ export class TursoDatabaseInit {
       // Migration 2: Add model_type field to agents table
       await TursoDatabaseInit.migrateAgentsModelType(db);
 
+      // Migration 3: Add stdio_env field to mcp_servers table
+      await TursoDatabaseInit.migrateMCPServersStdioEnv(db);
+
       logger.info('✅ Database migrations check completed');
     } catch (error) {
       logger.error('❌ Database migration error:', error);
@@ -111,6 +114,34 @@ export class TursoDatabaseInit {
       }
     } catch (error) {
       logger.error('Error migrating agents table model_type:', error);
+      // Don't throw - allow app to continue
+    }
+  }
+
+  /**
+   * Add stdio_env field to mcp_servers table for environment variables
+   */
+  private static async migrateMCPServersStdioEnv(db: TursoClient): Promise<void> {
+    try {
+      // Check if the migration is needed by checking if stdio_env column exists
+      const result = await (db as any).execute(`
+        SELECT COUNT(*) as count
+        FROM pragma_table_info('mcp_servers')
+        WHERE name = 'stdio_env'
+      `);
+
+      const columnExists = result.rows[0]?.count > 0;
+
+      if (!columnExists) {
+        logger.info('Migrating mcp_servers table to add stdio_env field...');
+
+        // Add stdio_env column with default empty object
+        await (db as any).execute(`ALTER TABLE mcp_servers ADD COLUMN stdio_env TEXT DEFAULT '{}'`);
+
+        logger.info('✅ MCP servers table stdio_env migration completed');
+      }
+    } catch (error) {
+      logger.error('Error migrating mcp_servers table stdio_env:', error);
       // Don't throw - allow app to continue
     }
   }

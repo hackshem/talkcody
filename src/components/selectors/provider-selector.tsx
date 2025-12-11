@@ -1,8 +1,7 @@
 // src/components/selectors/provider-selector.tsx
 
 import { useMemo } from 'react';
-import { getProvidersForModel } from '@/lib/models';
-import { useModelStore } from '@/stores/model-store';
+import { useProviderStore } from '@/stores/provider-store';
 import { BaseSelector } from './base-selector';
 
 interface ProviderSelectorProps {
@@ -20,7 +19,7 @@ export function ProviderSelector({
   placeholder = 'Select provider',
   disabled = false,
 }: ProviderSelectorProps) {
-  const { availableModels } = useModelStore();
+  const availableModels = useProviderStore((state) => state.availableModels);
 
   // Get available providers for the selected model
   const providerItems = useMemo(() => {

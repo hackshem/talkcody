@@ -3,6 +3,7 @@ import { BaseDirectory, exists, readTextFile, writeTextFile } from '@tauri-apps/
 import { logger } from '@/lib/logger';
 import type { ProxyRequest, ProxyResponse } from '@/lib/tauri-fetch';
 import { PROVIDER_CONFIGS, type ProviderIds } from '@/providers/provider_config';
+import { customProviderService } from '@/services/custom-provider-service';
 import { settingsManager } from '@/stores/settings-store';
 import type { ModelConfig, ModelsConfiguration } from '@/types/models';
 
@@ -32,6 +33,7 @@ const PROVIDER_MODELS_ENDPOINTS: Record<string, string | null> = {
   anthropic: 'https://api.anthropic.com/v1/models',
   google: 'https://generativelanguage.googleapis.com/v1beta/models', // API key as query param
   aiGateway: 'https://ai-gateway.vercel.sh/v1/models',
+  moonshot: 'https://api.moonshot.cn/v1/models',
   // Non-AI providers, no need to test
   tavily: null,
   elevenlabs: null,
@@ -114,11 +116,34 @@ class CustomModelService {
   }
 
   /**
-   * Add a custom model
+   * Add a custom model. If model already exists, merges providers instead of replacing.
    */
   async addCustomModel(modelId: string, modelConfig: ModelConfig): Promise<void> {
     const config = await this.getCustomModels();
-    config.models[modelId] = modelConfig;
+    const existingModel = config.models[modelId];
+
+    if (existingModel) {
+      // Model exists - merge providers (deduplicate)
+      const mergedProviders = Array.from(
+        new Set([...existingModel.providers, ...modelConfig.providers])
+      );
+
+      // Merge providerMappings
+      const mergedMappings = {
+        ...existingModel.providerMappings,
+        ...modelConfig.providerMappings,
+      };
+
+      config.models[modelId] = {
+        ...existingModel,
+        ...modelConfig,
+        providers: mergedProviders,
+        providerMappings: Object.keys(mergedMappings).length > 0 ? mergedMappings : undefined,
+      };
+    } else {
+      config.models[modelId] = modelConfig;
+    }
+
     await this.saveCustomModels(config);
 
     // Dispatch event to notify UI
@@ -126,11 +151,38 @@ class CustomModelService {
   }
 
   /**
-   * Add multiple custom models at once
+   * Add multiple custom models at once. If model already exists, merges providers instead of replacing.
    */
   async addCustomModels(models: Record<string, ModelConfig>): Promise<void> {
     const config = await this.getCustomModels();
-    config.models = { ...config.models, ...models };
+
+    for (const [modelId, newModelConfig] of Object.entries(models)) {
+      const existingModel = config.models[modelId];
+
+      if (existingModel) {
+        // Model exists - merge providers (deduplicate)
+        const mergedProviders = Array.from(
+          new Set([...existingModel.providers, ...newModelConfig.providers])
+        );
+
+        // Merge providerMappings
+        const mergedMappings = {
+          ...existingModel.providerMappings,
+          ...newModelConfig.providerMappings,
+        };
+
+        config.models[modelId] = {
+          ...existingModel,
+          ...newModelConfig,
+          providers: mergedProviders,
+          providerMappings: Object.keys(mergedMappings).length > 0 ? mergedMappings : undefined,
+        };
+      } else {
+        // New model - add directly
+        config.models[modelId] = newModelConfig;
+      }
+    }
+
     await this.saveCustomModels(config);
 
     // Dispatch event to notify UI
@@ -168,7 +220,12 @@ class CustomModelService {
    * Check if provider supports fetching models list
    */
   supportsModelsFetch(providerId: string): boolean {
-    return PROVIDER_MODELS_ENDPOINTS[providerId] !== null;
+    // Built-in providers have explicit endpoint definitions
+    if (providerId in PROVIDER_MODELS_ENDPOINTS) {
+      return PROVIDER_MODELS_ENDPOINTS[providerId] !== null;
+    }
+    // Custom providers always support models fetch (via /v1/models)
+    return true;
   }
 
   /**
@@ -183,24 +240,42 @@ class CustomModelService {
    */
   async fetchProviderModels(providerId: string): Promise<FetchedModel[]> {
     let endpoint = this.getModelsEndpoint(providerId);
-    if (!endpoint) {
-      throw new Error(`Provider ${providerId} does not support models listing`);
-    }
+    let apiKey: string | undefined;
+    let isCustomProvider = false;
+    let customProviderType: 'openai-compatible' | 'anthropic' | undefined;
 
-    // Check if user has set a custom base URL (for providers like Anthropic, OpenAI)
-    const customBaseUrl = await settingsManager.getProviderBaseUrl(providerId);
-    if (customBaseUrl) {
-      // Use custom base URL to construct models endpoint
-      // Remove trailing slashes and append /models
-      endpoint = customBaseUrl.replace(/\/+$/, '') + '/models';
-      logger.info(`Using custom base URL for ${providerId}: ${endpoint}`);
-    }
+    // Check if this is a custom provider
+    const customProviders = await customProviderService.getEnabledCustomProviders();
+    const customProvider = customProviders.find((p) => p.id === providerId);
 
-    // Get API key for the provider
-    const apiKey = settingsManager.getProviderApiKey(providerId);
+    if (customProvider) {
+      // Custom provider - use its base URL and API key
+      isCustomProvider = true;
+      customProviderType = customProvider.type;
+      endpoint = customProvider.baseUrl.replace(/\/+$/, '') + '/v1/models';
+      apiKey = customProvider.apiKey;
+      logger.info(`Using custom provider ${providerId}: ${endpoint}`);
+    } else {
+      // Built-in provider
+      if (!endpoint) {
+        throw new Error(`Provider ${providerId} does not support models listing`);
+      }
+
+      // Check if user has set a custom base URL (for providers like Anthropic, OpenAI)
+      const customBaseUrl = await settingsManager.getProviderBaseUrl(providerId);
+      if (customBaseUrl) {
+        // Use custom base URL to construct models endpoint
+        // Remove trailing slashes and append /models
+        endpoint = customBaseUrl.replace(/\/+$/, '') + '/models';
+        logger.info(`Using custom base URL for ${providerId}: ${endpoint}`);
+      }
+
+      // Get API key for the provider
+      apiKey = settingsManager.getProviderApiKey(providerId);
+    }
 
     // For local providers (ollama, lmstudio), API key is optional
-    if (!apiKey && !isLocalProvider(providerId)) {
+    if (!apiKey && !isLocalProvider(providerId) && !isCustomProvider) {
       throw new Error(`No API key configured for provider ${providerId}`);
     }
 
@@ -210,9 +285,13 @@ class CustomModelService {
         Accept: 'application/json',
       };
 
-      // Provider-specific authentication (apiKey is guaranteed to exist for non-local providers)
-      if (providerId === 'anthropic' && apiKey) {
-        // Anthropic uses x-api-key header
+      // Provider-specific authentication
+      if (isCustomProvider && customProviderType === 'anthropic' && apiKey) {
+        // Custom Anthropic provider uses x-api-key header
+        headers['x-api-key'] = apiKey;
+        headers['anthropic-version'] = '2023-06-01';
+      } else if (providerId === 'anthropic' && apiKey) {
+        // Built-in Anthropic uses x-api-key header
         headers['x-api-key'] = apiKey;
         headers['anthropic-version'] = '2023-06-01';
       } else if (providerId === 'google' && apiKey) {
@@ -224,7 +303,7 @@ class CustomModelService {
         headers['HTTP-Referer'] = 'https://talkcody.com';
         headers['X-Title'] = 'TalkCody';
       } else if (apiKey && !isLocalProvider(providerId)) {
-        // Default: Bearer token
+        // Default: Bearer token (for OpenAI-compatible and custom providers)
         headers['Authorization'] = `Bearer ${apiKey}`;
       }
 
@@ -281,10 +360,12 @@ class CustomModelService {
 
   /**
    * Get list of providers that support models fetching and have API keys configured
+   * Includes both built-in providers and custom providers
    */
-  getAvailableProvidersForFetch(): Array<{ id: string; name: string }> {
+  async getAvailableProvidersForFetch(): Promise<Array<{ id: string; name: string }>> {
     const providers: Array<{ id: string; name: string }> = [];
 
+    // Add built-in providers
     for (const [providerId, endpoint] of Object.entries(PROVIDER_MODELS_ENDPOINTS)) {
       if (endpoint === null) continue;
 
@@ -303,6 +384,19 @@ class CustomModelService {
           name: providerConfig.name,
         });
       }
+    }
+
+    // Add custom providers (they all support models fetching via /v1/models)
+    try {
+      const customProviders = await customProviderService.getEnabledCustomProviders();
+      for (const customProvider of customProviders) {
+        providers.push({
+          id: customProvider.id,
+          name: customProvider.name,
+        });
+      }
+    } catch (error) {
+      logger.warn('Failed to load custom providers for model fetch:', error);
     }
 
     return providers;

@@ -1,8 +1,11 @@
 import { ChevronDown, ChevronRight, ExternalLink, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { CustomProviderSection } from '@/components/custom-provider/CustomProviderSection';
+import { ProviderIcon } from '@/components/settings/provider-icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { HelpTooltip } from '@/components/ui/help-tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,9 +14,11 @@ import { useLocale } from '@/hooks/use-locale';
 import { getDocLinks } from '@/lib/doc-links';
 import { logger } from '@/lib/logger';
 import { simpleFetch } from '@/lib/tauri-fetch';
-import { PROVIDER_CONFIGS } from '@/providers';
-import { aiProviderService } from '@/services/ai-provider-service';
+import { cn } from '@/lib/utils';
+import { PROVIDER_CONFIGS, PROVIDERS_WITH_CODING_PLAN } from '@/providers';
 import { customModelService, isLocalProvider } from '@/services/custom-model-service';
+import { databaseService } from '@/services/database-service';
+import { useProviderStore } from '@/stores/provider-store';
 import { settingsManager } from '@/stores/settings-store';
 import type { ApiKeySettings } from '@/types/api-keys';
 
@@ -35,6 +40,55 @@ export function ApiKeysSettings() {
     [key: string]: ReturnType<typeof setTimeout>;
   }>({});
   const [baseUrlExpanded, setBaseUrlExpanded] = useState<Record<string, boolean>>({});
+  const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
+
+  // Sync API key to Coding Plan MCP servers when enabled
+  const syncCodingPlanMcpApiKey = useCallback(async (providerId: string, apiKey: string) => {
+    if (!apiKey) return;
+
+    try {
+      if (providerId === 'MiniMax') {
+        // Sync to minimax-coding-plan MCP
+        const server = await databaseService.getMCPServer('minimax-coding-plan');
+        if (server) {
+          const env = server.stdio_env || {};
+          env.MINIMAX_API_KEY = apiKey;
+          if (!env.MINIMAX_API_HOST) {
+            env.MINIMAX_API_HOST = 'https://api.minimaxi.com';
+          }
+          await databaseService.updateMCPServer('minimax-coding-plan', {
+            stdio_env: env,
+          });
+          logger.info('Synced API key to minimax-coding-plan MCP');
+        }
+      } else if (providerId === 'zhipu') {
+        // Sync to 3 GLM Coding Plan MCPs
+        const glmHttpServers = ['glm-coding-plan-reader', 'glm-coding-plan-search'];
+        for (const serverId of glmHttpServers) {
+          const server = await databaseService.getMCPServer(serverId);
+          if (server) {
+            await databaseService.updateMCPServer(serverId, {
+              headers: { Authorization: `Bearer ${apiKey}` },
+            });
+            logger.info(`Synced API key to ${serverId} MCP`);
+          }
+        }
+
+        // glm-coding-plan-vision uses stdio
+        const visionServer = await databaseService.getMCPServer('glm-coding-plan-vision');
+        if (visionServer) {
+          const env = visionServer.stdio_env || {};
+          env.Z_AI_API_KEY = apiKey;
+          await databaseService.updateMCPServer('glm-coding-plan-vision', {
+            stdio_env: env,
+          });
+          logger.info('Synced API key to glm-coding-plan-vision MCP');
+        }
+      }
+    } catch (error) {
+      logger.error(`Failed to sync API key to Coding Plan MCP for ${providerId}:`, error);
+    }
+  }, []);
 
   // Load settings when component mounts
   useEffect(() => {
@@ -52,8 +106,8 @@ export function ApiKeysSettings() {
             loadedBaseUrls[providerId] = baseUrl;
           }
 
-          // Load useCodingPlan setting for Zhipu
-          if (providerId === 'zhipu') {
+          // Load useCodingPlan setting for providers that support it
+          if (PROVIDERS_WITH_CODING_PLAN.includes(providerId)) {
             const useCodingPlan = await settingsManager.getProviderUseCodingPlan(providerId);
             loadedUseCodingPlanSettings[providerId] = useCodingPlan;
           }
@@ -106,7 +160,7 @@ export function ApiKeysSettings() {
         await settingsManager.setProviderBaseUrl(providerId, value);
         logger.info('Model service cache invalidated after base URL update');
         // Refresh providers after base URL change
-        await aiProviderService.refreshProviders();
+        await useProviderStore.getState().setBaseUrl(providerId, value);
         logger.info(`${providerId} base URL updated`);
       } catch (error) {
         logger.error(`Failed to update ${providerId} base URL:`, error);
@@ -123,8 +177,17 @@ export function ApiKeysSettings() {
     try {
       await settingsManager.setProviderUseCodingPlan(providerId, value);
       logger.info('Model service cache invalidated after useCodingPlan update');
+
+      // Sync API key to Coding Plan MCP servers when enabled
+      if (value) {
+        await syncCodingPlanMcpApiKey(
+          providerId,
+          apiKeys[providerId as keyof ApiKeySettings] || ''
+        );
+      }
+
       // Refresh providers after useCodingPlan change
-      await aiProviderService.refreshProviders();
+      await useProviderStore.getState().refresh();
       logger.info(`${providerId} useCodingPlan updated to ${value}`);
       toast.success(
         value
@@ -147,13 +210,14 @@ export function ApiKeysSettings() {
   // Helper function to save API key (extracted for reuse)
   const saveApiKey = async (providerId: string, value: string) => {
     try {
-      await settingsManager.setApiKeys({
-        [providerId]: value,
-      } as ApiKeySettings);
-      logger.info('Model service cache invalidated after API key update');
-      await aiProviderService.refreshProviders();
-      window.dispatchEvent(new CustomEvent('apiKeysUpdated'));
+      // Use provider store to set API key - this handles both persistence and provider rebuild
+      await useProviderStore.getState().setApiKey(providerId, value);
       logger.info(`${providerId} API key updated`);
+
+      // If Coding Plan is enabled, sync API key to MCP servers
+      if (PROVIDERS_WITH_CODING_PLAN.includes(providerId) && useCodingPlanSettings[providerId]) {
+        await syncCodingPlanMcpApiKey(providerId, value);
+      }
     } catch (error) {
       logger.error(`Failed to update ${providerId} API key:`, error);
     }
@@ -178,7 +242,7 @@ export function ApiKeysSettings() {
         await saveApiKey(providerId, currentKeyValue);
       } else {
         // Refresh providers first (only if no pending save)
-        await aiProviderService.refreshProviders();
+        await useProviderStore.getState().refresh();
       }
 
       // For local providers (Ollama, LM Studio), test the connection directly
@@ -237,7 +301,7 @@ export function ApiKeysSettings() {
           // Get the actual URL that will be tested (including custom base URL if set)
           const customBaseUrl = await settingsManager.getProviderBaseUrl(providerId);
           if (customBaseUrl) {
-            testedUrl = customBaseUrl.replace(/\/+$/, '') + '/models';
+            testedUrl = `${customBaseUrl.replace(/\/+$/, '')}/models`;
           } else {
             testedUrl = customModelService.getModelsEndpoint(providerId) || '';
           }
@@ -256,8 +320,7 @@ export function ApiKeysSettings() {
         }
       }
 
-      // Notify components that providers have been refreshed
-      window.dispatchEvent(new CustomEvent('apiKeysUpdated'));
+      // No need to dispatch events - Zustand handles reactivity automatically
     } catch (error) {
       logger.error(`Failed to test ${providerId} connection:`, error);
       const providerName = PROVIDER_CONFIGS[providerId]?.name || providerId;
@@ -271,189 +334,215 @@ export function ApiKeysSettings() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-lg">{t.Settings.apiKeys.title}</CardTitle>
-          <HelpTooltip
-            title={t.Settings.apiKeys.tooltipTitle}
-            description={t.Settings.apiKeys.tooltipDescription}
-            docUrl={getDocLinks().configuration.apiKeys}
-          />
-        </div>
-        <CardDescription>{t.Settings.apiKeys.description}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {Object.entries(PROVIDER_CONFIGS).map(([providerId, config]) => {
-          const currentKey = apiKeys[providerId as keyof ApiKeySettings] || '';
-          const isVisible = apiKeyVisibility[providerId] || false;
-          const isLocal = isLocalProvider(providerId);
-          const hasKey = isLocal ? currentKey === 'enabled' : currentKey.trim().length > 0;
+    <div className="space-y-6">
+      {/* Custom Providers Section - at the top */}
+      <CustomProviderSection />
 
-          return (
-            <div key={providerId} className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <Label htmlFor={`api-key-${providerId}`} className="flex items-center gap-2">
-                    <span className="font-medium">{config.name}</span>
-                    {hasKey && (
-                      <span className="text-green-600 text-xs bg-green-50 px-2 py-0.5 rounded-full">
-                        {t.Settings.apiKeys.configured}
-                      </span>
+      {/* Built-in Providers */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-lg">{t.Settings.apiKeys.title}</CardTitle>
+            <HelpTooltip
+              title={t.Settings.apiKeys.tooltipTitle}
+              description={t.Settings.apiKeys.tooltipDescription}
+              docUrl={getDocLinks().configuration.apiKeys}
+            />
+          </div>
+          <CardDescription>{t.Settings.apiKeys.description}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {Object.entries(PROVIDER_CONFIGS).map(([providerId, config]) => {
+            const currentKey = apiKeys[providerId as keyof ApiKeySettings] || '';
+            const isVisible = apiKeyVisibility[providerId] || false;
+            const isLocal = isLocalProvider(providerId);
+            const hasKey = isLocal ? currentKey === 'enabled' : currentKey.trim().length > 0;
+            const isExpanded = expandedProviders[providerId] ?? false;
+            const docLink =
+              getDocLinks().apiKeysProviders[
+                providerId as keyof ReturnType<typeof getDocLinks>['apiKeysProviders']
+              ];
+
+            return (
+              <Collapsible
+                key={providerId}
+                open={isExpanded}
+                onOpenChange={(open) =>
+                  setExpandedProviders((prev) => ({ ...prev, [providerId]: open }))
+                }
+                className="border rounded-lg"
+              >
+                <CollapsibleTrigger className="flex items-center gap-2 w-full p-3 hover:bg-muted/50 transition-colors rounded-lg">
+                  <ChevronRight
+                    className={cn(
+                      'h-4 w-4 shrink-0 transition-transform duration-200',
+                      isExpanded && 'rotate-90'
                     )}
-                    {getDocLinks().apiKeysProviders[
-                      providerId as keyof ReturnType<typeof getDocLinks>['apiKeysProviders']
-                    ] && (
-                      <a
-                        href={
-                          getDocLinks().apiKeysProviders[
-                            providerId as keyof ReturnType<typeof getDocLinks>['apiKeysProviders']
-                          ]
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-foreground transition-colors"
-                        title={t.Settings.apiKeys.viewDocumentation}
-                      >
-                        <ExternalLink size={14} />
-                      </a>
-                    )}
-                  </Label>
-                </div>
-                {/* Use Coding Plan toggle for Zhipu - inline with header */}
-                {providerId === 'zhipu' && (
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor={`use-coding-plan-${providerId}`}
-                      className="text-sm text-muted-foreground"
-                    >
-                      {t.Settings.apiKeys.useCodingPlan}
-                    </Label>
-                    <Switch
-                      id={`use-coding-plan-${providerId}`}
-                      checked={useCodingPlanSettings[providerId] || false}
-                      onCheckedChange={(checked) => handleUseCodingPlanChange(providerId, checked)}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {isLocal ? (
-                // Special UI for local providers (Ollama, LM Studio) - toggle switch instead of API key input
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      id={`${providerId}-enabled`}
-                      checked={currentKey === 'enabled'}
-                      onCheckedChange={(checked) =>
-                        handleApiKeyChange(providerId, checked ? 'enabled' : '')
-                      }
-                    />
-                    <Label htmlFor={`${providerId}-enabled`} className="text-sm">
-                      {currentKey === 'enabled' ? t.Common.enabled : t.Common.disabled}
-                    </Label>
-                  </div>
-                  {currentKey === 'enabled' && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleTestConnection(providerId)}
-                      disabled={testingProvider !== null}
-                    >
-                      {testingProvider === providerId ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {t.Settings.apiKeys.testing}
-                        </>
-                      ) : (
-                        t.Settings.apiKeys.testConnection
-                      )}
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                // Standard API key input for other providers
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      id={`api-key-${providerId}`}
-                      type={isVisible ? 'text' : 'password'}
-                      placeholder={t.Settings.apiKeys.enterKey(config.name)}
-                      value={currentKey}
-                      onChange={(e) => handleApiKeyChange(providerId, e.target.value)}
-                      className="pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => toggleApiKeyVisibility(providerId)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                    >
-                      {isVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-
+                  />
+                  <ProviderIcon providerId={providerId} size={18} className="shrink-0" />
+                  <span className="font-medium text-sm">{config.name}</span>
                   {hasKey && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleTestConnection(providerId)}
-                      disabled={testingProvider !== null}
+                    <span className="text-green-600 dark:text-green-400 text-xs bg-green-50 dark:bg-green-950 px-2 py-0.5 rounded-full ml-auto">
+                      {t.Settings.apiKeys.configured}
+                    </span>
+                  )}
+                  {docLink && (
+                    <a
+                      href={docLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        'text-muted-foreground hover:text-foreground transition-colors',
+                        !hasKey && 'ml-auto'
+                      )}
+                      title={t.Settings.apiKeys.viewDocumentation}
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      {testingProvider === providerId ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {t.Settings.apiKeys.testing}
-                        </>
-                      ) : (
-                        t.Settings.apiKeys.testConnection
-                      )}
-                    </Button>
+                      <ExternalLink size={14} />
+                    </a>
                   )}
-                </div>
-              )}
+                </CollapsibleTrigger>
 
-              {/* Base URL configuration for Anthropic and OpenAI */}
-              {(providerId === 'anthropic' || providerId === 'openai') && (
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setBaseUrlExpanded((prev) => ({
-                        ...prev,
-                        [providerId]: !prev[providerId],
-                      }))
-                    }
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {baseUrlExpanded[providerId] ? (
-                      <ChevronDown size={14} />
-                    ) : (
-                      <ChevronRight size={14} />
+                <CollapsibleContent className="px-3 pb-3 pt-0 border-t">
+                  <div className="pt-3 space-y-3">
+                    {/* Use Coding Plan toggle for providers that support it */}
+                    {PROVIDERS_WITH_CODING_PLAN.includes(providerId) && (
+                      <div className="flex items-center justify-between">
+                        <Label
+                          htmlFor={`use-coding-plan-${providerId}`}
+                          className="text-sm text-muted-foreground"
+                        >
+                          {t.Settings.apiKeys.useCodingPlan}
+                        </Label>
+                        <Switch
+                          id={`use-coding-plan-${providerId}`}
+                          checked={useCodingPlanSettings[providerId] || false}
+                          onCheckedChange={(checked) =>
+                            handleUseCodingPlanChange(providerId, checked)
+                          }
+                        />
+                      </div>
                     )}
-                    {t.Settings.apiKeys.customBaseUrl}
-                  </button>
-                  {baseUrlExpanded[providerId] && (
-                    <Input
-                      id={`base-url-${providerId}`}
-                      type="text"
-                      placeholder={t.Settings.apiKeys.baseUrlPlaceholder(
-                        providerId === 'anthropic'
-                          ? 'https://api.anthropic.com'
-                          : 'https://api.openai.com/v1'
-                      )}
-                      value={baseUrls[providerId] || ''}
-                      onChange={(e) => handleBaseUrlChange(providerId, e.target.value)}
-                      className="text-sm"
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
+
+                    {isLocal ? (
+                      // Special UI for local providers (Ollama, LM Studio) - toggle switch instead of API key input
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            id={`${providerId}-enabled`}
+                            checked={currentKey === 'enabled'}
+                            onCheckedChange={(checked) =>
+                              handleApiKeyChange(providerId, checked ? 'enabled' : '')
+                            }
+                          />
+                          <Label htmlFor={`${providerId}-enabled`} className="text-sm">
+                            {currentKey === 'enabled' ? t.Common.enabled : t.Common.disabled}
+                          </Label>
+                        </div>
+                        {currentKey === 'enabled' && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleTestConnection(providerId)}
+                            disabled={testingProvider !== null}
+                          >
+                            {testingProvider === providerId ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                {t.Settings.apiKeys.testing}
+                              </>
+                            ) : (
+                              t.Settings.apiKeys.testConnection
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      // Standard API key input for other providers
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Input
+                            id={`api-key-${providerId}`}
+                            type={isVisible ? 'text' : 'password'}
+                            placeholder={t.Settings.apiKeys.enterKey(config.name)}
+                            value={currentKey}
+                            onChange={(e) => handleApiKeyChange(providerId, e.target.value)}
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleApiKeyVisibility(providerId)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                          >
+                            {isVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+
+                        {hasKey && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleTestConnection(providerId)}
+                            disabled={testingProvider !== null}
+                          >
+                            {testingProvider === providerId ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                {t.Settings.apiKeys.testing}
+                              </>
+                            ) : (
+                              t.Settings.apiKeys.testConnection
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Base URL configuration for Anthropic and OpenAI */}
+                    {(providerId === 'anthropic' || providerId === 'openai') && (
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBaseUrlExpanded((prev) => ({
+                              ...prev,
+                              [providerId]: !prev[providerId],
+                            }))
+                          }
+                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {baseUrlExpanded[providerId] ? (
+                            <ChevronDown size={14} />
+                          ) : (
+                            <ChevronRight size={14} />
+                          )}
+                          {t.Settings.apiKeys.customBaseUrl}
+                        </button>
+                        {baseUrlExpanded[providerId] && (
+                          <Input
+                            id={`base-url-${providerId}`}
+                            type="text"
+                            placeholder={t.Settings.apiKeys.baseUrlPlaceholder(
+                              providerId === 'anthropic'
+                                ? 'https://api.anthropic.com'
+                                : 'https://api.openai.com/v1'
+                            )}
+                            value={baseUrls[providerId] || ''}
+                            onChange={(e) => handleBaseUrlChange(providerId, e.target.value)}
+                            className="text-sm"
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

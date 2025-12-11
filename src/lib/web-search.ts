@@ -1,9 +1,9 @@
 import { type GoogleGenerativeAIProviderMetadata, google } from '@ai-sdk/google';
 import { generateText } from 'ai';
-import { aiProviderService } from '@/services/ai-provider-service';
+import { useProviderStore } from '@/stores/provider-store';
 import { settingsManager } from '@/stores/settings-store';
 import { logger } from './logger';
-import { GEMINI_25_FLASH_LITE, GPT5_MINI } from './models';
+import { GEMINI_25_FLASH_LITE } from './models';
 import { fetchWithTimeout } from './utils';
 
 export interface TextSource {
@@ -67,12 +67,13 @@ export async function googleSearch(query: string): Promise<GoogleSearchResult> {
   logger.info('searchGoogle:', query);
 
   try {
-    const providerModel = aiProviderService.getProviderModel(GEMINI_25_FLASH_LITE);
+    const providerModel = useProviderStore.getState().getProviderModel(GEMINI_25_FLASH_LITE);
     logger.info('Using provider model:', providerModel);
 
     const { text, sources, providerMetadata } = await generateText({
       model: providerModel,
       tools: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         google_search: google.tools.googleSearch({ mode: 'MODE_DYNAMIC' }) as any,
       },
       prompt: query,
@@ -131,7 +132,7 @@ export class TavilySearch implements WebSearchSource {
     const videos: VideoSource[] = [];
 
     try {
-      const requestBody: any = {
+      const requestBody: Record<string, unknown> = {
         query: query.slice(0, 1000),
         search_depth: 'basic',
         include_answer: false,
@@ -190,22 +191,32 @@ export class TavilySearch implements WebSearchSource {
 
       if (jsonResponse.results && Array.isArray(jsonResponse.results)) {
         texts = texts.concat(
-          jsonResponse.results.map((result: any) => ({
-            title: result.title || '',
-            url: result.url || '',
-            content: result.content || '',
-          }))
+          jsonResponse.results.map(
+            (result: { title?: string; url?: string; content?: string }) => ({
+              title: result.title || '',
+              url: result.url || '',
+              content: result.content || '',
+            })
+          )
         );
       }
 
       // Process images if available
       if (jsonResponse.images && Array.isArray(jsonResponse.images)) {
         images = images.concat(
-          jsonResponse.images.map((image: any) => ({
-            title: image.description || image.title || '',
-            url: image.source_url || image.url || '',
-            image: image.url || image.image_url || '',
-          }))
+          jsonResponse.images.map(
+            (image: {
+              description?: string;
+              title?: string;
+              source_url?: string;
+              url?: string;
+              image_url?: string;
+            }) => ({
+              title: image.description || image.title || '',
+              url: image.source_url || image.url || '',
+              image: image.url || image.image_url || '',
+            })
+          )
         );
       }
 

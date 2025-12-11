@@ -19,6 +19,12 @@ vi.mock('sonner', () => ({
   },
 }));
 
+// Mock useToolbarState hook
+const mockUseToolbarState = vi.fn();
+vi.mock('@/hooks/use-toolbar-state', () => ({
+  useToolbarState: () => mockUseToolbarState(),
+}));
+
 // Mock model service
 const mockGetCurrentModel = vi.fn();
 vi.mock('@/services/model-service', () => ({
@@ -60,6 +66,15 @@ describe('ChatToolbar - Model Name Real-time Update', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Default toolbar state
+    mockUseToolbarState.mockReturnValue({
+      modelName: 'claude-3-sonnet@anthropic',
+      cost: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      contextUsage: null,
+    });
+
     // Default store state
     mockUseSettingsStore.mockReturnValue({
       model_type_main: 'claude-3-sonnet@anthropic',
@@ -83,8 +98,6 @@ describe('ChatToolbar - Model Name Real-time Update', () => {
     await waitFor(() => {
       expect(screen.getByText('claude-3-sonnet@anthropic')).toBeInTheDocument();
     });
-
-    expect(mockGetCurrentModel).toHaveBeenCalled();
   });
 
   it('should update model name when model_type_main changes in store', async () => {
@@ -95,26 +108,17 @@ describe('ChatToolbar - Model Name Real-time Update', () => {
       expect(screen.getByText('claude-3-sonnet@anthropic')).toBeInTheDocument();
     });
 
-    const initialCallCount = mockGetCurrentModel.mock.calls.length;
-
-    // Simulate store update (new model selected in settings)
-    mockUseSettingsStore.mockReturnValue({
-      model_type_main: 'gpt-4o@openai', // Changed
-      model_type_small: 'gpt-4o-mini@openai',
-      model_type_image_generator: '',
-      model_type_transcription: '',
-      assistantId: 'planner',
+    // Update toolbar state with new model name
+    mockUseToolbarState.mockReturnValue({
+      modelName: 'gpt-4o@openai',
+      cost: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      contextUsage: null,
     });
 
-    mockGetCurrentModel.mockResolvedValue('gpt-4o@openai');
-
-    // Re-render to trigger useEffect with new store values
+    // Re-render to trigger update
     rerender(<ChatToolbar {...defaultProps} />);
-
-    // Should call getCurrentModel again due to model_type_main change
-    await waitFor(() => {
-      expect(mockGetCurrentModel.mock.calls.length).toBeGreaterThan(initialCallCount);
-    });
 
     // Should display new model name
     await waitFor(() => {
@@ -129,24 +133,16 @@ describe('ChatToolbar - Model Name Real-time Update', () => {
       expect(screen.getByText('claude-3-sonnet@anthropic')).toBeInTheDocument();
     });
 
-    const initialCallCount = mockGetCurrentModel.mock.calls.length;
-
-    // Simulate provider change
-    mockUseSettingsStore.mockReturnValue({
-      model_type_main: 'claude-3-sonnet@openrouter', // Provider changed
-      model_type_small: 'gpt-4o-mini@openai',
-      model_type_image_generator: '',
-      model_type_transcription: '',
-      assistantId: 'planner',
+    // Update toolbar state with new provider
+    mockUseToolbarState.mockReturnValue({
+      modelName: 'claude-3-sonnet@openrouter',
+      cost: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      contextUsage: null,
     });
-
-    mockGetCurrentModel.mockResolvedValue('claude-3-sonnet@openrouter');
 
     rerender(<ChatToolbar {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(mockGetCurrentModel.mock.calls.length).toBeGreaterThan(initialCallCount);
-    });
 
     await waitFor(() => {
       expect(screen.getByText('claude-3-sonnet@openrouter')).toBeInTheDocument();
@@ -160,25 +156,16 @@ describe('ChatToolbar - Model Name Real-time Update', () => {
       expect(screen.getByText('claude-3-sonnet@anthropic')).toBeInTheDocument();
     });
 
-    const initialCallCount = mockGetCurrentModel.mock.calls.length;
-
-    // Simulate agent change (different agents may use different model types)
-    mockUseSettingsStore.mockReturnValue({
-      model_type_main: 'claude-3-sonnet@anthropic',
-      model_type_small: 'gpt-4o-mini@openai',
-      model_type_image_generator: '',
-      model_type_transcription: '',
-      assistantId: 'coder', // Changed agent
+    // Update toolbar state with different model for new assistant
+    mockUseToolbarState.mockReturnValue({
+      modelName: 'gpt-4o-mini@openai',
+      cost: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      contextUsage: null,
     });
-
-    // New agent might use a different model type
-    mockGetCurrentModel.mockResolvedValue('gpt-4o-mini@openai');
 
     rerender(<ChatToolbar {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(mockGetCurrentModel.mock.calls.length).toBeGreaterThan(initialCallCount);
-    });
 
     await waitFor(() => {
       expect(screen.getByText('gpt-4o-mini@openai')).toBeInTheDocument();
@@ -192,46 +179,23 @@ describe('ChatToolbar - Model Name Real-time Update', () => {
       expect(screen.getByText('claude-3-sonnet@anthropic')).toBeInTheDocument();
     });
 
-    // Wait for initial effects to complete
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
-
-    const callCountAfterMount = mockGetCurrentModel.mock.calls.length;
-
-    // Re-render with same store values (simulating other prop changes)
+    // Re-render with same toolbar state
     rerender(<ChatToolbar {...defaultProps} />);
 
-    // Wait a bit to ensure no additional calls
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
-
-    // Should not call getCurrentModel again since model_type_* didn't change
-    expect(mockGetCurrentModel.mock.calls.length).toBe(callCountAfterMount);
-  });
-
-  it('should handle getCurrentModel errors gracefully', async () => {
-    // Import the mocked logger
-    const { logger } = await import('@/lib/logger');
-
-    mockGetCurrentModel.mockRejectedValue(new Error('Failed to get model'));
-
-    render(<ChatToolbar {...defaultProps} />);
-
-    // Should not crash, and model name should be empty
+    // Model name should remain the same
     await waitFor(() => {
-      expect(screen.queryByText('Model:')).not.toBeInTheDocument();
+      expect(screen.getByText('claude-3-sonnet@anthropic')).toBeInTheDocument();
     });
-
-    expect(logger.error).toHaveBeenCalledWith(
-      'Failed to get current model:',
-      expect.any(Error)
-    );
   });
 
   it('should handle empty model name', async () => {
-    mockGetCurrentModel.mockResolvedValue('');
+    mockUseToolbarState.mockReturnValue({
+      modelName: '',
+      cost: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      contextUsage: null,
+    });
 
     render(<ChatToolbar {...defaultProps} />);
 

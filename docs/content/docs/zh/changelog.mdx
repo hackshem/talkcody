@@ -1,0 +1,33 @@
+---
+title: 更新日志
+description: TalkCody 版本发布历史和更新说明
+icon: History
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+TalkCody 的所有重要更新都记录在这里。
+
+## [0.1.17] - 2025-12-11
+
+### 新增
+
+- 支持多个会话并行执行, 大幅提升工作流效率
+- 支持自定义 AI 提供商
+- 新增内置 AI 提供商：moonshot
+- 新增内置模型：GLM-4.6 v
+- 新增内置 Minimax Coding Plan MCP，支持网页搜索和图像输入，拥有 Minimax Coding Plan 的用户可以直接使用
+- 新增内置 GLM Coding Plan MCP，支持网页搜索和图像输入，拥有 GLM Coding Plan 的用户可以直接使用
+- 版本更新后，向用户展示更新日志
+
+### 优化
+
+- 优化 Bash 工具输出以提升性能
+- 优化 Github PR 工具输出以提升性能
+- 优化 Context Compaction 逻辑，提升多轮对话性能
+
+### 修复
+
+- 修复 HTTP MCP 服务器请求头配置问题
+- 修复 Stdio MCP 服务器不支持自定义环境变量的问题
+- 修复 多窗口时，数据库提前退出时的问题

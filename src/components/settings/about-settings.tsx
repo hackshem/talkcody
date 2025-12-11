@@ -1,12 +1,13 @@
 import { getVersion } from '@tauri-apps/api/app';
 import { type as osType, platform } from '@tauri-apps/plugin-os';
-import { AlertCircle, Download, RefreshCw } from 'lucide-react';
+import { AlertCircle, Download, FileText, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UpdateDialog } from '@/components/update-dialog';
+import { WhatsNewDialog } from '@/components/whats-new-dialog';
 import { useLocale } from '@/hooks/use-locale';
 import { useUpdater } from '@/hooks/use-updater';
 import { logger } from '@/lib/logger';
@@ -16,6 +17,7 @@ export function AboutSettings() {
   const [appVersion, setAppVersion] = useState<string>('');
   const [platformName, setPlatformName] = useState<string>('');
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [whatsNewDialogOpen, setWhatsNewDialogOpen] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState<string | null>(null);
   const updater = useUpdater({ checkOnMount: false, periodicCheck: false });
 
@@ -99,7 +101,18 @@ export function AboutSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-muted-foreground">{t.Settings.about.version}</span>
-              <span className="text-sm font-medium">{appVersion || t.Common.loading}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">{appVersion || t.Common.loading}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => setWhatsNewDialogOpen(true)}
+                >
+                  <FileText className="mr-1 h-3 w-3" />
+                  {t.Settings.about.releaseNotes}
+                </Button>
+              </div>
             </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-muted-foreground">{t.Settings.about.platform}</span>
@@ -176,6 +189,7 @@ export function AboutSettings() {
       </Card>
 
       <UpdateDialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen} updater={updater} />
+      <WhatsNewDialog forceOpen={whatsNewDialogOpen} onForceOpenChange={setWhatsNewDialogOpen} />
     </>
   );
 }

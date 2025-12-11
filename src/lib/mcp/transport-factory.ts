@@ -3,6 +3,7 @@
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { logger } from '@/lib/logger';
+import { streamFetch } from '@/lib/tauri-fetch';
 import type { MCPServer } from '@/services/database/types';
 import { TauriPersistentTransport } from './tauri-persistent-transport';
 
@@ -91,7 +92,10 @@ export class TransportFactory {
 
       // Create transport with proper headers support
       // For GitHub MCP server, we need to ensure proper parameter structure
+      // Use streamFetch (Tauri backend proxy) to bypass browser CORS and header restrictions
+      // streamFetch supports SSE streaming which is required for MCP's server-to-client messages
       const transport = new StreamableHTTPClientTransport(url, {
+        fetch: streamFetch as typeof fetch,
         requestInit: {
           // Some browsers will silently drop forbidden headers; ensure we only send safe ones
           headers,

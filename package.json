@@ -1,7 +1,7 @@
 {
   "name": "talkcody-monorepo",
   "private": true,
-  "version": "0.1.16",
+  "version": "0.1.17",
   "type": "module",
   "workspaces": [
     "apps/*",
@@ -23,6 +23,11 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:coverage:ui": "vitest --ui --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:all": "bun run test && bun run test:e2e",
     "dev:api": "cd apps/api && bun run dev",
     "build:api": "cd apps/api && bun run build",
     "pre-commit": "./pre-commit.sh",
@@ -114,6 +119,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.2",
+    "@playwright/test": "^1.57.0",
     "@tailwindcss/typography": "^0.5.16",
     "@tauri-apps/cli": "^2.9.3",
     "@testing-library/dom": "^10.4.1",

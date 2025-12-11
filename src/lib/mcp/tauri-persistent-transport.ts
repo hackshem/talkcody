@@ -132,8 +132,22 @@ export class TauriPersistentTransport implements Transport {
         `Using shell wrapper: ${shellWrapper.name} with args: [${shellWrapper.args.join(', ')}, "${fullCommand}"]`
       );
 
+      // Build spawn options with environment variables if provided
+      const hasEnvVars = this.server.stdio_env && Object.keys(this.server.stdio_env).length > 0;
+      const spawnOptions = hasEnvVars ? { env: this.server.stdio_env } : undefined;
+
+      if (hasEnvVars) {
+        logger.info(
+          `Setting environment variables for ${this.server.id}: ${Object.keys(this.server.stdio_env!).join(', ')}`
+        );
+      }
+
       // Tauri shell plugin requires passing all args including the fixed ones from config
-      this.command = Command.create(shellWrapper.name, [...shellWrapper.args, fullCommand]);
+      this.command = Command.create(
+        shellWrapper.name,
+        [...shellWrapper.args, fullCommand],
+        spawnOptions
+      );
 
       // Set up stdout handler for JSON-RPC messages
       this.command.stdout.on('data', (data: string) => {

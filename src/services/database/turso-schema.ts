@@ -92,6 +92,7 @@ export class TursoSchema {
         headers TEXT DEFAULT '{}',
         stdio_command TEXT DEFAULT NULL,
         stdio_args TEXT DEFAULT '[]',
+        stdio_env TEXT DEFAULT '{}',
         is_enabled BOOLEAN DEFAULT 1,
         is_built_in BOOLEAN DEFAULT 0,
         created_at INTEGER NOT NULL,
@@ -359,7 +360,16 @@ export class TursoSchema {
   private static async insertBuiltInMCPServers(db: Client): Promise<void> {
     const now = Date.now();
 
-    const builtInServers = [
+    const builtInServers: Array<{
+      id: string;
+      name: string;
+      url: string;
+      protocol: string;
+      stdio_command: string | null;
+      stdio_args: string[] | null;
+      headers?: Record<string, string>;
+      stdio_env?: Record<string, string>;
+    }> = [
       {
         id: 'context7',
         name: 'Context7',
@@ -392,6 +402,42 @@ export class TursoSchema {
         stdio_command: 'npx',
         stdio_args: ['-y', '@modelcontextprotocol/server-sequential-thinking'],
       },
+      {
+        id: 'minimax-coding-plan',
+        name: 'MiniMax Coding Plan MCP',
+        url: '',
+        protocol: 'stdio',
+        stdio_command: 'uvx',
+        stdio_args: ['minimax-coding-plan-mcp', '-y'],
+      },
+      {
+        id: 'glm-coding-plan-vision',
+        name: 'GLM Coding Plan Vision',
+        url: '',
+        protocol: 'stdio',
+        stdio_command: 'npx',
+        stdio_args: ['-y', '@z_ai/mcp-server'],
+        stdio_env: {
+          Z_AI_API_KEY: '',
+          Z_AI_MODE: 'ZHIPU',
+        },
+      },
+      {
+        id: 'glm-coding-plan-search',
+        name: 'GLM Coding Plan Search',
+        url: 'https://open.bigmodel.cn/api/mcp/web_search_prime/mcp',
+        protocol: 'http',
+        stdio_command: null,
+        stdio_args: null,
+      },
+      {
+        id: 'glm-coding-plan-reader',
+        name: 'GLM Coding Plan Reader',
+        url: 'https://open.bigmodel.cn/api/mcp/web_reader/mcp',
+        protocol: 'http',
+        stdio_command: null,
+        stdio_args: null,
+      },
     ];
 
     for (const server of builtInServers) {
@@ -401,18 +447,19 @@ export class TursoSchema {
         if (result.rows.length === 0) {
           await db.execute(
             `INSERT INTO mcp_servers (
-              id, name, url, protocol, api_key, headers, stdio_command, stdio_args,
+              id, name, url, protocol, api_key, headers, stdio_command, stdio_args, stdio_env,
               is_enabled, is_built_in, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               server.id,
               server.name,
               server.url,
               server.protocol,
               null,
-              '{}',
+              JSON.stringify(server.headers || {}),
               server.stdio_command,
               JSON.stringify(server.stdio_args || []),
+              JSON.stringify(server.stdio_env || {}),
               0, // All built-in MCP servers are disabled by default
               1,
               now,
@@ -421,21 +468,10 @@ export class TursoSchema {
           );
 
           logger.info(`Inserted built-in MCP server: ${server.id}`);
-        } else {
-          // Update existing built-in server
-          // Update metadata but preserve user's is_enabled preference
-          await db.execute(
-            'UPDATE mcp_servers SET is_built_in = 1, url = ?, protocol = ?, stdio_command = ?, stdio_args = ?, updated_at = ? WHERE id = ?',
-            [
-              server.url,
-              server.protocol,
-              server.stdio_command,
-              JSON.stringify(server.stdio_args || []),
-              now,
-              server.id,
-            ]
-          );
         }
+        // If server already exists, don't update - preserve user's configuration
+        // (headers, stdio_env contain user's API keys that should not be overwritten)
+        // If built-in server definitions need to change, use migrations instead
       } catch (error) {
         logger.error(`Failed to insert/update built-in MCP server ${server.id}:`, error);
       }

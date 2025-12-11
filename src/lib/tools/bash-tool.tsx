@@ -40,7 +40,6 @@ The command will be executed in the current working directory.`,
   }),
   canConcurrent: false,
   execute: async ({ command }): Promise<BashResult> => {
-    // Delegate execution to the BashExecutor service
     return await bashExecutor.execute(command);
   },
   renderToolDoing: ({ command }) => <BashToolDoing command={command} />,

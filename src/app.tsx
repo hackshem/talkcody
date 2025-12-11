@@ -8,6 +8,7 @@ import { OnboardingWizard } from '@/components/onboarding';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { UpdateNotification } from '@/components/update-notification';
+import { WhatsNewDialog } from '@/components/whats-new-dialog';
 import { UiNavigationProvider, useUiNavigation } from '@/contexts/ui-navigation';
 import { useWindowContext, WindowProvider } from '@/contexts/window-context';
 import { useGlobalShortcuts } from '@/hooks/use-global-shortcuts';
@@ -300,6 +301,9 @@ function AppContent() {
 
       {/* Update Notification */}
       <UpdateNotification checkOnMount={true} periodicCheck={true} />
+
+      {/* What's New Dialog - shown after app update */}
+      <WhatsNewDialog />
     </div>
   );
 }

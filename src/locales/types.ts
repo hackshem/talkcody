@@ -159,6 +159,7 @@ export interface LocaleDefinition {
     tabs: {
       account: string;
       apiKeys: string;
+      customProviders: string;
       models: string;
       shortcuts: string;
       general: string;
@@ -694,6 +695,18 @@ export interface LocaleDefinition {
       commandPlaceholder: string;
       arguments: string;
       argumentsPlaceholder: string;
+      envVars: string;
+      envVarsPlaceholder: string;
+      envVarKey: string;
+      envVarValue: string;
+      addEnvVar: string;
+      minimaxApiKey: string;
+      minimaxApiKeyPlaceholder: string;
+      minimaxApiHost: string;
+      glmApiKey: string;
+      glmApiKeyPlaceholder: string;
+      glmApiMode: string;
+      glmApiModeHint: string;
     };
     validation: {
       serverIdRequired: string;
@@ -704,6 +717,8 @@ export interface LocaleDefinition {
       invalidHeaders: string;
       invalidArguments: string;
       argumentsMustBeArray: string;
+      invalidEnvVars: string;
+      duplicateEnvVarKey: string;
     };
     actions: {
       creating: string;
@@ -954,6 +969,62 @@ export interface LocaleDefinition {
     otherLabel: string;
     otherPlaceholder: string;
     submitAnswers: string;
+  };
+
+  CustomProviderDialog: {
+    addTitle: string;
+    editTitle: string;
+    description: string;
+    providerType: string;
+    selectProviderType: string;
+    providerName: string;
+    providerNamePlaceholder: string;
+    baseUrl: string;
+    baseUrlPlaceholder: string;
+    baseUrlHint: string;
+    apiKey: string;
+    apiKeyPlaceholder: string;
+    enabled: string;
+    test: string;
+    testing: string;
+    saving: string;
+    skip: string;
+    connectionSuccessful: string;
+    connectionSuccessfulWithTime: (time: number) => string;
+    connectionFailed: (error: string) => string;
+    availableModelsHint: (models: string, more: number) => string;
+    fixValidationErrors: string;
+    testFailed: (error: string) => string;
+    providerUpdated: string;
+    providerAdded: string;
+    saveFailed: (error: string) => string;
+    addModelsTitle: (name: string) => string;
+    openaiCompatible: string;
+    openaiCompatibleDescription: string;
+    anthropic: string;
+    anthropicDescription: string;
+  };
+
+  CustomProviderSection: {
+    description: string;
+    noProviders: string;
+    providerEnabled: string;
+    providerDisabled: string;
+    updateFailed: string;
+    deleteConfirm: (name: string) => string;
+    deleteFailed: string;
+    deleteSuccess: string;
+  };
+
+  WhatsNew: {
+    title: string;
+    viewFullChangelog: string;
+    gotIt: string;
+    added: string;
+    changed: string;
+    fixed: string;
+    removed: string;
+    releasedOn: (date: string) => string;
   };
 }
 

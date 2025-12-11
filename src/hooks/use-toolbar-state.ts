@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { logger } from '@/lib/logger';
-import { modelService } from '@/services/model-service';
+import { modelService, useProviderStore } from '@/stores/provider-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useTaskStore } from '@/stores/task-store';
 
@@ -62,16 +62,38 @@ export function useToolbarState(): ToolbarState {
     assistantId,
   } = useSettingsStore();
 
-  // Fetch current model identifier
+  // Get available models from store
+  const availableModels = useProviderStore((state) => state.availableModels);
+
+  // Fetch current model identifier and format display name
   const updateModelName = useCallback(async () => {
     try {
       const modelIdentifier = await modelService.getCurrentModel();
-      setModelName(modelIdentifier || '');
+      if (!modelIdentifier) {
+        setModelName('');
+        return;
+      }
+
+      // Parse "modelKey@providerId" format
+      const [modelKey, providerId] = modelIdentifier.split('@');
+
+      // Find the model in available models to get display name and provider name
+      const model = availableModels.find(
+        (m) => m.key === modelKey && (!providerId || m.provider === providerId)
+      );
+
+      if (model) {
+        // Display as "ModelName@ProviderName" for better readability
+        setModelName(`${model.name}@${model.providerName}`);
+      } else {
+        // Fallback to raw identifier if model not found
+        setModelName(modelIdentifier);
+      }
     } catch (error) {
       logger.error('Failed to get current model:', error);
       setModelName('');
     }
-  }, []);
+  }, [availableModels]);
 
   // Update model name when model type settings change
   // biome-ignore lint/correctness/useExhaustiveDependencies: These dependencies trigger re-fetch when model settings change in the store

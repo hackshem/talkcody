@@ -16,10 +16,17 @@ export class ModelTypeService {
     const settingsKey = MODEL_TYPE_SETTINGS_KEYS[modelType];
     const configuredModel = await settingsManager.get(settingsKey);
 
+    logger.debug(
+      `resolveModelType: settingsKey=${settingsKey}, configuredModel=${configuredModel}`
+    );
+
     // If user has configured a model for this type, use it
     if (configuredModel && typeof configuredModel === 'string' && configuredModel.trim()) {
       // Verify the model is available (has API key)
       const isAvailable = await modelService.isModelAvailable(configuredModel);
+      logger.debug(
+        `resolveModelType: configuredModel=${configuredModel}, isAvailable=${isAvailable}`
+      );
       if (isAvailable) {
         return configuredModel;
       }

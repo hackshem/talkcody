@@ -226,11 +226,11 @@ export class ToolExecutor {
 
         // Prepare tool arguments - create a mutable copy to allow adding properties
         // Ensure toolArgs is at least an empty object to prevent undefined from breaking parameter destructuring
-        const toolArgs =
+        const toolArgs: Record<string, unknown> =
           typeof parsedInput === 'object' && parsedInput !== null
             ? { ...parsedInput }
             : parsedInput !== undefined
-              ? parsedInput
+              ? { value: parsedInput }
               : {};
 
         // Pass special parameters to callAgent tool

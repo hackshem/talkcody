@@ -53,8 +53,6 @@ export function AddCustomModelDialog({
   // Load available providers on mount
   useEffect(() => {
     if (open) {
-      const providers = customModelService.getAvailableProvidersForFetch();
-      setAvailableProviders(providers);
       // Reset state when dialog opens
       setSelectedProvider('');
       setFetchedModels([]);
@@ -62,6 +60,9 @@ export function AddCustomModelDialog({
       setManualModelName('');
       setSearchQuery('');
       setShowManualInput(false);
+
+      // Load providers (including custom providers) asynchronously
+      customModelService.getAvailableProvidersForFetch().then(setAvailableProviders);
     }
   }, [open]);
 

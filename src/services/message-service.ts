@@ -115,7 +115,7 @@ class MessageService {
         messageId
       )
       .then(() => {
-        logger.info('[MessageService] Assistant message persisted', { taskId, messageId });
+        // logger.info('[MessageService] Assistant message persisted', { taskId, messageId });
       })
       .catch((error) => {
         logger.error('[MessageService] Failed to persist assistant message:', error);

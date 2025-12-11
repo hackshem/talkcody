@@ -17,7 +17,6 @@ import { getContextLength } from '@/lib/models';
 import { getToolSync } from '@/lib/tools';
 import { generateId } from '@/lib/utils';
 import { getLocale, type SupportedLocale } from '@/locales';
-import { modelService } from '@/services/model-service';
 import { modelTypeService } from '@/services/model-type-service';
 import { getValidatedWorkspaceRoot } from '@/services/workspace-root-service';
 import { usePlanModeStore } from '@/stores/plan-mode-store';
@@ -54,7 +53,7 @@ export interface AgentLoopCallbacks {
   onAttachment?: (attachment: MessageAttachment) => void;
 }
 
-import { aiProviderService } from '../ai-provider-service';
+import { useProviderStore } from '@/stores/provider-store';
 import { fileService } from '../file-service';
 import { MessageCompactor } from '../message-compactor';
 import { ErrorHandler } from './error-handler';
@@ -133,12 +132,6 @@ export class LLMService {
         onAttachment,
       } = callbacks;
 
-      logger.info('Starting agent loop', {
-        model: options.model,
-        maxIterations: options.maxIterations,
-        taskId: taskId || 'nested',
-      });
-
       try {
         const {
           messages: inputMessages,
@@ -152,7 +145,6 @@ export class LLMService {
         } = options;
 
         const isImageGenerator = agentId === 'image-generator';
-        logger.info('isImageGenerator', { isImageGenerator });
 
         // Merge compression config with defaults
         const compressionConfig: CompressionConfig = {
@@ -162,9 +154,11 @@ export class LLMService {
 
         logger.info('Starting agent loop with model', {
           model,
+          maxIterations: options.maxIterations,
+          taskId: taskId || 'nested',
           inputMessageCount: inputMessages.length,
+          agentId: agentId || 'default',
         });
-        logger.info('systemPrompt', { systemPrompt });
         const t = this.getTranslations();
         onStatus?.(t.LLMService.status.initializing);
 
@@ -174,20 +168,21 @@ export class LLMService {
           useFileChangesStore.getState().clearConversation(taskId);
         }
 
-        const isAvailable = modelService.isModelAvailableSync(model);
+        const providerStore = useProviderStore.getState();
+        const isAvailable = providerStore.isModelAvailable(model);
         if (!isAvailable) {
           const errorContext = createErrorContext(model, {
             phase: 'model-initialization',
           });
           logger.error(`Model not available: ${model}`, undefined, {
             ...errorContext,
-            availableModels: modelService.getAvailableModels?.() || [],
+            availableModels: providerStore.availableModels || [],
           });
           throw new Error(
             t.LLMService.errors.noProvider(model, errorContext.provider || 'unknown')
           );
         }
-        const providerModel = aiProviderService.getProviderModel(model);
+        const providerModel = providerStore.getProviderModel(model);
 
         const rootPath = await getValidatedWorkspaceRoot();
 
@@ -204,6 +199,7 @@ export class LLMService {
         const modelMessages = await convertMessages(inputMessages, {
           rootPath,
           systemPrompt,
+          model,
         });
 
         // Validate and convert to Anthropic-compliant format

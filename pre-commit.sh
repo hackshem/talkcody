@@ -2,7 +2,7 @@
 
 # Run Biome check with auto-fix (includes formatting and safe fixes like import sorting)
 echo "Running Biome check with auto-fix..."
-output=$(biome check --write --staged 2>&1)
+output=$(npx biome check --write --staged 2>&1)
 exit_code=$?
 
 # Stage fixed files

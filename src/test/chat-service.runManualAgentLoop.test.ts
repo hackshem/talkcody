@@ -27,6 +27,33 @@ vi.mock('../services/ai-provider-service', () => ({
   },
 }));
 
+// Mock provider store
+const mockProviderStore = {
+  getProviderModel: vi.fn(() => ({
+    languageModel: {
+      provider: 'test',
+      modelId: 'test-model',
+    },
+    modelConfig: {
+      name: 'Test Model',
+      context_length: 128000,
+    },
+    providerId: 'test-provider',
+    modelKey: 'test-model',
+  })),
+  isModelAvailable: vi.fn(() => true),
+  availableModels: [],
+  apiKeys: {},
+  providers: new Map(),
+  customProviders: {},
+};
+
+vi.mock('../stores/provider-store', () => ({
+  useProviderStore: {
+    getState: vi.fn(() => mockProviderStore),
+  },
+}));
+
 vi.mock('../stores/settings-store', () => ({
   settingsManager: {
     getCurrentRootPath: vi.fn().mockReturnValue('/test/path'),
@@ -688,8 +715,14 @@ describe('ChatService.runManualAgentLoop', () => {
     });
 
     it('should handle model unavailable error', async () => {
-      const { modelService } = await import('../services/model-service');
-      vi.mocked(modelService.isModelAvailableSync).mockReturnValue(false);
+      // Make provider store throw error for unavailable model
+      const { useProviderStore } = await import('../stores/provider-store');
+      vi.mocked(useProviderStore.getState).mockReturnValueOnce({
+        ...mockProviderStore,
+        getProviderModel: vi.fn(() => {
+          throw new Error('No available provider for model: unavailable-model');
+        }),
+      });
 
       const options = createBasicOptions({ model: 'unavailable-model' });
 

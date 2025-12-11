@@ -1,5 +1,5 @@
 import { InvalidToolInputError, NoSuchToolError } from 'ai';
-import { aiProviderService } from '@/services/ai-provider-service';
+import { useProviderStore } from '@/stores/provider-store';
 
 // HTTP status codes for error handling
 export const HTTP_STATUS = {
@@ -56,17 +56,17 @@ function extractCauseChain(
   let depth = 0;
 
   while (current && depth < maxDepth) {
-    const currentError = current as any;
+    const currentError = current as Record<string, unknown>;
 
     // Get the cause from the current error
-    const cause = currentError?.cause;
+    const cause = currentError?.cause as Record<string, unknown> | undefined;
     if (!cause) break;
 
     // Extract info from the cause
     const causeInfo = {
-      name: cause?.name || cause?.constructor?.name || 'Unknown',
-      message: cause?.message || String(cause),
-      stack: cause?.stack,
+      name: String(cause?.name || cause?.constructor?.name || 'Unknown'),
+      message: String(cause?.message || String(cause)),
+      stack: cause?.stack as string | undefined,
     };
 
     chain.push(causeInfo);
@@ -82,8 +82,8 @@ function extractCauseChain(
  */
 function serializeError(error: unknown): string {
   try {
-    const errorObj = error as any;
-    const serialized: Record<string, any> = {};
+    const errorObj = error as Record<string, unknown>;
+    const serialized: Record<string, unknown> = {};
 
     // Handle DOMException and other browser-specific errors
     if (error instanceof Error) {
@@ -157,28 +157,28 @@ function serializeError(error: unknown): string {
  * Extracts comprehensive error details from any error object
  */
 export function extractErrorDetails(error: unknown, context?: ErrorContext): DetailedErrorInfo {
-  const errorObj = error as any;
+  const errorObj = error as Record<string, unknown>;
   const errorInfo: DetailedErrorInfo = {
-    name: errorObj?.name || errorObj?.constructor?.name || 'Unknown Error',
-    message: errorObj?.message || String(error),
+    name: String(errorObj?.name || errorObj?.constructor?.name || 'Unknown Error'),
+    message: String(errorObj?.message || String(error)),
     timestamp: new Date().toISOString(),
     context,
   };
 
   // Extract stack trace
   if (errorObj?.stack) {
-    errorInfo.stack = errorObj.stack;
+    errorInfo.stack = String(errorObj.stack);
   }
 
   // Extract HTTP/API error details
-  if (errorObj?.status !== undefined) {
-    errorInfo.status = errorObj.status;
+  if (errorObj?.status !== undefined && errorObj?.status !== null) {
+    errorInfo.status = Number(errorObj.status);
   }
   if (errorObj?.statusText) {
-    errorInfo.statusText = errorObj.statusText;
+    errorInfo.statusText = String(errorObj.statusText);
   }
   if (errorObj?.code) {
-    errorInfo.code = errorObj.code;
+    errorInfo.code = String(errorObj.code);
   }
 
   // Extract provider/model context
@@ -191,11 +191,11 @@ export function extractErrorDetails(error: unknown, context?: ErrorContext): Det
 
   // Extract tool-specific error details
   if (NoSuchToolError.isInstance(error)) {
-    errorInfo.toolName = errorObj.toolName;
-    errorInfo.availableTools = errorObj.availableTools;
+    errorInfo.toolName = String(errorObj.toolName);
+    errorInfo.availableTools = errorObj.availableTools as string[];
   }
   if (InvalidToolInputError.isInstance(error)) {
-    errorInfo.toolName = errorObj.toolName;
+    errorInfo.toolName = String(errorObj.toolName);
     errorInfo.toolInput = errorObj.toolInput;
   }
   if (context?.toolName) {
@@ -212,18 +212,19 @@ export function extractErrorDetails(error: unknown, context?: ErrorContext): Det
     errorInfo.causeChain = extractCauseChain(error);
   }
   if (errorObj?.requestId) {
-    errorInfo.requestId = errorObj.requestId;
+    errorInfo.requestId = String(errorObj.requestId);
   }
 
   // Extract response data for API errors
-  if (errorObj?.response?.data) {
-    errorInfo.message = `${errorInfo.message} | Response: ${JSON.stringify(errorObj.response.data)}`;
+  const response = errorObj?.response as Record<string, unknown> | undefined;
+  if (response?.data) {
+    errorInfo.message = `${errorInfo.message} | Response: ${JSON.stringify(response.data)}`;
   }
-  if (errorObj?.response?.status) {
-    errorInfo.status = errorObj.response.status;
+  if (response?.status) {
+    errorInfo.status = Number(response.status);
   }
-  if (errorObj?.response?.statusText) {
-    errorInfo.statusText = errorObj.response.statusText;
+  if (response?.statusText) {
+    errorInfo.statusText = String(response.statusText);
   }
 
   // Serialize the complete error object for debugging
@@ -308,7 +309,7 @@ export function getProviderErrorContext(model: string): {
   model?: string;
 } {
   try {
-    const providerModel = aiProviderService.getProviderModel(model);
+    const providerModel = useProviderStore.getState().getProviderModel(model);
     return {
       provider: providerModel?.provider || 'unknown',
       model,

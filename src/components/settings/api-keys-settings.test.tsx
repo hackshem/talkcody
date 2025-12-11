@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { toast } from 'sonner';
@@ -11,35 +11,56 @@ vi.mock('sonner', () => ({
   },
 }));
 
+// Mock translations object
+const mockTranslations = {
+  Settings: {
+    apiKeys: {
+      title: 'API Keys',
+      description: 'Configure API keys',
+      tooltipTitle: 'API Keys',
+      tooltipDescription: 'Configure your API keys',
+      test: 'Test',
+      testing: 'Testing...',
+      testConnection: 'Test',
+      customBaseUrl: 'Custom Base URL',
+      baseUrlPlaceholder: () => 'Enter base URL',
+      testSuccess: (name: string) => `${name} connection successful`,
+      testFailed: (name: string) => `${name} connection failed`,
+      useCodingPlan: 'Use Coding Plan',
+      configured: 'Configured',
+      viewDocumentation: 'View Documentation',
+      enterKey: () => 'Enter API key',
+      codingPlanEnabled: () => 'Coding plan enabled',
+      codingPlanDisabled: () => 'Coding plan disabled',
+      codingPlanUpdateFailed: () => 'Failed to update',
+    },
+    customProvider: {
+      title: 'Custom Providers',
+      description: 'Add custom providers',
+      addProvider: 'Add Provider',
+      providerName: 'Provider Name',
+      baseUrl: 'Base URL',
+      apiKey: 'API Key',
+      save: 'Save',
+      delete: 'Delete',
+      edit: 'Edit',
+      cancel: 'Cancel',
+    },
+  },
+};
+
 // Mock locale
 vi.mock('@/hooks/use-locale', () => ({
   useLocale: () => ({
-    t: {
-      Settings: {
-        apiKeys: {
-          title: 'API Keys',
-          description: 'Configure API keys',
-          tooltipTitle: 'API Keys',
-          tooltipDescription: 'Configure your API keys',
-          test: 'Test',
-          testing: 'Testing...',
-          testConnection: 'Test',
-          customBaseUrl: 'Custom Base URL',
-          baseUrlPlaceholder: () => 'Enter base URL',
-          testSuccess: (name: string) => `${name} connection successful`,
-          testFailed: (name: string) => `${name} connection failed`,
-          useCodingPlan: 'Use Coding Plan',
-          configured: 'Configured',
-          viewDocumentation: 'View Documentation',
-          enterKey: () => 'Enter API key',
-          codingPlanEnabled: () => 'Coding plan enabled',
-          codingPlanDisabled: () => 'Coding plan disabled',
-          codingPlanUpdateFailed: () => 'Failed to update',
-        },
-      },
-    },
+    t: mockTranslations,
     locale: 'en',
   }),
+  useTranslation: () => mockTranslations,
+}));
+
+// Mock CustomProviderSection to avoid complex translation dependencies
+vi.mock('@/components/custom-provider/CustomProviderSection', () => ({
+  CustomProviderSection: () => <div data-testid="custom-provider-section">Custom Provider Section</div>,
 }));
 
 // Mock doc links
@@ -81,6 +102,7 @@ vi.mock('@/providers', () => ({
       baseUrl: 'https://api.openai.com',
     },
   },
+  PROVIDERS_WITH_CODING_PLAN: ['anthropic'],
 }));
 
 // Mock ai-provider-service
@@ -131,19 +153,19 @@ describe('ApiKeysSettings - Connection Test Error Messages', () => {
       expect(settingsManager.getApiKeys).toHaveBeenCalled();
     });
 
-    // Find and click the Test button for anthropic
-    const testButtons = await screen.findAllByRole('button', { name: /test/i });
-    const anthropicTestButton = testButtons.find((btn) => btn.textContent?.toLowerCase().includes('test'));
+    // First, expand the Anthropic provider by clicking on its collapsible trigger
+    const anthropicTrigger = await screen.findByRole('button', { name: /anthropic/i });
+    fireEvent.click(anthropicTrigger);
 
-    if (anthropicTestButton) {
-      fireEvent.click(anthropicTestButton);
+    // Now find the Test button within the expanded content
+    const testButton = await screen.findByRole('button', { name: /test/i });
+    fireEvent.click(testButton);
 
-      await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          expect.stringContaining('https://api.anthropic.com/v1/models')
-        );
-      });
-    }
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining('https://api.anthropic.com/v1/models')
+      );
+    });
   });
 
   it('should show custom URL in error message when connection test fails with custom base URL', async () => {
@@ -157,18 +179,19 @@ describe('ApiKeysSettings - Connection Test Error Messages', () => {
       expect(settingsManager.getApiKeys).toHaveBeenCalled();
     });
 
-    const testButtons = await screen.findAllByRole('button', { name: /test/i });
-    const anthropicTestButton = testButtons.find((btn) => btn.textContent?.toLowerCase().includes('test'));
+    // First, expand the Anthropic provider by clicking on its collapsible trigger
+    const anthropicTrigger = await screen.findByRole('button', { name: /anthropic/i });
+    fireEvent.click(anthropicTrigger);
 
-    if (anthropicTestButton) {
-      fireEvent.click(anthropicTestButton);
+    // Now find the Test button within the expanded content
+    const testButton = await screen.findByRole('button', { name: /test/i });
+    fireEvent.click(testButton);
 
-      await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          expect.stringContaining('https://my-custom-proxy.com/v1/models')
-        );
-      });
-    }
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining('https://my-custom-proxy.com/v1/models')
+      );
+    });
   });
 
   it('should show provider name in error message', async () => {
@@ -181,16 +204,17 @@ describe('ApiKeysSettings - Connection Test Error Messages', () => {
       expect(settingsManager.getApiKeys).toHaveBeenCalled();
     });
 
-    const testButtons = await screen.findAllByRole('button', { name: /test/i });
-    const anthropicTestButton = testButtons.find((btn) => btn.textContent?.toLowerCase().includes('test'));
+    // First, expand the Anthropic provider by clicking on its collapsible trigger
+    const anthropicTrigger = await screen.findByRole('button', { name: /anthropic/i });
+    fireEvent.click(anthropicTrigger);
 
-    if (anthropicTestButton) {
-      fireEvent.click(anthropicTestButton);
+    // Now find the Test button within the expanded content
+    const testButton = await screen.findByRole('button', { name: /test/i });
+    fireEvent.click(testButton);
 
-      await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Anthropic'));
-      });
-    }
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Anthropic'));
+    });
   });
 
   it('should show success message when connection test succeeds', async () => {
@@ -205,15 +229,16 @@ describe('ApiKeysSettings - Connection Test Error Messages', () => {
       expect(settingsManager.getApiKeys).toHaveBeenCalled();
     });
 
-    const testButtons = await screen.findAllByRole('button', { name: /test/i });
-    const anthropicTestButton = testButtons.find((btn) => btn.textContent?.toLowerCase().includes('test'));
+    // First, expand the Anthropic provider by clicking on its collapsible trigger
+    const anthropicTrigger = await screen.findByRole('button', { name: /anthropic/i });
+    fireEvent.click(anthropicTrigger);
 
-    if (anthropicTestButton) {
-      fireEvent.click(anthropicTestButton);
+    // Now find the Test button within the expanded content
+    const testButton = await screen.findByRole('button', { name: /test/i });
+    fireEvent.click(testButton);
 
-      await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Anthropic'));
-      });
-    }
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Anthropic'));
+    });
   });
 });

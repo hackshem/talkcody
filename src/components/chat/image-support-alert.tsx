@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useLocale } from '@/hooks/use-locale';
 import { logger } from '@/lib/logger';
-import { useModelStore } from '@/stores/model-store';
+import { useProviderStore } from '@/stores/provider-store';
 
 interface ImageSupportAlertProps {
   open: boolean;
@@ -29,7 +29,7 @@ export function ImageSupportAlert({
   onCancel,
 }: ImageSupportAlertProps) {
   const { t } = useLocale();
-  const { availableModels } = useModelStore();
+  const availableModels = useProviderStore((state) => state.availableModels);
   const [imageSupportedModels, setImageSupportedModels] = useState<string[]>([]);
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { simpleFetch } from './tauri-fetch';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -50,20 +51,24 @@ interface FetchWithTimeoutOptions extends RequestInit {
   timeout?: number;
 }
 
+/**
+ * Fetch with timeout using Tauri's simpleFetch to bypass CORS restrictions.
+ * Uses AbortSignal.timeout for automatic request cancellation.
+ */
 export const fetchWithTimeout = async (
   resource: RequestInfo,
   options: FetchWithTimeoutOptions = {}
 ): Promise<Response> => {
-  const { timeout = 10_000 } = options;
+  const { timeout = 10_000, ...fetchOptions } = options;
 
-  const response = await fetch(resource, {
-    ...options,
+  const response = await simpleFetch(resource, {
+    ...fetchOptions,
     signal: AbortSignal.timeout(timeout),
   });
   return response;
 };
 
-export function format(format?: any, ...param: any[]): string {
+export function format(format?: unknown, ...param: unknown[]): string {
   if (typeof format !== 'string') {
     return String(format || '');
   }
@@ -105,7 +110,7 @@ export function decodeHtmlEntities(text: string): string {
 /**
  * Recursively decodes HTML entities in an object's string values
  */
-export function decodeObjectHtmlEntities(obj: any): any {
+export function decodeObjectHtmlEntities(obj: unknown): unknown {
   if (typeof obj === 'string') {
     return decodeHtmlEntities(obj);
   }
@@ -115,7 +120,7 @@ export function decodeObjectHtmlEntities(obj: any): any {
   }
 
   if (obj && typeof obj === 'object') {
-    const decoded: any = {};
+    const decoded: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       decoded[key] = decodeObjectHtmlEntities(value);
     }

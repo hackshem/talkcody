@@ -1,4 +1,14 @@
-import { ChevronDown, Edit2, Plus, Power, PowerOff, RefreshCw, Server, Trash2 } from 'lucide-react';
+import {
+  ChevronDown,
+  Edit2,
+  Minus,
+  Plus,
+  Power,
+  PowerOff,
+  RefreshCw,
+  Server,
+  Trash2,
+} from 'lucide-react';
 import { useId, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -40,6 +50,11 @@ import {
   type UpdateMCPServerData,
 } from '@/services/database-service';
 
+interface EnvVarItem {
+  key: string;
+  value: string;
+}
+
 interface MCPServerFormData {
   id: string;
   name: string;
@@ -49,7 +64,80 @@ interface MCPServerFormData {
   headers?: string; // JSON string
   stdio_command?: string;
   stdio_args?: string; // JSON string
+  stdio_env: EnvVarItem[]; // Array of key-value pairs for UI
 }
+
+// Convert Record<string, string> to EnvVarItem[]
+const envRecordToArray = (env: Record<string, string> | undefined): EnvVarItem[] => {
+  if (!env) return [];
+  return Object.entries(env).map(([key, value]) => ({ key, value }));
+};
+
+// Convert EnvVarItem[] to Record<string, string>
+const envArrayToRecord = (items: EnvVarItem[]): Record<string, string> => {
+  const record: Record<string, string> = {};
+  for (const item of items) {
+    if (item.key.trim()) {
+      record[item.key.trim()] = item.value;
+    }
+  }
+  return record;
+};
+
+// Check if this is a MiniMax Coding Plan MCP server
+const isMinimaxCodingPlanServer = (formData: MCPServerFormData): boolean => {
+  // Check by args containing minimax-coding-plan-mcp
+  if (formData.stdio_args) {
+    try {
+      const args = JSON.parse(formData.stdio_args);
+      if (Array.isArray(args) && args.some((arg) => arg.includes('minimax-coding-plan'))) {
+        return true;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+  // Check by ID
+  if (formData.id.toLowerCase().includes('minimax')) {
+    return true;
+  }
+  return false;
+};
+
+const MINIMAX_DEFAULT_HOST = 'https://api.minimaxi.com';
+
+// Check if this is a GLM Coding Plan Vision MCP server (stdio)
+const isGLMCodingPlanVisionServer = (formData: MCPServerFormData): boolean => {
+  // Check by args containing @z_ai/mcp-server
+  if (formData.stdio_args) {
+    try {
+      const args = JSON.parse(formData.stdio_args);
+      if (Array.isArray(args) && args.some((arg) => arg.includes('@z_ai/mcp-server'))) {
+        return true;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+  // Check by ID
+  if (formData.id === 'glm-coding-plan-vision') {
+    return true;
+  }
+  return false;
+};
+
+// Check if this is a GLM Coding Plan HTTP server (Search or Reader)
+const isGLMCodingPlanHttpServer = (formData: MCPServerFormData): boolean => {
+  // Check by URL containing bigmodel.cn
+  if (formData.url?.includes('open.bigmodel.cn/api/mcp/')) {
+    return true;
+  }
+  // Check by ID
+  if (formData.id === 'glm-coding-plan-search' || formData.id === 'glm-coding-plan-reader') {
+    return true;
+  }
+  return false;
+};
 
 export function MCPServersPage() {
   // Generate unique IDs for form fields
@@ -60,6 +148,7 @@ export function MCPServersPage() {
   const createHeadersId = useId();
   const createCommandId = useId();
   const createArgsId = useId();
+  const createEnvId = useId();
   const editIdId = useId();
   const editNameId = useId();
   const editUrlId = useId();
@@ -67,6 +156,7 @@ export function MCPServersPage() {
   const editHeadersId = useId();
   const editCommandId = useId();
   const editArgsId = useId();
+  const editEnvId = useId();
 
   const t = useTranslation();
 
@@ -91,6 +181,7 @@ export function MCPServersPage() {
     name: '',
     url: '',
     protocol: 'http',
+    stdio_env: [],
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,6 +192,7 @@ export function MCPServersPage() {
       name: '',
       url: '',
       protocol: 'http',
+      stdio_env: [],
     });
     setFormError(null);
   };
@@ -112,15 +204,34 @@ export function MCPServersPage() {
 
   const openEditDialog = (server: MCPServer) => {
     setEditingServer(server);
+
+    // For GLM HTTP servers, extract API key from Authorization header
+    let apiKey = server.api_key || '';
+    let headersJson = JSON.stringify(server.headers || {}, null, 2);
+    const isGLMHttp =
+      server.url?.includes('open.bigmodel.cn/api/mcp/') ||
+      server.id === 'glm-coding-plan-search' ||
+      server.id === 'glm-coding-plan-reader';
+
+    if (isGLMHttp && server.headers?.Authorization) {
+      const authHeader = server.headers.Authorization;
+      if (authHeader.startsWith('Bearer ')) {
+        apiKey = authHeader.substring(7); // Extract token after "Bearer "
+      }
+      // Clear headers display for GLM servers since we use API key field
+      headersJson = '{}';
+    }
+
     setFormData({
       id: server.id,
       name: server.name,
       url: server.url,
       protocol: server.protocol,
-      api_key: server.api_key || '',
-      headers: JSON.stringify(server.headers || {}, null, 2),
+      api_key: apiKey,
+      headers: headersJson,
       stdio_command: server.stdio_command || '',
       stdio_args: JSON.stringify(server.stdio_args || [], null, 2),
+      stdio_env: envRecordToArray(server.stdio_env),
     });
     setFormError(null);
     setIsEditDialogOpen(true);
@@ -180,6 +291,14 @@ export function MCPServersPage() {
       }
     }
 
+    // Validate env vars - check for duplicate keys
+    const envKeys = formData.stdio_env.map((item) => item.key.trim()).filter((key) => key);
+    const uniqueKeys = new Set(envKeys);
+    if (envKeys.length !== uniqueKeys.size) {
+      setFormError(t.MCPServers.validation.duplicateEnvVarKey);
+      return false;
+    }
+
     return true;
   };
 
@@ -188,6 +307,13 @@ export function MCPServersPage() {
 
     setIsSubmitting(true);
     try {
+      let envRecord = envArrayToRecord(formData.stdio_env);
+
+      // For MiniMax servers, ensure MINIMAX_API_HOST is set with default value if not provided
+      if (isMinimaxCodingPlanServer(formData) && !envRecord.MINIMAX_API_HOST) {
+        envRecord = { ...envRecord, MINIMAX_API_HOST: MINIMAX_DEFAULT_HOST };
+      }
+
       const serverData: CreateMCPServerData = {
         id: formData.id.trim(),
         name: formData.name.trim(),
@@ -197,6 +323,7 @@ export function MCPServersPage() {
         headers: formData.headers?.trim() ? JSON.parse(formData.headers) : undefined,
         stdio_command: formData.stdio_command?.trim() || undefined,
         stdio_args: formData.stdio_args?.trim() ? JSON.parse(formData.stdio_args) : undefined,
+        stdio_env: Object.keys(envRecord).length > 0 ? envRecord : undefined,
         is_enabled: true,
         is_built_in: false,
       };
@@ -221,14 +348,32 @@ export function MCPServersPage() {
 
     setIsSubmitting(true);
     try {
+      let envRecord = envArrayToRecord(formData.stdio_env);
+
+      // For MiniMax servers, ensure MINIMAX_API_HOST is set with default value if not provided
+      if (isMinimaxCodingPlanServer(formData) && !envRecord.MINIMAX_API_HOST) {
+        envRecord = { ...envRecord, MINIMAX_API_HOST: MINIMAX_DEFAULT_HOST };
+      }
+
+      // For GLM HTTP servers, convert API key to Authorization header
+      let headers: Record<string, string> | undefined;
+      if (isGLMCodingPlanHttpServer(formData) && formData.api_key?.trim()) {
+        headers = { Authorization: `Bearer ${formData.api_key.trim()}` };
+      } else if (formData.headers?.trim()) {
+        headers = JSON.parse(formData.headers);
+      }
+
       const updateData: UpdateMCPServerData = {
         name: formData.name.trim(),
         url: formData.url.trim(),
         protocol: formData.protocol,
-        api_key: formData.api_key?.trim() || undefined,
-        headers: formData.headers?.trim() ? JSON.parse(formData.headers) : undefined,
+        api_key: isGLMCodingPlanHttpServer(formData)
+          ? undefined
+          : formData.api_key?.trim() || undefined,
+        headers,
         stdio_command: formData.stdio_command?.trim() || undefined,
         stdio_args: formData.stdio_args?.trim() ? JSON.parse(formData.stdio_args) : undefined,
+        stdio_env: Object.keys(envRecord).length > 0 ? envRecord : undefined,
       };
 
       await databaseService.updateMCPServer(editingServer.id, updateData);
@@ -654,6 +799,171 @@ export function MCPServersPage() {
                     rows={3}
                   />
                 </div>
+
+                {/* Environment Variables */}
+                <div className="space-y-2">
+                  <Label>{t.MCPServers.form.envVars}</Label>
+                  {isMinimaxCodingPlanServer(formData) ? (
+                    // MiniMax specific env vars
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor={`${createEnvId}-api-key`} className="text-sm font-normal">
+                          {t.MCPServers.form.minimaxApiKey}
+                        </Label>
+                        <Input
+                          id={`${createEnvId}-api-key`}
+                          type="password"
+                          value={
+                            formData.stdio_env.find((e) => e.key === 'MINIMAX_API_KEY')?.value || ''
+                          }
+                          onChange={(e) => {
+                            const newEnv = formData.stdio_env.filter(
+                              (item) => item.key !== 'MINIMAX_API_KEY'
+                            );
+                            if (e.target.value) {
+                              newEnv.push({ key: 'MINIMAX_API_KEY', value: e.target.value });
+                            }
+                            setFormData({ ...formData, stdio_env: newEnv });
+                          }}
+                          placeholder={t.MCPServers.form.minimaxApiKeyPlaceholder}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`${createEnvId}-api-host`} className="text-sm font-normal">
+                          {t.MCPServers.form.minimaxApiHost}
+                        </Label>
+                        <Input
+                          id={`${createEnvId}-api-host`}
+                          value={
+                            formData.stdio_env.find((e) => e.key === 'MINIMAX_API_HOST')?.value ||
+                            MINIMAX_DEFAULT_HOST
+                          }
+                          onChange={(e) => {
+                            const newEnv = formData.stdio_env.filter(
+                              (item) => item.key !== 'MINIMAX_API_HOST'
+                            );
+                            if (e.target.value && e.target.value !== MINIMAX_DEFAULT_HOST) {
+                              newEnv.push({ key: 'MINIMAX_API_HOST', value: e.target.value });
+                            } else if (e.target.value === '') {
+                              // Keep empty to use default
+                            } else {
+                              newEnv.push({ key: 'MINIMAX_API_HOST', value: e.target.value });
+                            }
+                            setFormData({ ...formData, stdio_env: newEnv });
+                          }}
+                          placeholder={MINIMAX_DEFAULT_HOST}
+                        />
+                      </div>
+                    </div>
+                  ) : isGLMCodingPlanVisionServer(formData) ? (
+                    // GLM Coding Plan Vision specific env vars
+                    <div className="space-y-3">
+                      <div>
+                        <Label
+                          htmlFor={`${createEnvId}-z-ai-api-key`}
+                          className="text-sm font-normal"
+                        >
+                          {t.MCPServers.form.glmApiKey}
+                        </Label>
+                        <Input
+                          id={`${createEnvId}-z-ai-api-key`}
+                          type="password"
+                          value={
+                            formData.stdio_env.find((e) => e.key === 'Z_AI_API_KEY')?.value || ''
+                          }
+                          onChange={(e) => {
+                            const newEnv = formData.stdio_env.filter(
+                              (item) => item.key !== 'Z_AI_API_KEY'
+                            );
+                            if (e.target.value) {
+                              newEnv.push({ key: 'Z_AI_API_KEY', value: e.target.value });
+                            }
+                            setFormData({ ...formData, stdio_env: newEnv });
+                          }}
+                          placeholder={t.MCPServers.form.glmApiKeyPlaceholder}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`${createEnvId}-z-ai-mode`} className="text-sm font-normal">
+                          {t.MCPServers.form.glmApiMode}
+                        </Label>
+                        <Input
+                          id={`${createEnvId}-z-ai-mode`}
+                          value={
+                            formData.stdio_env.find((e) => e.key === 'Z_AI_MODE')?.value || 'ZHIPU'
+                          }
+                          onChange={(e) => {
+                            const newEnv = formData.stdio_env.filter(
+                              (item) => item.key !== 'Z_AI_MODE'
+                            );
+                            newEnv.push({ key: 'Z_AI_MODE', value: e.target.value || 'ZHIPU' });
+                            setFormData({ ...formData, stdio_env: newEnv });
+                          }}
+                          placeholder="ZHIPU"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {t.MCPServers.form.glmApiModeHint}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    // Generic key-value env vars
+                    <div className="space-y-2">
+                      {formData.stdio_env.map((item, index) => (
+                        <div
+                          key={`${item.key}-${item.value}-${index}`}
+                          className="flex items-center gap-2"
+                        >
+                          <Input
+                            value={item.key}
+                            onChange={(e) => {
+                              const newEnv = [...formData.stdio_env];
+                              newEnv[index] = { key: e.target.value, value: item.value };
+                              setFormData({ ...formData, stdio_env: newEnv });
+                            }}
+                            placeholder={t.MCPServers.form.envVarKey}
+                            className="flex-1"
+                          />
+                          <Input
+                            value={item.value}
+                            onChange={(e) => {
+                              const newEnv = [...formData.stdio_env];
+                              newEnv[index] = { key: item.key, value: e.target.value };
+                              setFormData({ ...formData, stdio_env: newEnv });
+                            }}
+                            placeholder={t.MCPServers.form.envVarValue}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              const newEnv = formData.stdio_env.filter((_, i) => i !== index);
+                              setFormData({ ...formData, stdio_env: newEnv });
+                            }}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            stdio_env: [...formData.stdio_env, { key: '', value: '' }],
+                          });
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        {t.MCPServers.form.addEnvVar}
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </>
             )}
 
@@ -755,16 +1065,19 @@ export function MCPServersPage() {
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor={editHeadersId}>{t.MCPServers.form.headers}</Label>
-                  <Textarea
-                    id={editHeadersId}
-                    value={formData.headers || ''}
-                    onChange={(e) => setFormData({ ...formData, headers: e.target.value })}
-                    placeholder={t.MCPServers.form.headersPlaceholder}
-                    rows={3}
-                  />
-                </div>
+                {/* Hide headers field for GLM HTTP servers - API key is auto-converted to Authorization header */}
+                {!isGLMCodingPlanHttpServer(formData) && (
+                  <div>
+                    <Label htmlFor={editHeadersId}>{t.MCPServers.form.headers}</Label>
+                    <Textarea
+                      id={editHeadersId}
+                      value={formData.headers || ''}
+                      onChange={(e) => setFormData({ ...formData, headers: e.target.value })}
+                      placeholder={t.MCPServers.form.headersPlaceholder}
+                      rows={3}
+                    />
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -792,6 +1105,171 @@ export function MCPServersPage() {
                     placeholder={t.MCPServers.form.argumentsPlaceholder}
                     rows={3}
                   />
+                </div>
+
+                {/* Environment Variables */}
+                <div className="space-y-2">
+                  <Label>{t.MCPServers.form.envVars}</Label>
+                  {isMinimaxCodingPlanServer(formData) ? (
+                    // MiniMax specific env vars
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor={`${editEnvId}-api-key`} className="text-sm font-normal">
+                          {t.MCPServers.form.minimaxApiKey}
+                        </Label>
+                        <Input
+                          id={`${editEnvId}-api-key`}
+                          type="password"
+                          value={
+                            formData.stdio_env.find((e) => e.key === 'MINIMAX_API_KEY')?.value || ''
+                          }
+                          onChange={(e) => {
+                            const newEnv = formData.stdio_env.filter(
+                              (item) => item.key !== 'MINIMAX_API_KEY'
+                            );
+                            if (e.target.value) {
+                              newEnv.push({ key: 'MINIMAX_API_KEY', value: e.target.value });
+                            }
+                            setFormData({ ...formData, stdio_env: newEnv });
+                          }}
+                          placeholder={t.MCPServers.form.minimaxApiKeyPlaceholder}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`${editEnvId}-api-host`} className="text-sm font-normal">
+                          {t.MCPServers.form.minimaxApiHost}
+                        </Label>
+                        <Input
+                          id={`${editEnvId}-api-host`}
+                          value={
+                            formData.stdio_env.find((e) => e.key === 'MINIMAX_API_HOST')?.value ||
+                            MINIMAX_DEFAULT_HOST
+                          }
+                          onChange={(e) => {
+                            const newEnv = formData.stdio_env.filter(
+                              (item) => item.key !== 'MINIMAX_API_HOST'
+                            );
+                            if (e.target.value && e.target.value !== MINIMAX_DEFAULT_HOST) {
+                              newEnv.push({ key: 'MINIMAX_API_HOST', value: e.target.value });
+                            } else if (e.target.value === '') {
+                              // Keep empty to use default
+                            } else {
+                              newEnv.push({ key: 'MINIMAX_API_HOST', value: e.target.value });
+                            }
+                            setFormData({ ...formData, stdio_env: newEnv });
+                          }}
+                          placeholder={MINIMAX_DEFAULT_HOST}
+                        />
+                      </div>
+                    </div>
+                  ) : isGLMCodingPlanVisionServer(formData) ? (
+                    // GLM Coding Plan Vision specific env vars
+                    <div className="space-y-3">
+                      <div>
+                        <Label
+                          htmlFor={`${editEnvId}-z-ai-api-key`}
+                          className="text-sm font-normal"
+                        >
+                          {t.MCPServers.form.glmApiKey}
+                        </Label>
+                        <Input
+                          id={`${editEnvId}-z-ai-api-key`}
+                          type="password"
+                          value={
+                            formData.stdio_env.find((e) => e.key === 'Z_AI_API_KEY')?.value || ''
+                          }
+                          onChange={(e) => {
+                            const newEnv = formData.stdio_env.filter(
+                              (item) => item.key !== 'Z_AI_API_KEY'
+                            );
+                            if (e.target.value) {
+                              newEnv.push({ key: 'Z_AI_API_KEY', value: e.target.value });
+                            }
+                            setFormData({ ...formData, stdio_env: newEnv });
+                          }}
+                          placeholder={t.MCPServers.form.glmApiKeyPlaceholder}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`${editEnvId}-z-ai-mode`} className="text-sm font-normal">
+                          {t.MCPServers.form.glmApiMode}
+                        </Label>
+                        <Input
+                          id={`${editEnvId}-z-ai-mode`}
+                          value={
+                            formData.stdio_env.find((e) => e.key === 'Z_AI_MODE')?.value || 'ZHIPU'
+                          }
+                          onChange={(e) => {
+                            const newEnv = formData.stdio_env.filter(
+                              (item) => item.key !== 'Z_AI_MODE'
+                            );
+                            newEnv.push({ key: 'Z_AI_MODE', value: e.target.value || 'ZHIPU' });
+                            setFormData({ ...formData, stdio_env: newEnv });
+                          }}
+                          placeholder="ZHIPU"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {t.MCPServers.form.glmApiModeHint}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    // Generic key-value env vars
+                    <div className="space-y-2">
+                      {formData.stdio_env.map((item, index) => (
+                        <div
+                          key={`${item.key}-${item.value}-${index}`}
+                          className="flex items-center gap-2"
+                        >
+                          <Input
+                            value={item.key}
+                            onChange={(e) => {
+                              const newEnv = [...formData.stdio_env];
+                              newEnv[index] = { key: e.target.value, value: item.value };
+                              setFormData({ ...formData, stdio_env: newEnv });
+                            }}
+                            placeholder={t.MCPServers.form.envVarKey}
+                            className="flex-1"
+                          />
+                          <Input
+                            value={item.value}
+                            onChange={(e) => {
+                              const newEnv = [...formData.stdio_env];
+                              newEnv[index] = { key: item.key, value: e.target.value };
+                              setFormData({ ...formData, stdio_env: newEnv });
+                            }}
+                            placeholder={t.MCPServers.form.envVarValue}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              const newEnv = formData.stdio_env.filter((_, i) => i !== index);
+                              setFormData({ ...formData, stdio_env: newEnv });
+                            }}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            stdio_env: [...formData.stdio_env, { key: '', value: '' }],
+                          });
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        {t.MCPServers.form.addEnvVar}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </>
             )}

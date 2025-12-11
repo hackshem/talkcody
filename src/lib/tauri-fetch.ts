@@ -45,18 +45,28 @@ function extractRequestParams(input: RequestInfo | URL, init?: RequestInit) {
     typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
   const method = init?.method || 'GET';
 
-  // Extract headers with defaults
-  const headers: Record<string, string> = {
-    Accept: 'application/json, text/plain, */*',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'User-Agent': navigator.userAgent,
-  };
+  // Extract headers - start with empty object, then add defaults only if not provided
+  const headers: Record<string, string> = {};
 
+  // First, extract all headers from init (if provided)
   if (init?.headers) {
     const headerObj = new Headers(init.headers);
     headerObj.forEach((value, key) => {
+      // Normalize header names to proper case for consistency
       headers[key] = value;
     });
+  }
+
+  // Add defaults only if not already set (case-insensitive check)
+  const headerKeys = Object.keys(headers).map((k) => k.toLowerCase());
+  if (!headerKeys.includes('accept')) {
+    headers['Accept'] = 'application/json, text/plain, */*';
+  }
+  if (!headerKeys.includes('accept-language')) {
+    headers['Accept-Language'] = 'en-US,en;q=0.9';
+  }
+  if (!headerKeys.includes('user-agent')) {
+    headers['User-Agent'] = navigator.userAgent;
   }
 
   // Extract body

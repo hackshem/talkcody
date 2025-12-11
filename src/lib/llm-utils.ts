@@ -2,6 +2,7 @@ import { safeValidateTypes } from '@ai-sdk/provider-utils';
 import type { ModelMessage } from 'ai';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
+import { parseModelIdentifier } from '@/lib/provider-utils';
 import type { ConvertMessagesOptions, ToolMessageContent, UIMessage } from '@/types/agent';
 
 const MAX_LINES = 2000;
@@ -246,12 +247,23 @@ export async function convertMessages(
         });
       }
 
+      const modelKey = options.model ? parseModelIdentifier(options.model).modelKey : undefined;
+      logger.info('[convertMessages] Processing attachments for model:', { modelKey });
+
       for (const attachment of msg.attachments) {
         if (attachment.type === 'image' && attachment.content) {
-          content.push({
-            type: 'image' as const,
-            image: attachment.content,
-          });
+          if (modelKey === 'glm-4.6') {
+            const filePath = attachment.filePath ?? attachment.filename;
+            content.push({
+              type: 'text' as const,
+              text: `The image file path is ${filePath}`,
+            });
+          } else {
+            content.push({
+              type: 'image' as const,
+              image: attachment.content,
+            });
+          }
         } else if (attachment.type === 'file' || attachment.type === 'code') {
           const { tooLong, lineCount } = isContentTooLong(attachment.content);
           const filePath = attachment.filePath ?? attachment.filename;

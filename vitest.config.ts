@@ -30,6 +30,7 @@ export default defineConfig({
       '**/~/.bun/**',
       'apps/**/node_modules/**',
       'packages/**/node_modules/**',
+      '**/e2e/**', // Playwright e2e tests should be run separately
     ],
     coverage: {
       provider: 'v8',

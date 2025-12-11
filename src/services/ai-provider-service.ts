@@ -1,6 +1,6 @@
 import { logger } from '@/lib/logger';
 import { MODEL_CONFIGS, type ModelKey, type ProviderType } from '@/lib/models';
-import { providerRegistry } from '@/providers';
+import { PROVIDERS_WITH_CODING_PLAN, providerRegistry } from '@/providers';
 import { modelService } from '@/services/model-service';
 import { settingsManager } from '@/stores/settings-store';
 import type { ApiKeySettings } from '@/types/api-keys';
@@ -49,6 +49,11 @@ export class AIProviderService {
 
     try {
       this.apiKeys = await settingsManager.getApiKeys();
+
+      // Also load custom provider API keys
+      const customApiKeys = await settingsManager.getCustomProviderApiKeys();
+      this.apiKeys = { ...this.apiKeys, ...customApiKeys };
+
       this.lastApiKeysUpdate = now;
 
       // Load base URLs and useCodingPlan settings for all providers
@@ -60,8 +65,8 @@ export class AIProviderService {
           this.baseUrls.set(provider.id, baseUrl);
         }
 
-        // Load useCodingPlan setting for Zhipu
-        if (provider.id === 'zhipu') {
+        // Load useCodingPlan setting for providers that support it
+        if (PROVIDERS_WITH_CODING_PLAN.includes(provider.id)) {
           const useCodingPlan = await settingsManager.getProviderUseCodingPlan(provider.id);
           this.useCodingPlanSettings.set(provider.id, useCodingPlan);
         }
@@ -84,7 +89,12 @@ export class AIProviderService {
     // Dynamically create providers based on registry
     for (const provider of providerRegistry.getAllProviders()) {
       const providerId = provider.id;
-      const apiKey = this.apiKeys[providerId as keyof ApiKeySettings];
+      let apiKey = this.apiKeys[providerId as keyof ApiKeySettings];
+
+      // For custom providers, get API key from custom provider service
+      if (provider.isCustom && provider.customConfig) {
+        apiKey = provider.customConfig.apiKey;
+      }
 
       // Skip if no API key (except for ollama/lmstudio which uses 'enabled')
       if (!apiKey) {
@@ -102,11 +112,11 @@ export class AIProviderService {
         // Use custom base URL if set, otherwise use the default from provider definition
         let customBaseUrl = this.baseUrls.get(providerId);
 
-        // Special handling for Zhipu: determine base URL based on useCodingPlan setting
-        if (providerId === 'zhipu' && !customBaseUrl) {
+        // Special handling for providers with Coding Plan: determine base URL based on useCodingPlan setting
+        if (!customBaseUrl) {
           const useCodingPlan = this.useCodingPlanSettings.get(providerId);
-          if (useCodingPlan) {
-            customBaseUrl = 'https://open.bigmodel.cn/api/coding/paas/v4';
+          if (useCodingPlan && provider.codingPlanBaseUrl) {
+            customBaseUrl = provider.codingPlanBaseUrl;
           }
         }
 
@@ -239,6 +249,12 @@ export class AIProviderService {
     this.lastApiKeysUpdate = 0;
     await this.updateApiKeys();
     this.createProviders();
+  }
+
+  // Refresh custom providers
+  async refreshCustomProviders(): Promise<void> {
+    await providerRegistry.refreshCustomProviders();
+    await this.refreshProviders();
   }
 
   // Get a specific provider by ID

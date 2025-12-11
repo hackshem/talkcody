@@ -29,10 +29,9 @@ import { useVoiceInput } from '@/hooks/use-voice-input';
 import { logger } from '@/lib/logger';
 import { generateId } from '@/lib/utils';
 import { fileUploadService } from '@/services/file-upload-service';
-import { modelService } from '@/services/model-service';
 import { repositoryService } from '@/services/repository-service';
-import { useModelStore } from '@/stores/model-store';
 import { usePlanModeStore } from '@/stores/plan-mode-store';
+import { modelService, useProviderStore } from '@/stores/provider-store';
 import type { MessageAttachment } from '@/types/agent';
 import type { Command } from '@/types/command';
 import {
@@ -413,7 +412,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     const checkModelImageSupport = useCallback(
       async (modelIdentifier: string): Promise<boolean> => {
         try {
-          const { availableModels } = useModelStore.getState();
+          const { availableModels } = useProviderStore.getState();
 
           // Parse model identifier (format: "modelKey@provider" or just "modelKey")
           const modelKey = modelIdentifier.split('@')[0];

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ModelConfig } from '@/types/models';
 
 // Mock dependencies before importing the service
 vi.mock('@tauri-apps/api/core', () => ({
@@ -10,6 +11,12 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
   exists: vi.fn(),
   readTextFile: vi.fn(),
   writeTextFile: vi.fn(),
+}));
+
+vi.mock('@/services/custom-provider-service', () => ({
+  customProviderService: {
+    getEnabledCustomProviders: vi.fn().mockResolvedValue([]),
+  },
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -152,5 +159,271 @@ describe('CustomModelService - fetchProviderModels with custom base URL', () => 
         }),
       }),
     });
+  });
+});
+
+describe('CustomModelService - addCustomModel provider merging', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it('should merge providers when adding a model with same ID via addCustomModel', async () => {
+    const { exists, readTextFile, writeTextFile } = await import('@tauri-apps/plugin-fs');
+    const { customModelService } = await import('./custom-model-service');
+
+    // Setup: existing model with provider A
+    const existingConfig = {
+      version: 'custom',
+      models: {
+        'test-model': {
+          name: 'Test Model',
+          providers: ['providerA'],
+          pricing: { input: '0', output: '0' },
+        },
+      },
+    };
+
+    vi.mocked(exists).mockResolvedValue(true);
+    vi.mocked(readTextFile).mockResolvedValue(JSON.stringify(existingConfig));
+    vi.mocked(writeTextFile).mockResolvedValue();
+
+    // Clear cache to force re-read
+    customModelService.clearCache();
+
+    // Add same model with provider B
+    const newConfig: ModelConfig = {
+      name: 'Test Model',
+      providers: ['providerB'],
+      pricing: { input: '0', output: '0' },
+    };
+
+    await customModelService.addCustomModel('test-model', newConfig);
+
+    // Verify writeTextFile was called with merged providers
+    expect(writeTextFile).toHaveBeenCalled();
+    const savedContent = vi.mocked(writeTextFile).mock.calls[0][1];
+    const savedConfig = JSON.parse(savedContent);
+
+    expect(savedConfig.models['test-model'].providers).toEqual(['providerA', 'providerB']);
+  });
+
+  it('should merge providers when adding a model with same ID via addCustomModels', async () => {
+    const { exists, readTextFile, writeTextFile } = await import('@tauri-apps/plugin-fs');
+    const { customModelService } = await import('./custom-model-service');
+
+    // Setup: existing model with provider A
+    const existingConfig = {
+      version: 'custom',
+      models: {
+        'test-model': {
+          name: 'Test Model',
+          providers: ['providerA'],
+          pricing: { input: '0', output: '0' },
+        },
+      },
+    };
+
+    vi.mocked(exists).mockResolvedValue(true);
+    vi.mocked(readTextFile).mockResolvedValue(JSON.stringify(existingConfig));
+    vi.mocked(writeTextFile).mockResolvedValue();
+
+    // Clear cache to force re-read
+    customModelService.clearCache();
+
+    // Add same model with provider B
+    const newModels: Record<string, ModelConfig> = {
+      'test-model': {
+        name: 'Test Model',
+        providers: ['providerB'],
+        pricing: { input: '0', output: '0' },
+      },
+    };
+
+    await customModelService.addCustomModels(newModels);
+
+    // Verify writeTextFile was called with merged providers
+    expect(writeTextFile).toHaveBeenCalled();
+    const savedContent = vi.mocked(writeTextFile).mock.calls[0][1];
+    const savedConfig = JSON.parse(savedContent);
+
+    expect(savedConfig.models['test-model'].providers).toEqual(['providerA', 'providerB']);
+  });
+
+  it('should merge providerMappings when adding a model with same ID', async () => {
+    const { exists, readTextFile, writeTextFile } = await import('@tauri-apps/plugin-fs');
+    const { customModelService } = await import('./custom-model-service');
+
+    // Setup: existing model with provider A and its mapping
+    const existingConfig = {
+      version: 'custom',
+      models: {
+        'test-model': {
+          name: 'Test Model',
+          providers: ['providerA'],
+          providerMappings: { providerA: 'model-name-on-A' },
+          pricing: { input: '0', output: '0' },
+        },
+      },
+    };
+
+    vi.mocked(exists).mockResolvedValue(true);
+    vi.mocked(readTextFile).mockResolvedValue(JSON.stringify(existingConfig));
+    vi.mocked(writeTextFile).mockResolvedValue();
+
+    // Clear cache to force re-read
+    customModelService.clearCache();
+
+    // Add same model with provider B and its mapping
+    const newConfig: ModelConfig = {
+      name: 'Test Model',
+      providers: ['providerB'],
+      providerMappings: { providerB: 'model-name-on-B' },
+      pricing: { input: '0', output: '0' },
+    };
+
+    await customModelService.addCustomModel('test-model', newConfig);
+
+    // Verify writeTextFile was called with merged providerMappings
+    expect(writeTextFile).toHaveBeenCalled();
+    const savedContent = vi.mocked(writeTextFile).mock.calls[0][1];
+    const savedConfig = JSON.parse(savedContent);
+
+    expect(savedConfig.models['test-model'].providers).toEqual(['providerA', 'providerB']);
+    expect(savedConfig.models['test-model'].providerMappings).toEqual({
+      providerA: 'model-name-on-A',
+      providerB: 'model-name-on-B',
+    });
+  });
+
+  it('should not duplicate providers when adding same provider twice', async () => {
+    const { exists, readTextFile, writeTextFile } = await import('@tauri-apps/plugin-fs');
+    const { customModelService } = await import('./custom-model-service');
+
+    // Setup: existing model with provider A
+    const existingConfig = {
+      version: 'custom',
+      models: {
+        'test-model': {
+          name: 'Test Model',
+          providers: ['providerA'],
+          pricing: { input: '0', output: '0' },
+        },
+      },
+    };
+
+    vi.mocked(exists).mockResolvedValue(true);
+    vi.mocked(readTextFile).mockResolvedValue(JSON.stringify(existingConfig));
+    vi.mocked(writeTextFile).mockResolvedValue();
+
+    // Clear cache to force re-read
+    customModelService.clearCache();
+
+    // Add same model with same provider A again
+    const newConfig: ModelConfig = {
+      name: 'Test Model',
+      providers: ['providerA'],
+      pricing: { input: '0', output: '0' },
+    };
+
+    await customModelService.addCustomModel('test-model', newConfig);
+
+    // Verify writeTextFile was called with deduplicated providers
+    expect(writeTextFile).toHaveBeenCalled();
+    const savedContent = vi.mocked(writeTextFile).mock.calls[0][1];
+    const savedConfig = JSON.parse(savedContent);
+
+    expect(savedConfig.models['test-model'].providers).toEqual(['providerA']);
+  });
+
+  it('should create new model when model ID does not exist', async () => {
+    const { exists, readTextFile, writeTextFile } = await import('@tauri-apps/plugin-fs');
+    const { customModelService } = await import('./custom-model-service');
+
+    // Setup: empty config
+    const existingConfig = {
+      version: 'custom',
+      models: {},
+    };
+
+    vi.mocked(exists).mockResolvedValue(true);
+    vi.mocked(readTextFile).mockResolvedValue(JSON.stringify(existingConfig));
+    vi.mocked(writeTextFile).mockResolvedValue();
+
+    // Clear cache to force re-read
+    customModelService.clearCache();
+
+    // Add new model
+    const newConfig: ModelConfig = {
+      name: 'New Model',
+      providers: ['providerA'],
+      pricing: { input: '0', output: '0' },
+    };
+
+    await customModelService.addCustomModel('new-model', newConfig);
+
+    // Verify writeTextFile was called with the new model
+    expect(writeTextFile).toHaveBeenCalled();
+    const savedContent = vi.mocked(writeTextFile).mock.calls[0][1];
+    const savedConfig = JSON.parse(savedContent);
+
+    expect(savedConfig.models['new-model']).toEqual(newConfig);
+  });
+
+  it('should handle merging multiple models at once with addCustomModels', async () => {
+    const { exists, readTextFile, writeTextFile } = await import('@tauri-apps/plugin-fs');
+    const { customModelService } = await import('./custom-model-service');
+
+    // Setup: existing models
+    const existingConfig = {
+      version: 'custom',
+      models: {
+        'model-1': {
+          name: 'Model 1',
+          providers: ['providerA'],
+          pricing: { input: '0', output: '0' },
+        },
+        'model-2': {
+          name: 'Model 2',
+          providers: ['providerA'],
+          pricing: { input: '0', output: '0' },
+        },
+      },
+    };
+
+    vi.mocked(exists).mockResolvedValue(true);
+    vi.mocked(readTextFile).mockResolvedValue(JSON.stringify(existingConfig));
+    vi.mocked(writeTextFile).mockResolvedValue();
+
+    // Clear cache to force re-read
+    customModelService.clearCache();
+
+    // Add: merge model-1, create model-3
+    const newModels: Record<string, ModelConfig> = {
+      'model-1': {
+        name: 'Model 1',
+        providers: ['providerB'],
+        pricing: { input: '0', output: '0' },
+      },
+      'model-3': {
+        name: 'Model 3',
+        providers: ['providerC'],
+        pricing: { input: '0', output: '0' },
+      },
+    };
+
+    await customModelService.addCustomModels(newModels);
+
+    // Verify
+    expect(writeTextFile).toHaveBeenCalled();
+    const savedContent = vi.mocked(writeTextFile).mock.calls[0][1];
+    const savedConfig = JSON.parse(savedContent);
+
+    // model-1 should have merged providers
+    expect(savedConfig.models['model-1'].providers).toEqual(['providerA', 'providerB']);
+    // model-2 should be unchanged
+    expect(savedConfig.models['model-2'].providers).toEqual(['providerA']);
+    // model-3 should be newly created
+    expect(savedConfig.models['model-3'].providers).toEqual(['providerC']);
   });
 });

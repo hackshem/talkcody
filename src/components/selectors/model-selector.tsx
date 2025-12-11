@@ -1,9 +1,9 @@
 // src/components/selectors/model-selector.tsx
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useAppSettings } from '@/hooks/use-settings';
 import { logger } from '@/lib/logger';
-import { useModelStore } from '@/stores/model-store';
+import { useProviderStore } from '@/stores/provider-store';
 import type { AvailableModel } from '@/types/api-keys';
 import { BaseSelector } from './base-selector';
 
@@ -23,27 +23,9 @@ export function ModelSelector({
   placeholder,
 }: ModelSelectorProps) {
   const { settings, setModel, loading: settingsLoading } = useAppSettings();
-  const { availableModels, isLoading: modelsLoading, refreshModels } = useModelStore();
-
-  // Add global event listeners for API key updates and model config updates
-  useEffect(() => {
-    const handleApiKeysUpdate = () => {
-      refreshModels();
-    };
-
-    const handleModelsUpdate = () => {
-      refreshModels();
-    };
-
-    // Listen for custom events
-    window.addEventListener('apiKeysUpdated', handleApiKeysUpdate);
-    window.addEventListener('modelsUpdated', handleModelsUpdate);
-
-    return () => {
-      window.removeEventListener('apiKeysUpdated', handleApiKeysUpdate);
-      window.removeEventListener('modelsUpdated', handleModelsUpdate);
-    };
-  }, [refreshModels]);
+  // Use provider store directly - no event listeners needed, Zustand handles reactivity
+  const availableModels = useProviderStore((state) => state.availableModels);
+  const isLoading = useProviderStore((state) => state.isLoading);
 
   const modelItems = useMemo(() => {
     // Filter models based on filterFn
@@ -77,7 +59,7 @@ export function ModelSelector({
   };
 
   // Show loading state while models or settings are loading
-  if ((!value && settingsLoading) || modelsLoading) return null;
+  if ((!value && settingsLoading) || isLoading) return null;
 
   // If no models are available, show a helpful message instead of a selector
   if (availableModels.length === 0) {

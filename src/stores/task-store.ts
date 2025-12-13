@@ -17,7 +17,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { logger } from '@/lib/logger';
 import { generateId } from '@/lib/utils';
-import type { Task, TaskSettings } from '@/services/database/types';
+import type { Task, TaskSettings } from '@/types';
 import type { ToolMessageContent, UIMessage } from '@/types/agent';
 
 // Stable empty array reference to avoid unnecessary re-renders

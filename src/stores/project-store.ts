@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { logger } from '@/lib/logger';
-import type { Project } from '@/services/database/types';
 import { databaseService } from '@/services/database-service';
+import type { Project } from '@/types';
 
 interface ProjectState {
   projects: Project[];

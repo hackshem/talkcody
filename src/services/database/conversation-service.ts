@@ -3,10 +3,10 @@
 import { logger } from '@/lib/logger';
 import { timedMethod } from '@/lib/timer';
 import { generateId } from '@/lib/utils';
+import type { StoredAttachment, StoredMessage, Task } from '@/types';
 import type { MessageAttachment } from '@/types/agent';
 import { fileService } from '../file-service';
 import type { TursoClient } from './turso-client';
-import type { StoredAttachment, StoredMessage, Task } from './types';
 
 export class ConversationService {
   constructor(private db: TursoClient) {}

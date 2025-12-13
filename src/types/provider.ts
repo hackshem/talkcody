@@ -1,5 +1,9 @@
-// src/providers/types.ts
-import type { CustomProviderConfig } from '@/types/custom-provider';
+// src/types/provider.ts
+/**
+ * Provider type definitions
+ */
+
+import type { CustomProviderConfig } from './custom-provider';
 
 export type ProviderType =
   | 'openai'

@@ -1,7 +1,7 @@
 // src/components/chat/message-list.test.tsx
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { StoredToolContent } from '@/services/database/types';
+import type { StoredToolContent } from '@/types';
 import type { UIMessage } from '@/types/agent';
 import { MessageList } from './message-list';
 

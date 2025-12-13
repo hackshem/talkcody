@@ -5,7 +5,6 @@ import { createTool } from '@/lib/create-tool';
 import { logger } from '@/lib/logger';
 import { createPathSecurityError, isPathWithinProjectDirectory } from '@/lib/utils/path-security';
 import { ConversationManager } from '@/services/conversation-manager';
-import type { TaskSettings } from '@/services/database/types';
 import { notificationService } from '@/services/notification-service';
 import { repositoryService } from '@/services/repository-service';
 import { normalizeFilePath } from '@/services/repository-utils';
@@ -17,6 +16,7 @@ import {
 } from '@/stores/edit-review-store';
 import { useFileChangesStore } from '@/stores/file-changes-store';
 import { settingsManager } from '@/stores/settings-store';
+import type { TaskSettings } from '@/types';
 import {
   findSimilarText,
   fuzzyMatch,

@@ -5,7 +5,7 @@ export type {
   CreateMCPServerData,
   MCPServer,
   UpdateMCPServerData,
-} from '@/services/database/types';
+} from '@/types';
 export * from './mcp-server-service';
 // Export all MCP related modules and types
 export * from './multi-mcp-adapter';

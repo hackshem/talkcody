@@ -3,7 +3,7 @@ import { join } from '@tauri-apps/api/path';
 import { exists, mkdir, readDir, readTextFile, remove, writeTextFile } from '@tauri-apps/plugin-fs';
 import { logger } from '@/lib/logger';
 import { timedMethod } from '@/lib/timer';
-import type { CreateTodoItem, TodoItem } from './database/types';
+import type { CreateTodoItem, TodoItem } from '@/types';
 
 export interface FileTodoData {
   conversationId: string;

@@ -6,7 +6,7 @@ import type { JSONRPCMessage, MessageExtraInfo } from '@modelcontextprotocol/sdk
 import { platform } from '@tauri-apps/plugin-os';
 import { type Child, Command } from '@tauri-apps/plugin-shell';
 import { logger } from '@/lib/logger';
-import type { MCPServer } from '@/services/database/types';
+import type { MCPServer } from '@/types';
 
 /**
  * Shell wrapper configuration for each platform

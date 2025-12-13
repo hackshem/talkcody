@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Project } from '@/services/database/types';
+import type { Project } from '@/types';
 import { useProjectStore } from './project-store';
 
 vi.mock('@/services/database-service', () => ({

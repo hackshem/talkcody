@@ -1,6 +1,7 @@
 // src/services/database/agent-service.ts
+
+import type { Agent, CreateAgentData, UpdateAgentData } from '@/types';
 import { agentDatabaseService } from '../agent-database-service';
-import type { Agent, CreateAgentData, UpdateAgentData } from './types';
 
 export class AgentService {
   async createAgent(data: CreateAgentData): Promise<Agent> {

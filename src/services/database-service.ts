@@ -21,7 +21,7 @@ export type {
   TodoItem,
   UpdateMCPServerData,
   UpdateProjectData,
-} from './database/types';
+} from '@/types';
 
 export class DatabaseService {
   private db: TursoClient | null = null;
@@ -81,28 +81,25 @@ export class DatabaseService {
   }
 
   // Project methods
-  async createProject(data: import('./database/types').CreateProjectData): Promise<string> {
+  async createProject(data: import('@/types').CreateProjectData): Promise<string> {
     await this.ensureInitialized();
     if (!this.projectService) throw new Error('Project service not initialized');
     return this.projectService.createProject(data);
   }
 
-  async getProjects(): Promise<import('./database/types').Project[]> {
+  async getProjects(): Promise<import('@/types').Project[]> {
     await this.ensureInitialized();
     if (!this.projectService) throw new Error('Project service not initialized');
     return this.projectService.getProjects();
   }
 
-  async getProject(projectId: string): Promise<import('./database/types').Project> {
+  async getProject(projectId: string): Promise<import('@/types').Project> {
     await this.ensureInitialized();
     if (!this.projectService) throw new Error('Project service not initialized');
     return this.projectService.getProject(projectId);
   }
 
-  async updateProject(
-    projectId: string,
-    data: import('./database/types').UpdateProjectData
-  ): Promise<void> {
+  async updateProject(projectId: string, data: import('@/types').UpdateProjectData): Promise<void> {
     await this.ensureInitialized();
     if (!this.projectService) throw new Error('Project service not initialized');
     return this.projectService.updateProject(projectId, data);
@@ -120,15 +117,13 @@ export class DatabaseService {
     return this.projectService.getProjectStats(projectId);
   }
 
-  async getProjectByRootPath(rootPath: string): Promise<import('./database/types').Project | null> {
+  async getProjectByRootPath(rootPath: string): Promise<import('@/types').Project | null> {
     await this.ensureInitialized();
     if (!this.projectService) throw new Error('Project service not initialized');
     return this.projectService.getProjectByRootPath(rootPath);
   }
 
-  async createOrGetProjectForRepository(
-    rootPath: string
-  ): Promise<import('./database/types').Project> {
+  async createOrGetProjectForRepository(rootPath: string): Promise<import('@/types').Project> {
     await this.ensureInitialized();
     if (!this.projectService) throw new Error('Project service not initialized');
     return this.projectService.createOrGetProjectForRepository(rootPath);
@@ -140,9 +135,7 @@ export class DatabaseService {
     return this.projectService.clearRepositoryPath(projectId);
   }
 
-  async getProjectByRepositoryPath(
-    rootPath: string
-  ): Promise<import('./database/types').Project | null> {
+  async getProjectByRepositoryPath(rootPath: string): Promise<import('@/types').Project | null> {
     await this.ensureInitialized();
     if (!this.projectService) throw new Error('Project service not initialized');
     return this.projectService.getProjectByRepositoryPath(rootPath);
@@ -159,15 +152,13 @@ export class DatabaseService {
     return this.conversationService.createConversation(title, conversationId, projectId);
   }
 
-  async getConversations(projectId?: string): Promise<import('./database/types').Task[]> {
+  async getConversations(projectId?: string): Promise<import('@/types').Task[]> {
     await this.ensureInitialized();
     if (!this.conversationService) throw new Error('Conversation service not initialized');
     return this.conversationService.getConversations(projectId);
   }
 
-  async getConversationDetails(
-    conversationId: string
-  ): Promise<import('./database/types').Task | null> {
+  async getConversationDetails(conversationId: string): Promise<import('@/types').Task | null> {
     await this.ensureInitialized();
     if (!this.conversationService) throw new Error('Conversation service not initialized');
     return this.conversationService.getConversationDetails(conversationId);
@@ -214,7 +205,7 @@ export class DatabaseService {
     );
   }
 
-  async getMessages(conversationId: string): Promise<import('./database/types').StoredMessage[]> {
+  async getMessages(conversationId: string): Promise<import('@/types').StoredMessage[]> {
     await this.ensureInitialized();
     if (!this.conversationService) throw new Error('Conversation service not initialized');
     return this.conversationService.getMessages(conversationId);
@@ -279,34 +270,31 @@ export class DatabaseService {
   }
 
   // MCP Server methods
-  async createMCPServer(data: import('./database/types').CreateMCPServerData): Promise<string> {
+  async createMCPServer(data: import('@/types').CreateMCPServerData): Promise<string> {
     await this.ensureInitialized();
     if (!this.mcpServerService) throw new Error('MCP Server service not initialized');
     return this.mcpServerService.createMCPServer(data);
   }
 
-  async getMCPServers(): Promise<import('./database/types').MCPServer[]> {
+  async getMCPServers(): Promise<import('@/types').MCPServer[]> {
     await this.ensureInitialized();
     if (!this.mcpServerService) throw new Error('MCP Server service not initialized');
     return this.mcpServerService.getMCPServers();
   }
 
-  async getEnabledMCPServers(): Promise<import('./database/types').MCPServer[]> {
+  async getEnabledMCPServers(): Promise<import('@/types').MCPServer[]> {
     await this.ensureInitialized();
     if (!this.mcpServerService) throw new Error('MCP Server service not initialized');
     return this.mcpServerService.getEnabledMCPServers();
   }
 
-  async getMCPServer(id: string): Promise<import('./database/types').MCPServer | null> {
+  async getMCPServer(id: string): Promise<import('@/types').MCPServer | null> {
     await this.ensureInitialized();
     if (!this.mcpServerService) throw new Error('MCP Server service not initialized');
     return this.mcpServerService.getMCPServer(id);
   }
 
-  async updateMCPServer(
-    id: string,
-    data: import('./database/types').UpdateMCPServerData
-  ): Promise<void> {
+  async updateMCPServer(id: string, data: import('@/types').UpdateMCPServerData): Promise<void> {
     await this.ensureInitialized();
     if (!this.mcpServerService) throw new Error('MCP Server service not initialized');
     return this.mcpServerService.updateMCPServer(id, data);

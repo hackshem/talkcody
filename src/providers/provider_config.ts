@@ -6,7 +6,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { streamFetch } from '@/lib/tauri-fetch';
-import type { ProviderRegistry } from './types';
+import type { ProviderRegistry } from '@/types';
 
 export const PROVIDER_CONFIGS: ProviderRegistry = {
   MiniMax: {

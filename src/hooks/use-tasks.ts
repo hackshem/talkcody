@@ -9,10 +9,10 @@ import { useTaskStore } from '@/stores/task-store';
 import { useUIStateStore } from '@/stores/ui-state-store';
 
 // Re-export Conversation type from database types
-export type { Task as Conversation } from '@/services/database/types';
+export type { Task as Conversation } from '@/types';
 
 // Import for local use
-import type { Task } from '@/services/database/types';
+import type { Task } from '@/types';
 
 export function useTasks(onTaskStart?: (conversationId: string, title: string) => void) {
   const [error, setError] = useState<string | null>(null);

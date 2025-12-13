@@ -1,8 +1,8 @@
 // src/lib/mcp/multi-mcp-adapter.ts
 import { experimental_createMCPClient, type experimental_MCPClient } from '@ai-sdk/mcp';
 import { logger } from '@/lib/logger';
-import type { MCPServer } from '@/services/database/types';
 import { databaseService } from '@/services/database-service';
+import type { MCPServer } from '@/types';
 import { TransportFactory } from './transport-factory';
 
 export interface MCPToolInfo {

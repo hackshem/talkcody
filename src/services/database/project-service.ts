@@ -2,8 +2,8 @@
 
 import { timedMethod } from '@/lib/timer';
 import { generateId } from '@/lib/utils';
+import type { CreateProjectData, Project, UpdateProjectData } from '@/types';
 import type { TursoClient } from './turso-client';
-import type { CreateProjectData, Project, UpdateProjectData } from './types';
 
 export class ProjectService {
   constructor(private db: TursoClient) {}

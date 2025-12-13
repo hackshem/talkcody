@@ -15,7 +15,7 @@ import {
   resolveProviderModelName,
 } from '@/lib/provider-utils';
 import { PROVIDER_CONFIGS, PROVIDERS_WITH_CODING_PLAN } from '@/providers/provider_config';
-import type { ProviderDefinition } from '@/providers/types';
+import type { ProviderDefinition } from '@/types';
 import type { AvailableModel } from '@/types/api-keys';
 import type { CustomProviderConfig } from '@/types/custom-provider';
 import { isValidModelType, type ModelType } from '@/types/model-types';

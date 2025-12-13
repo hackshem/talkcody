@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import type { Agent } from '@/services/database/types';
+import type { Agent } from '@/types';
 import type { AgentDefinition } from '@/types/agent';
 
 type UnifiedAgent = (MarketplaceAgent | AgentDefinition | Agent) & {

@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { logger } from '@/lib/logger';
 import { agentRegistry } from '@/services/agents/agent-registry';
 import { agentService } from '@/services/database/agent-service';
-import type { Agent } from '@/services/database/types';
 import { useAgentStore } from '@/stores/agent-store';
+import type { Agent } from '@/types';
 import { useMarketplace } from './use-marketplace';
 
 export type UnifiedAgent =

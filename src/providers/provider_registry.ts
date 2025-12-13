@@ -2,10 +2,10 @@
 import { logger } from '@/lib/logger';
 import { isLocalProvider } from '@/services/custom-model-service';
 import { customProviderService } from '@/services/custom-provider-service';
+import type { ProviderDefinition } from '@/types';
 import type { CustomProviderConfig } from '@/types/custom-provider';
 import { createCustomProvider } from './custom-provider-factory';
 import { PROVIDER_CONFIGS } from './provider_config';
-import type { ProviderDefinition } from './types';
 
 export class ProviderRegistry {
   private static instance: ProviderRegistry;

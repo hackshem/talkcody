@@ -15,7 +15,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { UIMessage, ToolMessageContent } from '@/types/agent';
 import type { StoredMessage } from '@/services/database-service';
-import type { StoredToolContent } from '@/services/database/types';
+import type { StoredToolContent } from '@/types';
 import { mapStoredToUIMessage } from '@/lib/message-mapper';
 import { convertMessages } from '@/lib/llm-utils';
 

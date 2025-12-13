@@ -2,11 +2,7 @@
 
 import { logger } from '@/lib/logger';
 import type { TursoClient } from '@/services/database/turso-client';
-import type {
-  CreateMCPServerData,
-  MCPServer,
-  UpdateMCPServerData,
-} from '@/services/database/types';
+import type { CreateMCPServerData, MCPServer, UpdateMCPServerData } from '@/types';
 
 export class MCPServerService {
   constructor(private db: TursoClient) {}

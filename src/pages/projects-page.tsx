@@ -14,12 +14,12 @@ import {
 import { useUiNavigation } from '@/contexts/ui-navigation';
 import { useTranslation } from '@/hooks/use-locale';
 import { logger } from '@/lib/logger';
-import type { Project } from '@/services/database/types';
 import { databaseService } from '@/services/database-service';
 import { WindowManagerService } from '@/services/window-manager-service';
 import { useProjectStore } from '@/stores/project-store';
 import { useRepositoryStore } from '@/stores/repository-store';
 import { settingsManager } from '@/stores/settings-store';
+import type { Project } from '@/types';
 import { NavigationView } from '@/types/navigation';
 
 export function ProjectsPage() {

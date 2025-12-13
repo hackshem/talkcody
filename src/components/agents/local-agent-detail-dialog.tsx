@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { Agent } from '@/services/database/types';
+import type { Agent } from '@/types';
 import { MODEL_TYPE_LABELS } from '@/types/model-types';
 
 interface LocalAgentDetailDialogProps {

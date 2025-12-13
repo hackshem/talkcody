@@ -4,7 +4,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { logger } from '@/lib/logger';
 import { streamFetch } from '@/lib/tauri-fetch';
-import type { MCPServer } from '@/services/database/types';
+import type { MCPServer } from '@/types';
 import { TauriPersistentTransport } from './tauri-persistent-transport';
 
 export type MCPTransport =

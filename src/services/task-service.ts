@@ -14,11 +14,11 @@
 import { logger } from '@/lib/logger';
 import { mapStoredMessagesToUI } from '@/lib/message-mapper';
 import { generateConversationTitle, generateId } from '@/lib/utils';
-import type { Task, TaskSettings } from '@/services/database/types';
 import { databaseService } from '@/services/database-service';
 import { useExecutionStore } from '@/stores/execution-store';
 import { settingsManager } from '@/stores/settings-store';
 import { useTaskStore } from '@/stores/task-store';
+import type { Task, TaskSettings } from '@/types';
 import type { UIMessage } from '@/types/agent';
 
 class TaskService {

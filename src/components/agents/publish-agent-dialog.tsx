@@ -25,8 +25,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { logger } from '@/lib/logger';
 import { apiClient } from '@/services/api-client';
-import type { Agent } from '@/services/database/types';
 import { useAuthStore } from '@/stores/auth-store';
+import type { Agent } from '@/types';
 
 interface PublishAgentDialogProps {
   agent: Agent;

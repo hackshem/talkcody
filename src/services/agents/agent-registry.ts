@@ -4,10 +4,10 @@ import { logger } from '@/lib/logger';
 import { multiMCPAdapter } from '@/lib/mcp/multi-mcp-adapter';
 import { convertToolsForAI } from '@/lib/tool-adapter';
 import { type ToolOverride, useToolOverrideStore } from '@/stores/tool-override-store';
+import type { Agent, CreateAgentData, UpdateAgentData } from '@/types';
 import type { AgentDefinition, DynamicPromptConfig } from '@/types/agent';
 import { agentDatabaseService } from '../agent-database-service';
 import { agentService } from '../database/agent-service';
-import type { Agent, CreateAgentData, UpdateAgentData } from '../database/types';
 import { filterToolSetForAgent, isToolAllowedForAgent } from './agent-tool-access';
 import { getToolByName, restoreToolsFromConfig } from './tool-registry';
 

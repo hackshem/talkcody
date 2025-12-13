@@ -40,8 +40,8 @@ import { isToolAllowedForAgent } from '@/services/agents/agent-tool-access';
 import { forkAgent } from '@/services/agents/fork-agent';
 import { getAvailableToolsForUISync } from '@/services/agents/tool-registry';
 import { agentService } from '@/services/database/agent-service';
-import type { Agent } from '@/services/database/types';
 import { useAgentStore } from '@/stores/agent-store';
+import type { Agent } from '@/types';
 import type { ModelType } from '@/types/model-types';
 
 export function AgentMarketplacePage() {

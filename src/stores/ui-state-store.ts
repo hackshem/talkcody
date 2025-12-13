@@ -13,7 +13,7 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { Task } from '@/services/database/types';
+import type { Task } from '@/types';
 
 interface UIState {
   // Task editing state

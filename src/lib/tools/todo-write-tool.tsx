@@ -15,9 +15,7 @@ export interface TodoItem {
 }
 
 // Convert tool TodoItem to file service CreateTodoItem format (without ID)
-const convertToolTodoToFileTodo = (
-  toolTodo: TodoItem
-): import('@/services/database/types').CreateTodoItem => {
+const convertToolTodoToFileTodo = (toolTodo: TodoItem): import('@/types').CreateTodoItem => {
   return {
     id: toolTodo.id,
     content: toolTodo.content,

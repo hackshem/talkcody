@@ -8,7 +8,7 @@ import { ToolErrorFallback } from '@/components/tools/tool-error-fallback';
 import { UnifiedToolResult } from '@/components/tools/unified-tool-result';
 import { logger } from '@/lib/logger';
 import { getToolUIRenderers } from '@/lib/tool-adapter';
-import type { StoredToolCall, StoredToolContent } from '@/services/database/types';
+import type { StoredToolCall, StoredToolContent } from '@/types';
 import type { ToolMessageContent, UIMessage } from '@/types/agent';
 import { Action, Actions } from '../ai-elements/actions';
 import MyMarkdown from './my-markdown';

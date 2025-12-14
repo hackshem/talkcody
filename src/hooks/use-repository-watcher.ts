@@ -29,7 +29,6 @@ export function useRepositoryWatcher() {
     }
 
     gitStatusTimeoutRef.current = setTimeout(() => {
-      logger.info('Executing debounced git status refresh');
       useGitStore.getState().refreshStatus();
       gitStatusTimeoutRef.current = null;
     }, GIT_STATUS_DEBOUNCE_DELAY);
@@ -105,7 +104,6 @@ export function useRepositoryWatcher() {
 
     // Listen for git status changes (from .git directory watcher)
     const unlistenGitStatus = listen('git-status-changed', () => {
-      logger.info('Git status changed event received, scheduling debounced refresh...');
       debouncedRefreshGitStatus();
     });
 

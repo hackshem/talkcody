@@ -223,6 +223,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
     async fn test_timeout_enforcement() {
         use tempfile::NamedTempFile;
         use std::io::Write;
@@ -252,6 +253,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
     async fn test_successful_execution() {
         use tempfile::NamedTempFile;
         use std::io::Write;

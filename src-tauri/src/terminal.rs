@@ -28,11 +28,12 @@ lazy_static::lazy_static! {
 }
 
 /// Windows shell configurations: (command, version_args, shell_args)
+/// Note: cmd.exe /? returns exit code 1, so we use /c exit 0 to check availability
 #[cfg(target_os = "windows")]
 const WINDOWS_SHELLS: &[(&str, &[&str], &[&str])] = &[
     ("pwsh", &["--version"], &["-NoLogo", "-NoExit"]),
     ("powershell", &["-Version"], &["-NoLogo", "-NoExit"]),
-    ("cmd.exe", &["/?"], &[]),
+    ("cmd.exe", &["/c", "exit", "0"], &[]),
 ];
 
 /// Check if a shell command is available and working
@@ -111,7 +112,7 @@ fn get_shell_args(shell: &str) -> Vec<&'static str> {
 /// Try to spawn shells in order, falling back to next shell if one fails
 #[cfg(target_os = "windows")]
 fn spawn_with_fallback(
-    slave: &Box<dyn portable_pty::PtySlave>,
+    slave: &Box<dyn portable_pty::SlavePty + Send>,
     cwd: Option<&str>,
 ) -> Result<(String, Box<dyn portable_pty::Child + Send + Sync>), String> {
     let mut last_error = String::new();
@@ -360,5 +361,128 @@ pub fn pty_kill(pty_id: String) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!("PTY session {} not found", pty_id))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test that get_default_shell returns a valid shell
+    #[test]
+    fn test_get_default_shell_auto() {
+        let shell = get_default_shell(None);
+        assert!(!shell.is_empty(), "Default shell should not be empty");
+
+        #[cfg(target_os = "windows")]
+        {
+            // On Windows, should be one of the known shells
+            let valid_shells = ["pwsh", "powershell", "cmd.exe", "cmd"];
+            let is_valid = valid_shells.iter().any(|s| shell.contains(s));
+            assert!(is_valid, "Shell '{}' should be a valid Windows shell", shell);
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            // On Unix, should be a path or shell name
+            assert!(
+                shell.contains("sh") || shell.contains("bash") || shell.contains("zsh"),
+                "Shell '{}' should be a valid Unix shell", shell
+            );
+        }
+    }
+
+    /// Test that user-preferred shell is respected
+    #[test]
+    fn test_get_default_shell_with_preference() {
+        let shell = get_default_shell(Some("custom-shell"));
+        assert_eq!(shell, "custom-shell", "Should use user-preferred shell");
+    }
+
+    /// Test that "auto" preference triggers auto-detection
+    #[test]
+    fn test_get_default_shell_auto_preference() {
+        let shell = get_default_shell(Some("auto"));
+        // "auto" should trigger auto-detection, not return "auto"
+        assert_ne!(shell, "auto", "Should not return 'auto' as shell name");
+    }
+
+    /// Windows-specific tests
+    #[cfg(target_os = "windows")]
+    mod windows_tests {
+        use super::*;
+
+        /// Test that check_shell_available correctly identifies available shells
+        #[test]
+        fn test_check_shell_available_cmd() {
+            // cmd.exe should always be available on Windows
+            // Note: cmd.exe /? returns exit code 1, so we use /c exit 0
+            let available = check_shell_available("cmd.exe", &["/c", "exit", "0"]);
+            assert!(available, "cmd.exe should be available on Windows");
+        }
+
+        /// Test that check_shell_available returns false for non-existent shell
+        #[test]
+        fn test_check_shell_available_nonexistent() {
+            let available = check_shell_available("nonexistent-shell-12345", &["--version"]);
+            assert!(!available, "Non-existent shell should not be available");
+        }
+
+        /// Test that get_shell_args returns correct args for known shells
+        #[test]
+        fn test_get_shell_args() {
+            let pwsh_args = get_shell_args("pwsh");
+            assert!(pwsh_args.contains(&"-NoLogo"), "pwsh should have -NoLogo");
+            assert!(pwsh_args.contains(&"-NoExit"), "pwsh should have -NoExit");
+
+            let cmd_args = get_shell_args("cmd.exe");
+            assert!(cmd_args.is_empty(), "cmd.exe should have no special args");
+
+            let unknown_args = get_shell_args("unknown-shell");
+            assert!(unknown_args.is_empty(), "Unknown shell should have no args");
+        }
+
+        /// Test that WINDOWS_SHELLS constant is properly defined
+        #[test]
+        fn test_windows_shells_constant() {
+            assert!(!WINDOWS_SHELLS.is_empty(), "WINDOWS_SHELLS should not be empty");
+
+            // Verify expected shells are in the list
+            let shell_names: Vec<&str> = WINDOWS_SHELLS.iter().map(|(cmd, _, _)| *cmd).collect();
+            assert!(shell_names.contains(&"pwsh"), "Should include pwsh");
+            assert!(shell_names.contains(&"powershell"), "Should include powershell");
+            assert!(shell_names.contains(&"cmd.exe"), "Should include cmd.exe");
+        }
+
+        /// Integration test: spawn a shell and verify it works
+        #[test]
+        fn test_spawn_with_fallback() {
+            use portable_pty::native_pty_system;
+
+            let pty_system = native_pty_system();
+            let pty_size = PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            };
+
+            let pair = pty_system.openpty(pty_size).expect("Failed to open PTY");
+
+            // spawn_with_fallback should succeed with at least one shell
+            let result = spawn_with_fallback(&pair.slave, None);
+            assert!(result.is_ok(), "spawn_with_fallback should succeed: {:?}", result.err());
+
+            let (shell, _child) = result.unwrap();
+            println!("Successfully spawned shell: {}", shell);
+
+            // Verify shell is one of the expected ones
+            let valid_shells = ["pwsh", "powershell", "cmd.exe"];
+            assert!(
+                valid_shells.iter().any(|s| shell.contains(s)),
+                "Spawned shell '{}' should be a valid Windows shell",
+                shell
+            );
+        }
     }
 }

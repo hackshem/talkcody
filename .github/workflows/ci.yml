@@ -69,6 +69,31 @@ jobs:
           flags: unittests
           name: codecov-umbrella
 
+  test-rust-windows:
+    name: Rust Tests (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: windows-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            windows-cargo-
+
+      - name: Run Rust tests
+        working-directory: src-tauri
+        run: cargo test --verbose -- --nocapture
+
   build:
     name: Build
     runs-on: ubuntu-latest

@@ -35,7 +35,7 @@ tauri-plugin-clipboard = "2.1.11"
 tauri-plugin-process = "2"
 tauri-plugin-os = "2"
 tauri-plugin-notification = "2"
-libsql = "0.6"
+libsql = "0.9.29"
 tokio = { version = "1", features = ["full"] }
 base64 = "0.22"
 reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls", "blocking"], default-features = false }

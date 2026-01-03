@@ -1,5 +1,6 @@
 // src/components/skills/skill-card.tsx
 
+import { open } from '@tauri-apps/plugin-shell';
 import {
   BookOpen,
   Code,
@@ -13,13 +14,10 @@ import {
   Pencil,
   RefreshCw,
   Scale,
-  Share2,
-  Star,
   Trash2,
   Workflow,
   Zap,
 } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -98,9 +96,7 @@ export function SkillCard({
 
   return (
     <Card
-      className={`cursor-pointer hover:bg-accent transition-colors ${
-        isActive ? 'border-primary border-2' : ''
-      }`}
+      className={`hover:bg-accent transition-colors ${isActive ? 'border-primary border-2' : ''}`}
       onClick={handleCardClick}
     >
       <CardHeader>
@@ -221,55 +217,6 @@ export function SkillCard({
           )}
         </div>
 
-        {/* GitHub info for remote skills */}
-        {sourceType === 'remote' && skill.metadata.repository && skill.metadata.githubPath && (
-          <div className="mb-3">
-            <a
-              href={`https://github.com/${skill.metadata.repository}/tree/main/${skill.metadata.githubPath}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors group"
-              onClick={(e) => e.stopPropagation()}
-              title={`View on GitHub: ${skill.metadata.githubPath}`}
-            >
-              <Github className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{skill.metadata.repository}</span>
-              <ExternalLink className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </a>
-          </div>
-        )}
-
-        {/* Marketplace stats for marketplace skills */}
-        {sourceType === 'marketplace' && skill.marketplace && (
-          <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
-            <div className="flex items-center gap-1">
-              <Download className="h-3 w-3" />
-              {skill.marketplace.downloads.toLocaleString()}
-            </div>
-
-            {skill.marketplace.rating > 0 && (
-              <div className="flex items-center gap-1">
-                <Star className="h-3 w-3 fill-current" />
-                {skill.marketplace.rating.toFixed(1)}
-              </div>
-            )}
-
-            <div className="flex items-center gap-1">
-              <Avatar className="h-4 w-4">
-                <AvatarImage src={skill.marketplace.authorAvatar || ''} />
-                <AvatarFallback>
-                  {(skill.marketplace.authorDisplayName || skill.marketplace.author)
-                    .charAt(0)
-                    .toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span className="truncate">
-                {skill.marketplace.authorDisplayName || skill.marketplace.author}
-              </span>
-            </div>
-          </div>
-        )}
-
         {/* Tags */}
         {skill.metadata.tags && skill.metadata.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -288,7 +235,7 @@ export function SkillCard({
       </CardContent>
 
       {showActions && (
-        <CardFooter className="flex-col gap-3 pt-4">
+        <CardFooter className="flex-col gap-3 pt-0">
           {/* Action buttons row */}
           <div className="flex items-center justify-center gap-2 w-full">
             {!isBuiltIn && onEdit && (
@@ -325,23 +272,6 @@ export function SkillCard({
               </button>
             )}
 
-            {onShare && !isBuiltIn && (
-              <button
-                type="button"
-                className="flex flex-col items-center gap-1 px-2 py-1.5 rounded-md hover:bg-primary/10 transition-all group"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onShare();
-                }}
-                title="Share to Marketplace"
-              >
-                <Share2 className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                  Share
-                </span>
-              </button>
-            )}
-
             {!isBuiltIn && onDelete && (
               <button
                 type="button"
@@ -361,46 +291,64 @@ export function SkillCard({
           </div>
 
           {/* Primary action buttons */}
-          <div className="flex gap-2 w-full">
-            {onInstall ? (
-              <Button
-                variant="default"
-                size="sm"
-                className="flex-1"
+          <div className="flex gap-2 w-full items-center justify-between">
+            {/* GitHub link for remote skills */}
+            {sourceType === 'remote' && skill.metadata.repository && skill.metadata.githubPath ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors group cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onInstall(skill);
+                  open(
+                    `https://github.com/${skill.metadata.repository}/tree/main/${skill.metadata.githubPath}`
+                  );
                 }}
-                disabled={isInstalling}
+                title={`View on GitHub: ${skill.metadata.githubPath}`}
               >
-                {isInstalling ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Installing...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4 mr-2" />
-                    Install
-                  </>
-                )}
-              </Button>
+                <Github className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate max-w-[150px]">{skill.metadata.repository}</span>
+                <ExternalLink className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
             ) : (
-              <Button variant="outline" size="sm" className="flex-1" onClick={handleCardClick}>
-                View Details
-              </Button>
+              <div />
             )}
-            {onToggle && (
-              <Button
-                variant={isActive ? 'secondary' : 'default'}
-                size="sm"
-                className="flex-1"
-                onClick={handleToggleClick}
-                disabled={isToggling}
-              >
-                {isToggling ? 'Loading...' : isActive ? 'Deactivate' : 'Activate'}
-              </Button>
-            )}
+
+            <div className="flex gap-2">
+              {onInstall ? (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onInstall(skill);
+                  }}
+                  disabled={isInstalling}
+                >
+                  {isInstalling ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Installing...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Install
+                    </>
+                  )}
+                </Button>
+              ) : null}
+              {onToggle && (
+                <Button
+                  variant={isActive ? 'secondary' : 'default'}
+                  size="sm"
+                  onClick={handleToggleClick}
+                  disabled={isToggling}
+                >
+                  {isToggling ? 'Loading...' : isActive ? 'Deactivate' : 'Activate'}
+                </Button>
+              )}
+            </div>
           </div>
         </CardFooter>
       )}

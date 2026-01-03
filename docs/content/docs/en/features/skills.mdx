@@ -20,7 +20,7 @@ A Skill contains:
 By activating different Skills, agents can quickly acquire specialized capabilities in specific domains.
 
 <Callout type="info">
-TalkCody fully complies with the [Agent Skills Specification](https://agentskills.io) standard, ensuring complete compatibility with other tools that support this standard (such as Claude Code, GitHub Copilot).
+TalkCody Skills fully comply with the [Agent Skills Specification](https://agentskills.io) standard.
 </Callout>
 
 ## Agent Skills Standard
@@ -141,25 +141,6 @@ Differences between Skills and Agents:
 An Agent can use multiple Skills simultaneously, gaining specialized capabilities across multiple domains.
 </Callout>
 
-## Migrating from Other Tools
-
-### Import Claude Code Skills
-
-If you already have Claude Code Skills, you can use them directly in TalkCody:
-
-1. Copy the Claude Code Skills directory to the TalkCody Skills directory
-2. Or use the GitHub import feature to import from the repository
-
-TalkCody will automatically recognize and load Skills that comply with the standard.
-
-### Import Other Agent Skills
-
-Any Skill that complies with the Agent Skills Specification can be used in TalkCody:
-
-- GitHub Copilot Skills
-- VS Code Agent Skills
-- Or Skills created by other tools that support this standard
-
 ## Best Practices
 
 ### Writing Skill Prompts
@@ -180,24 +161,3 @@ Activated Skills:
 - API Security
 - Error Handling
 ```
-
-### Sharing Skills
-
-Because TalkCody Skills comply with open standards, you can easily share them:
-
-1. **Via Git Repository**
-   - Push the Skills directory to GitHub/GitLab
-   - Other users can use it via the GitHub import feature
-
-2. **Via Marketplace**
-   - Submit to TalkCody Skills Marketplace
-   - Let more users discover and use it
-
-3. **Cross-tool Usage**
-   - Your Skills can be used in other tools that support the Agent Skills Specification
-
-## Resource Links
-
-- [Agent Skills Specification](https://agentskills.io) - Official standard specification
-- [Anthropic Skills Repository](https://github.com/anthropics/skills) - Anthropic official Skills repository
-- [Community Skills](https://github.com/ComposioHQ/awesome-claude-skills) - Community Skills collection

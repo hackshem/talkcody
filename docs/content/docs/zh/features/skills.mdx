@@ -20,7 +20,7 @@ Skill 包含：
 通过激活不同的 Skills，智能体可以快速获得特定领域的专业能力。
 
 <Callout type="info">
-TalkCody 完全遵循 [Agent Skills Specification](https://agentskills.io) 标准，确保与其他支持该标准的工具（如 Claude Code、GitHub Copilot）完全兼容。
+TalkCody Skills 完全遵循 [Agent Skills Specification](https://agentskills.io) 标准。
 </Callout>
 
 ## Agent Skills 标准
@@ -141,25 +141,6 @@ Skills 和 Agents 的区别：
 一个 Agent 可以同时使用多个 Skills，获得多领域的专业能力。
 </Callout>
 
-## 从其他工具迁移
-
-### 导入 Claude Code Skills
-
-如果你已经有 Claude Code 的 Skills，可以直接在 TalkCody 中使用：
-
-1. 复制 Claude Code Skills 目录到 TalkCody Skills 目录
-2. 或使用 GitHub 导入功能从仓库导入
-
-TalkCody 会自动识别并加载符合标准的 Skills。
-
-### 导入其他 Agent Skills
-
-任何符合 Agent Skills Specification 的 Skill 都可以在 TalkCody 中使用：
-
-- GitHub Copilot Skills
-- VS Code Agent Skills
-- 或其他支持该标准的工具创建的 Skills
-
 ## 最佳实践
 
 ### 编写 Skill 提示
@@ -180,24 +161,3 @@ TalkCody 会自动识别并加载符合标准的 Skills。
 - API Security
 - Error Handling
 ```
-
-### 分享 Skills
-
-因为 TalkCody Skills 符合开放标准，你可以轻松分享：
-
-1. **通过 Git 仓库**
-   - 将 Skills 目录推送到 GitHub/GitLab
-   - 其他用户可以通过 GitHub 导入功能使用
-
-2. **通过 Marketplace**
-   - 提交到 TalkCody Skills Marketplace
-   - 让更多用户发现和使用
-
-3. **跨工具使用**
-   - 你的 Skills 可以在其他支持 Agent Skills Specification 的工具中使用
-
-## 资源链接
-
-- [Agent Skills Specification](https://agentskills.io) - 官方标准规范
-- [Anthropic Skills Repository](https://github.com/anthropics/skills) - Anthropic 官方 Skills 仓库
-- [Community Skills](https://github.com/ComposioHQ/awesome-claude-skills) - 社区 Skills 集合

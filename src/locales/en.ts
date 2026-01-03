@@ -1666,6 +1666,38 @@ const en: LocaleDefinition = {
       description: 'Usage breakdown by individual models',
     },
   },
+
+  minimaxUsage: {
+    title: 'MiniMax Coding Plan Usage',
+    description: 'Monitor your MiniMax Coding Plan usage',
+    notConfigured: 'Cookie Not Configured',
+    configurePrompt: 'Add your MiniMax session cookie in settings to view usage statistics',
+    configureButton: 'Go to Settings',
+    sessionExpired: 'Session Expired',
+    sessionExpiredDescription:
+      'Your MiniMax session has expired. Please update your cookie in settings.',
+    updateCookie: 'Update Cookie',
+    error: 'Error Loading Usage',
+    retry: 'Retry',
+    refresh: 'Refresh',
+    refreshing: 'Refreshing...',
+    noData: 'No Usage Data',
+    noDataDescription: 'Unable to load usage data. Please try refreshing.',
+    used: 'Used',
+    remaining: 'Remaining',
+    resetsIn: 'Resets in',
+    lastValidated: 'Last validated',
+    criticalWarning: 'Warning: You are approaching your usage limit!',
+
+    fiveHour: {
+      title: '5-Hour Session Usage',
+      description: 'Usage within your current 5-hour coding plan window',
+    },
+
+    plan: {
+      title: 'Coding Plan',
+    },
+  },
 };
 
 export default en;

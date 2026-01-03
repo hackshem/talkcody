@@ -49,6 +49,9 @@ interface SettingsState {
   // API Keys (dynamic based on provider registry)
   apiKeys: ApiKeySettings;
 
+  // MiniMax Cookie (for manual session cookie configuration)
+  minimax_cookie: string;
+
   // Shortcuts
   shortcuts: ShortcutSettings;
 
@@ -133,6 +136,10 @@ interface SettingsActions {
   setProviderUseCodingPlan: (providerId: string, useCodingPlan: boolean) => Promise<void>;
   getProviderUseCodingPlan: (providerId: string) => boolean | undefined;
 
+  // MiniMax Cookie
+  setMinimaxCookie: (cookie: string) => Promise<void>;
+  getMinimaxCookie: () => string;
+
   // Shortcuts
   getShortcutConfig: (action: ShortcutAction) => ShortcutConfig;
   setShortcutConfig: (action: ShortcutAction, config: ShortcutConfig) => Promise<void>;
@@ -207,6 +214,7 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'loading' | 'error' | 'isInitialized
   model_type_image_generator: '',
   model_type_transcription: '',
   apiKeys: {} as ApiKeySettings,
+  minimax_cookie: '',
   shortcuts: DEFAULT_SHORTCUTS,
   last_seen_version: '',
   sidebar_view: 'files',
@@ -400,6 +408,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         'model_type_image_generator',
         'model_type_transcription',
         'onboarding_completed',
+        'minimax_cookie',
         'last_seen_version',
         'sidebar_view',
         'terminal_shell',
@@ -473,6 +482,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         model_type_image_generator: rawSettings.model_type_image_generator || '',
         model_type_transcription: rawSettings.model_type_transcription || '',
         apiKeys: apiKeys as ApiKeySettings,
+        minimax_cookie: rawSettings.minimax_cookie || '',
         shortcuts: shortcuts as ShortcutSettings,
         last_seen_version: rawSettings.last_seen_version || '',
         sidebar_view: rawSettings.sidebar_view || 'files',
@@ -722,7 +732,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     });
   },
 
-  getCustomProviderApiKey: (providerId: string) => {
+  getCustomProviderApiKey: (_providerId: string) => {
     // We need to get this from the database directly since we don't cache it in state
     // For now, we'll return undefined and let the component handle async loading
     return undefined;
@@ -847,6 +857,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   getTerminalFontSize: () => {
     return get().terminal_font_size || 14;
+  },
+
+  // MiniMax Cookie
+  setMinimaxCookie: async (cookie: string) => {
+    await settingsDb.set('minimax_cookie', cookie);
+    set({ minimax_cookie: cookie });
+  },
+
+  getMinimaxCookie: () => {
+    return get().minimax_cookie || '';
   },
 
   // Worktree Settings
@@ -1059,6 +1079,10 @@ export const settingsManager = {
   getTerminalFont: () => useSettingsStore.getState().getTerminalFont(),
   setTerminalFontSize: (size: number) => useSettingsStore.getState().setTerminalFontSize(size),
   getTerminalFontSize: () => useSettingsStore.getState().getTerminalFontSize(),
+
+  // MiniMax Cookie
+  setMinimaxCookie: (cookie: string) => useSettingsStore.getState().setMinimaxCookie(cookie),
+  getMinimaxCookie: () => useSettingsStore.getState().getMinimaxCookie(),
 
   // Worktree Settings
   setWorktreeRootPath: (path: string) => useSettingsStore.getState().setWorktreeRootPath(path),

@@ -1627,6 +1627,37 @@ const zh: LocaleDefinition = {
       description: '按单个模型划分的使用情况',
     },
   },
+
+  minimaxUsage: {
+    title: 'MiniMax Coding Plan 使用情况',
+    description: '监控您的 MiniMax Coding Plan 使用情况',
+    notConfigured: 'Cookie 未配置',
+    configurePrompt: '请在设置中添加您的 MiniMax 会话 Cookie 以查看使用统计',
+    configureButton: '前往设置',
+    sessionExpired: '会话已过期',
+    sessionExpiredDescription: '您的 MiniMax 会话已过期，请在设置中更新您的 Cookie。',
+    updateCookie: '更新 Cookie',
+    error: '加载使用情况时出错',
+    retry: '重试',
+    refresh: '刷新',
+    refreshing: '刷新中...',
+    noData: '无使用数据',
+    noDataDescription: '无法加载使用数据，请尝试刷新。',
+    used: '已使用',
+    remaining: '剩余',
+    resetsIn: '重置时间',
+    lastValidated: '上次验证',
+    criticalWarning: '警告：您即将达到使用限制！',
+
+    fiveHour: {
+      title: '5 小时会话使用量',
+      description: '当前 5 小时编码计划窗口内的使用情况',
+    },
+
+    plan: {
+      title: '编码计划',
+    },
+  },
 };
 
 export default zh;

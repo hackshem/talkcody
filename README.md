@@ -5,13 +5,9 @@
 
 **Free, Open-Source AI Coding Agent**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://reactjs.org/)
-[![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131.svg)](https://tauri.app/)
+[![GitHub release](https://img.shields.io/github/v/release/talkcody/talkcody)](https://github.com/talkcody/talkcody/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-
-[Features](#features) • [Installation](#installation) • [Quick Start](#quick-start) • [Development](#development) • [Contributing](#contributing)
 
 
 [![TalkCody](public/talkcody.png)](https://talkcody.com)
@@ -20,27 +16,38 @@
 
 ## Overview
 
-TalkCody is a free, open-source AI Coding Agent that helps developers build software more efficiently. Built with Rust + Tauri for native performance, fast response, and low resource usage.
+TalkCody is an **AI Coding Agent** that actually works the way you do—**in parallel, with control, and privately**.
 
-### Key Highlights
+Unlike cloud-only AI tools that lock you into a single model or upload your code to remote servers, TalkCody gives you:
+- **True Freedom** - Use any AI model (OpenAI, Anthropic, Google, local models) without vendor lock-in
+- **Maximum Speed** - Unique four-level parallelism runs multiple tasks simultaneously
+- **Your Privacy** - Everything runs locally, your code never leaves your machine
+- **Your Money** - 9 ways to use completely free, or leverage your existing Claude Pro/ChatGPT Plus/GitHub Copilot
 
-- **Open Source & Transparent** - Completely open-source code, transparent and auditable, community-driven development
-- **BYOK, No Middleman** - Bring Your Own Key mode, pay directly to AI providers, no middleman markup, predictable costs, zero lock-in
-- **Model Freedom** - Choose any provider and model freely, experience the latest released models immediately
-- **Privacy First** - All data stored locally, supports local models (Ollama), fully offline capable
-- **Fully Customizable** - System Prompts, Agents, Tools, MCP Servers, Skills all customizable, every AI request and response under your control
+**Built by developers, for developers who value speed, cost, control, and privacy.**
 
+### Why TalkCody
 
+#### 🚀 Blazing Fast Development
+- **[Four-Level Parallelism](https://www.talkcody.com/blog/four-level-parallelism)** - Project, task, agent, and tool levels run simultaneously—complete complex projects in a fraction of the time
 
-## Features
+#### 💰 Maximum Flexibility, Minimum Cost
+- **[9 Ways to Use Free](https://www.talkcody.com/docs/guides/free-use)** - Local models, free tiers, and more
+- **Leverage Existing Subscriptions** - Use your [Claude Pro/Max](https://www.talkcody.com/docs/features/claude-pro-plan), [ChatGPT Plus/Pro](https://www.talkcody.com/docs/features/openai-plus-plan), or [GitHub Copilot](https://www.talkcody.com/docs/features/github-copilot) accounts
+- **Any Model, Any Provider** - Switch between OpenAI, Anthropic, Google, or local models instantly
 
-- **Multi-Model Support** - Access to 50+ mainstream models including OpenAI, Claude, Gemini, DeepSeek, and more
-- **Multimodal Input** - Text, voice, images, and files seamlessly integrated
-- **MCP Servers** - Extend capabilities through Model Context Protocol
-- **Agents & Skills Marketplace** - Community-shared workflows and specialized agents
-- **Plan Mode** - Systematic approach to complex projects
-- **Built-in Terminal** - Execute commands without switching windows
-- **Native Performance** - Built with Rust + Tauri for fast response and low resource usage
+#### 🔒 Privacy You Can Trust
+- **100% Local Storage** - All data, conversations, and code stored on your machine
+- **Offline Capable** - Works completely offline with Ollama or LM Studio
+- **You Own Everything** - Your code, your data, your models—completely auditable open-source code
+
+#### 🛠️ Professional-Grade Features
+- **Multimodal Input** - Text, voice, images, and files work seamlessly together
+- **MCP Server Support** - Extend capabilities through Model Context Protocol
+- **Agents & Skills Marketplace** - Download and share community workflows and specialized agents
+- **Fully Customizable** - System prompts, agents, tools, MCP servers—everything is configurable
+- **Built-in Terminal** - Execute commands without context switching
+- **Native Performance** - Built with Rust + Tauri for instant response and low resource usage
 
 
 

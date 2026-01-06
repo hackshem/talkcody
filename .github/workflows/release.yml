@@ -347,17 +347,48 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           VERSION: ${{ needs.create-release.outputs.version }}
 
-      - name: Upload Intel DMG to GitHub Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ${{ steps.find-dmg.outputs.dmg_path }}
-          asset_name: TalkCody-intel.dmg
-          asset_content_type: application/x-apple-diskimage
-
       - name: Cleanup Keychain
         if: always()
         run: |
           security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+
+
+  finalize-release:
+    name: Finalize Release (Merge Manifests)
+    needs: [create-release, build-linux, build-windows, build-macos-intel]
+    runs-on: ubuntu-latest
+    # Run even if some builds failed (allows partial releases)
+    if: always() && needs.create-release.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Setup Node.js for wrangler
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install wrangler
+        run: npm install -g wrangler
+
+      - name: Run finalize script
+        run: |
+          chmod +x .github/scripts/finalize-release.sh
+          ./.github/scripts/finalize-release.sh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION: ${{ needs.create-release.outputs.version }}
+
+      - name: Summary
+        run: |
+          echo "### Release Finalization Complete 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** v${{ needs.create-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Manifest URL:** https://cdn.talkcody.com/releases/v${{ needs.create-release.outputs.version }}/manifest.json" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Latest URL:** https://cdn.talkcody.com/latest.json" >> $GITHUB_STEP_SUMMARY

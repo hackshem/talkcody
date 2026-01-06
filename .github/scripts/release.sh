@@ -184,8 +184,8 @@ fi
 echo -e "${GREEN}✓${NC} Found signature file: $(basename "$SIGNATURE_FILE")"
 echo ""
 
-# Step 3: Generate/update manifest.json
-echo "📝 Step 3/5: Generating/updating manifest.json..."
+# Step 3: Generate platform-specific manifest fragment
+echo "📝 Step 3/5: Generating platform manifest fragment..."
 
 # Read signature content
 SIGNATURE=$(cat "$SIGNATURE_FILE")
@@ -196,13 +196,6 @@ PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # CDN URL prefix
 CDN_BASE="https://cdn.talkcody.com"
 
-# Temporary file paths
-MANIFEST_FILE="/tmp/manifest-${VERSION}-$$.json"
-R2_MANIFEST_PATH="releases/v${VERSION}/manifest.json"
-
-# Try to download existing manifest.json from R2 (if exists)
-echo "  Checking if manifest.json exists on R2..."
-
 # Configure wrangler authentication
 if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
     export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_TOKEN"
@@ -211,113 +204,39 @@ if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
     export CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID"
 fi
 
-if wrangler r2 object get "talkcody/${R2_MANIFEST_PATH}" --file "$MANIFEST_FILE" --remote 2>/dev/null; then
-    echo -e "${BLUE}  Found existing manifest.json, merging with current platform${NC}"
-
-    # Check if existing version matches current version
-    EXISTING_VERSION=$(cat "$MANIFEST_FILE" | jq -r '.version')
-
-    if [ "$EXISTING_VERSION" = "$VERSION" ]; then
-        # Same version: just add/update current platform, keep existing version and pub_date
-        echo -e "${BLUE}  Same version ($VERSION), adding ${PLATFORM} platform to existing manifest${NC}"
-        
-        # Generate download URLs based on platform
-        # For macOS: url points to .app.tar.gz (for auto-update), download_url points to .dmg (for manual download)
-        # For other platforms: both point to the same file
-        if [ "$PLATFORM" = "macos" ]; then
-            UPDATER_URL="${CDN_BASE}/releases/v${VERSION}/$ARTIFACT_FILENAME"
-            DOWNLOAD_URL="${CDN_BASE}/releases/v${VERSION}/$DMG_FILENAME"
-        else
-            DOWNLOAD_URL="${CDN_BASE}/releases/v${VERSION}/$ARTIFACT_FILENAME"
-            UPDATER_URL="$DOWNLOAD_URL"
-        fi
-        
-        TEMP_MANIFEST=$(cat "$MANIFEST_FILE" | jq \
-            --arg arch "$PLATFORM_ID" \
-            --arg url "$UPDATER_URL" \
-            --arg sig "$SIGNATURE" \
-            --arg download_url "$DOWNLOAD_URL" \
-            '.platforms[$arch] = {url: $url, signature: $sig, download_url: $download_url}')
-    else
-        # Different version: update everything
-        echo -e "${YELLOW}  Version mismatch (existing: $EXISTING_VERSION, current: $VERSION)${NC}"
-        echo -e "${YELLOW}  Creating new manifest with updated version${NC}"
-        
-        # Generate download URLs
-        # For macOS: url points to .app.tar.gz (for auto-update), download_url points to .dmg (for manual download)
-        # For other platforms: both point to the same file
-        if [ "$PLATFORM" = "macos" ]; then
-            UPDATER_URL="${CDN_BASE}/releases/v${VERSION}/$ARTIFACT_FILENAME"
-            DOWNLOAD_URL="${CDN_BASE}/releases/v${VERSION}/$DMG_FILENAME"
-        else
-            DOWNLOAD_URL="${CDN_BASE}/releases/v${VERSION}/$ARTIFACT_FILENAME"
-            UPDATER_URL="$DOWNLOAD_URL"
-        fi
-
-        TEMP_MANIFEST=$(cat "$MANIFEST_FILE" | jq \
-            --arg version "$VERSION" \
-            --arg pubdate "$PUB_DATE" \
-            --arg arch "$PLATFORM_ID" \
-            --arg url "$UPDATER_URL" \
-            --arg sig "$SIGNATURE" \
-            --arg download_url "$DOWNLOAD_URL" \
-            '.version = $version | .pub_date = $pubdate | .platforms = {($arch): {url: $url, signature: $sig, download_url: $download_url}}')
-    fi
-
-    echo "$TEMP_MANIFEST" > "$MANIFEST_FILE"
+# Generate download URLs based on platform
+# For macOS: url points to .app.tar.gz (for auto-update), download_url points to .dmg (for manual download)
+# For other platforms: both point to the same file
+if [ "$PLATFORM" = "macos" ]; then
+    UPDATER_URL="${CDN_BASE}/releases/v${VERSION}/$ARTIFACT_FILENAME"
+    DOWNLOAD_URL="${CDN_BASE}/releases/v${VERSION}/$DMG_FILENAME"
 else
-    echo -e "${YELLOW}  No existing manifest.json found, creating new one${NC}"
-
-    # Generate download URLs
-    # For macOS: url points to .app.tar.gz (for auto-update), download_url points to .dmg (for manual download)
-    # For other platforms: both point to the same file
-    if [ "$PLATFORM" = "macos" ]; then
-        UPDATER_URL="${CDN_BASE}/releases/v${VERSION}/$ARTIFACT_FILENAME"
-        DOWNLOAD_URL="${CDN_BASE}/releases/v${VERSION}/$DMG_FILENAME"
-    else
-        DOWNLOAD_URL="${CDN_BASE}/releases/v${VERSION}/$ARTIFACT_FILENAME"
-        UPDATER_URL="$DOWNLOAD_URL"
-    fi
-
-    # Generate new manifest.json (only current platform)
-    MANIFEST_JSON=$(cat <<EOF
-{
-  "version": "${VERSION}",
-  "pub_date": "${PUB_DATE}",
-  "notes": "Release v${VERSION}",
-  "platforms": {
-    "${PLATFORM_ID}": {
-      "url": "${UPDATER_URL}",
-      "signature": "${SIGNATURE}",
-      "download_url": "${DOWNLOAD_URL}"
-    }
-  }
-}
-EOF
-)
-    echo "$MANIFEST_JSON" > "$MANIFEST_FILE"
+    DOWNLOAD_URL="${CDN_BASE}/releases/v${VERSION}/$ARTIFACT_FILENAME"
+    UPDATER_URL="$DOWNLOAD_URL"
 fi
 
-echo -e "${GREEN}✓${NC} Manifest updated (${PLATFORM} ${ARCH})"
-echo ""
-
-# Step 4: Generate/update latest.json
-echo "📝 Step 4/5: Updating latest.json..."
-
-LATEST_JSON=$(cat <<EOF
+# Generate platform-specific manifest fragment
+# This will be merged by finalize-release.sh
+PLATFORM_MANIFEST_FILE="/tmp/platform-manifest-${PLATFORM}-${ARCH}-$$.json"
+PLATFORM_MANIFEST_JSON=$(cat <<EOF
 {
+  "platform_id": "${PLATFORM_ID}",
   "version": "${VERSION}",
   "pub_date": "${PUB_DATE}",
-  "notes": "Release v${VERSION}",
-  "manifest_url": "${CDN_BASE}/releases/v${VERSION}/manifest.json"
+  "url": "${UPDATER_URL}",
+  "signature": "${SIGNATURE}",
+  "download_url": "${DOWNLOAD_URL}"
 }
 EOF
 )
 
-LATEST_FILE="/tmp/latest-$$.json"
-echo "$LATEST_JSON" > "$LATEST_FILE"
+echo "$PLATFORM_MANIFEST_JSON" > "$PLATFORM_MANIFEST_FILE"
 
-echo -e "${GREEN}✓${NC} latest.json updated"
+echo -e "${GREEN}✓${NC} Platform manifest fragment created (${PLATFORM} ${ARCH})"
+echo ""
+
+# Step 4: Skip latest.json generation (will be handled by finalize-release job)
+echo "📝 Step 4/5: Skipping latest.json generation (handled by finalize job)"
 echo ""
 
 # Step 5: Upload to R2
@@ -371,21 +290,19 @@ if [ "$PLATFORM" = "macos" ]; then
     fi
 fi
 
-echo "  Uploading/updating manifest.json..."
-if ! upload_with_retry "$MANIFEST_FILE" "${R2_BUCKET}/${VERSION_PATH}/manifest.json" "application/json"; then
+echo "  Uploading platform manifest fragment..."
+PLATFORM_MANIFEST_FILENAME="platform-manifest-${PLATFORM}-${ARCH}.json"
+if ! upload_with_retry "$PLATFORM_MANIFEST_FILE" "${R2_BUCKET}/${VERSION_PATH}/${PLATFORM_MANIFEST_FILENAME}" "application/json"; then
     exit 1
 fi
 
-echo "  Updating latest.json..."
-if ! upload_with_retry "$LATEST_FILE" "${R2_BUCKET}/latest.json" "application/json"; then
-    exit 1
-fi
+echo -e "${BLUE}  Note: Final manifest.json and latest.json will be generated by finalize-release job${NC}"
 
 echo -e "${GREEN}✓${NC} ${PLATFORM} ${ARCH} files uploaded"
 echo ""
 
 # Clean up temporary files
-rm -f "$MANIFEST_FILE" "$LATEST_FILE"
+rm -f "$PLATFORM_MANIFEST_FILE"
 
 # Done
 echo "========================================="

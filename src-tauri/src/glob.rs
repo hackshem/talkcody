@@ -145,7 +145,12 @@ impl HighPerformanceGlob {
             file_path
         };
 
-        self.glob_match(relative_path, pattern)
+        // Normalize path separators for cross-platform compatibility
+        // Windows uses \ while patterns typically use /
+        let normalized_path = relative_path.replace('\\', "/");
+        let normalized_pattern = pattern.replace('\\', "/");
+
+        self.glob_match(&normalized_path, &normalized_pattern)
     }
 
     /// Simple glob pattern matching implementation

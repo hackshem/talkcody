@@ -687,6 +687,14 @@ export interface LocaleDefinition {
     directoryNotFound: string;
   };
 
+  RepositoryLayout: {
+    maxConcurrentTasksReached: string;
+    fullscreen: string;
+    exitFullscreen: string;
+    deleteTaskWithChangesTitle: string;
+    deleteAnyway: string;
+  };
+
   FileChanges: {
     codeReviewMessage: string;
     reviewTooltip: string;

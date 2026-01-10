@@ -697,6 +697,14 @@ const zh: LocaleDefinition = {
     directoryNotFound: '目录不存在',
   },
 
+  RepositoryLayout: {
+    maxConcurrentTasksReached: '已达到最大并发任务数',
+    fullscreen: '全屏',
+    exitFullscreen: '退出全屏',
+    deleteTaskWithChangesTitle: '删除包含未提交更改的任务？',
+    deleteAnyway: '仍然删除',
+  },
+
   FileChanges: {
     codeReviewMessage: '请调用 code review agent，review 当前的代码变动。',
     reviewTooltip: 'AI 将审查变更的文件，检查 bug、问题并提供改进建议',

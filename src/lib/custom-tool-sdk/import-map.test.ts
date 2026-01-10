@@ -9,12 +9,30 @@ const fsState = {
   files: new Map<string, string>(),
 };
 
-vi.mock('@tauri-apps/api/path', () =>
-  createMockTauriPath({
-    join: (...paths: string[]) => paths.filter(Boolean).join('/'),
-    normalize: (path: string) => path,
-  })
-);
+vi.mock('@tauri-apps/api/path', () => {
+  const mockNormalize = (path: string) => {
+    // Simple normalization: remove /./ and collapse multiple slashes
+    let normalized = path.replace(/\/\.\//g, '/');
+    normalized = normalized.replace(/\/\/+/g, '/');
+    return normalized;
+  };
+  return {
+    normalize: vi.fn().mockImplementation(mockNormalize),
+    appDataDir: vi.fn().mockResolvedValue('/test/app-data'),
+    homeDir: vi.fn().mockResolvedValue('/test/home'),
+    join: vi.fn().mockImplementation((...paths: string[]) => paths.filter(Boolean).join('/')),
+    dirname: vi.fn().mockImplementation((path: string) => {
+      const parts = path.split('/');
+      parts.pop();
+      return parts.join('/') || '/';
+    }),
+    basename: vi.fn().mockImplementation((path: string) => {
+      const parts = path.split('/');
+      return parts.pop() || '';
+    }),
+    isAbsolute: vi.fn().mockImplementation((path: string) => path.startsWith('/')),
+  };
+});
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
   exists: vi.fn((path: string) => Promise.resolve(fsState.existing.has(path))),

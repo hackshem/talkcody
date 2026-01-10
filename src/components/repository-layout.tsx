@@ -1,21 +1,6 @@
-import { Folder, ListTodo, Maximize2, Minimize2, Plus, Search } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ResizablePanelGroup } from '@/components/ui/resizable';
 import { useGlobalFileSearch } from '@/hooks/use-global-file-search';
 import { useGlobalShortcuts } from '@/hooks/use-global-shortcuts';
 import { useTranslation } from '@/hooks/use-locale';
@@ -39,21 +24,14 @@ import { useTerminalStore } from '@/stores/terminal-store';
 import { useRepositoryStore } from '@/stores/window-scoped-repository-store';
 import { useWorktreeStore } from '@/stores/worktree-store';
 import { SidebarView } from '@/types/navigation';
-import { ChatBox, type ChatBoxRef } from './chat-box';
-import { ChatPanelHeader } from './chat-panel-header';
-import { DiagnosticsPanel } from './diagnostics/diagnostics-panel';
-import { EmptyRepositoryState } from './empty-repository-state';
-import { ExternalFileChangeDialog } from './external-file-change-dialog';
-import { FileEditor } from './file-editor';
-import { FileTabs } from './file-tabs';
-import { FileTree } from './file-tree';
-import { FileTreeHeader } from './file-tree-header';
+import type { ChatBoxRef } from './chat-box';
 import { GitStatusBar } from './git/git-status-bar';
-import { GlobalContentSearch } from './search/global-content-search';
-import { GlobalFileSearch } from './search/global-file-search';
-import { TaskList } from './task-list';
-import { TerminalPanel } from './terminal/terminal-panel';
-import { WorktreeConflictDialog } from './worktree/worktree-conflict-dialog';
+import { RepositoryChatPanel } from './repository-layout/repository-chat-panel';
+import { RepositoryDialogs } from './repository-layout/repository-dialogs';
+import { RepositoryEditorArea } from './repository-layout/repository-editor-area';
+import { RepositoryGlobalSearch } from './repository-layout/repository-global-search';
+import { RepositorySidebar } from './repository-layout/repository-sidebar';
+import type { FullscreenPanel } from './repository-layout/types';
 
 export function RepositoryLayout() {
   const t = useTranslation();
@@ -79,7 +57,6 @@ export function RepositoryLayout() {
   const [failedPaths] = useState(() => new Set<string>());
 
   // Fullscreen panel state
-  type FullscreenPanel = 'none' | 'editor' | 'terminal' | 'chat';
   const [fullscreenPanel, setFullscreenPanel] = useState<FullscreenPanel>('none');
 
   const toggleFullscreen = (panel: 'editor' | 'terminal' | 'chat') => {
@@ -135,7 +112,7 @@ export function RepositoryLayout() {
   // Worktree store actions
   const initializeWorktree = useWorktreeStore((state) => state.initialize);
 
-  const chatBoxRef = useRef<ChatBoxRef>(null);
+  const chatBoxRef = useRef<ChatBoxRef | null>(null);
 
   // Determine if we have a loaded repository
   const hasRepository = !!(rootPath && fileTree);
@@ -213,8 +190,6 @@ export function RepositoryLayout() {
     cancelOperation,
     resetState: resetWorktreeState,
   } = useWorktreeConflict();
-
-  // Removed isSpecOpen state as it's replaced by mode system
 
   const {
     isOpen: isFileSearchOpen,
@@ -478,13 +453,13 @@ export function RepositoryLayout() {
 
   const handleCopyPath = (filePath: string) => {
     navigator.clipboard.writeText(filePath);
-    toast.success('Path copied to clipboard');
+    toast.success(t.FileTree.success.pathCopied);
   };
 
   const handleCopyRelativePath = (filePath: string, rootPath: string) => {
     const relativePath = getRelativePath(filePath, rootPath);
     navigator.clipboard.writeText(relativePath);
-    toast.success('Relative path copied to clipboard');
+    toast.success(t.FileTree.success.relativePathCopied);
   };
 
   // Get the currently selected file path for the file tree
@@ -516,374 +491,155 @@ export function RepositoryLayout() {
 
   return (
     <>
-      <GlobalFileSearch
+      <RepositoryGlobalSearch
         getRecentFiles={getRecentFiles}
-        isOpen={isFileSearchOpen}
-        onClose={closeFileSearch}
+        isFileSearchOpen={isFileSearchOpen}
+        onCloseFileSearch={closeFileSearch}
         onFileSelect={handleSearchFileSelect}
-        onSearch={searchFiles}
+        onSearchFiles={searchFiles}
         repositoryPath={rootPath}
+        isContentSearchVisible={isContentSearchVisible}
+        onToggleContentSearch={() => setIsContentSearchVisible((prev) => !prev)}
+        contentSearchInputRef={contentSearchInputRef}
+        showContentSearch={hasRepository}
       />
-
-      {hasRepository && (
-        <GlobalContentSearch
-          inputRef={contentSearchInputRef}
-          isSearchVisible={isContentSearchVisible}
-          onFileSelect={selectFile}
-          repositoryPath={rootPath}
-          toggleSearchVisibility={() => setIsContentSearchVisible((prev) => !prev)}
-        />
-      )}
 
       <div className="flex h-screen flex-1 flex-col overflow-hidden">
         <div className="flex-1 overflow-hidden">
           <ResizablePanelGroup className="h-full" direction="horizontal">
-            {/* Left Panel: FileTree when repository is loaded, EmptyRepositoryState when not */}
             {showFileTree && (
-              <>
-                <ResizablePanel
-                  id={shouldShowSidebar ? fileTreePanelId : emptyRepoPanelId}
-                  order={1}
-                  className={
-                    shouldShowSidebar
-                      ? 'border-r bg-white dark:bg-gray-950'
-                      : 'flex items-center justify-center bg-white dark:bg-gray-950'
+              <RepositorySidebar
+                emptyRepoPanelId={emptyRepoPanelId}
+                fileTreePanelId={fileTreePanelId}
+                shouldShowSidebar={shouldShowSidebar}
+                hasRepository={hasRepository}
+                sidebarView={sidebarView}
+                onSidebarViewChange={(view) => {
+                  setSidebarView(view);
+                  settingsManager.setSidebarView(view);
+                }}
+                currentProjectId={currentProjectId}
+                onProjectSelect={handleProjectSelect}
+                onImportRepository={async () => {
+                  const newProject = await selectRepository();
+                  if (newProject) {
+                    await refreshProjects();
                   }
-                  defaultSize={shouldShowSidebar ? 20 : 50}
-                  maxSize={shouldShowSidebar ? 40 : 70}
-                  minSize={shouldShowSidebar ? 10 : 30}
-                >
-                  {shouldShowSidebar ? (
-                    <div className="flex h-full flex-col">
-                      <FileTreeHeader
-                        currentProjectId={currentProjectId}
-                        onProjectSelect={handleProjectSelect}
-                        onImportRepository={async () => {
-                          const newProject = await selectRepository();
-                          if (newProject) {
-                            // Project ID will be updated via settings store reactivity
-                            await refreshProjects();
-                          }
-                        }}
-                        isLoadingProject={isLoading}
-                        isTerminalVisible={hasRepository ? isTerminalVisible : undefined}
-                        onToggleTerminal={hasRepository ? toggleTerminalVisible : undefined}
-                        onOpenFileSearch={hasRepository ? openFileSearch : undefined}
-                        onOpenContentSearch={
-                          hasRepository ? () => setIsContentSearchVisible(true) : undefined
-                        }
-                      />
-
-                      {/* View Switcher Tabs - only show when has repository */}
-                      {hasRepository && (
-                        <div className=" border-b px-2 py-1">
-                          <Tabs
-                            value={sidebarView}
-                            onValueChange={(v) => {
-                              setSidebarView(v as SidebarView);
-                              settingsManager.setSidebarView(v);
-                            }}
-                          >
-                            <TabsList className="grid w-full grid-cols-2 h-7 bg-muted/50 p-0.5">
-                              <TabsTrigger
-                                value={SidebarView.FILES}
-                                className="h-6 gap-1.5 px-2.5 text-[11px] data-[state=active]:shadow-none"
-                              >
-                                <Folder className="h-3.5 w-3.5" />
-                                {t.Sidebar.files || 'Files'}
-                              </TabsTrigger>
-                              <TabsTrigger
-                                value={SidebarView.TASKS}
-                                className="h-6 gap-1.5 px-2.5 text-[11px] data-[state=active]:shadow-none"
-                              >
-                                <ListTodo className="h-3.5 w-3.5" />
-                                {t.Sidebar.tasks || 'Tasks'}
-                              </TabsTrigger>
-                            </TabsList>
-                          </Tabs>
-                        </div>
-                      )}
-
-                      {/* Files View - only render when has repository */}
-                      {hasRepository && (
-                        <div
-                          className={
-                            sidebarView === SidebarView.FILES ? 'flex-1 overflow-auto' : 'hidden'
-                          }
-                        >
-                          <FileTree
-                            key={rootPath}
-                            fileTree={fileTree}
-                            repositoryPath={rootPath}
-                            expandedPaths={expandedPaths}
-                            onFileCreate={handleFileCreate}
-                            onFileDelete={handleFileDelete}
-                            onFileRename={handleFileRename}
-                            onFileSelect={selectFile}
-                            onRefresh={refreshFileTree}
-                            selectedFile={selectedFilePath}
-                            onLoadChildren={async (node) => {
-                              await loadDirectoryChildren(node);
-                              return node.children || [];
-                            }}
-                            onToggleExpansion={toggleExpansion}
-                          />
-                        </div>
-                      )}
-
-                      {/* Tasks View - always render, conditionally display */}
-                      <div
-                        className={
-                          !hasRepository || sidebarView === SidebarView.TASKS
-                            ? 'flex flex-1 flex-col overflow-hidden'
-                            : 'hidden'
-                        }
-                      >
-                        {/* Task Tools */}
-                        <div className="flex items-center gap-2 border-b p-2">
-                          <div className="relative flex-1">
-                            <Search className="-translate-y-1/2 absolute top-1/2 left-2.5 h-3.5 w-3.5 text-gray-400" />
-                            <Input
-                              className="h-8 pl-8 text-xs"
-                              onChange={(e) => setTaskSearchQuery(e.target.value)}
-                              placeholder={t.Sidebar.tasks || 'Search tasks...'}
-                              value={taskSearchQuery}
-                            />
-                          </div>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                className="h-8 w-8 p-0"
-                                disabled={isMaxReached}
-                                onClick={handleNewChat}
-                                size="sm"
-                                variant="outline"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            {isMaxReached && (
-                              <TooltipContent>
-                                <p>Maximum concurrent tasks reached</p>
-                              </TooltipContent>
-                            )}
-                          </Tooltip>
-                        </div>
-
-                        {/* Task List */}
-                        <div className="flex-1 overflow-auto">
-                          <TaskList
-                            tasks={filteredTasks}
-                            currentTaskId={currentTaskId}
-                            editingId={editingId}
-                            editingTitle={editingTitle}
-                            loading={tasksLoading}
-                            getWorktreeForTask={getWorktreeForTask}
-                            onCancelEdit={cancelEditing}
-                            onTaskSelect={handleHistoryTaskSelect}
-                            onDeleteTask={handleDeleteTask}
-                            onSaveEdit={finishEditing}
-                            onStartEditing={startEditing}
-                            onTitleChange={setEditingTitle}
-                            runningTaskIds={runningTaskIds}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <EmptyRepositoryState
-                      isLoading={isLoading}
-                      onSelectRepository={async () => {
-                        const newProject = await selectRepository();
-                        if (newProject) {
-                          // Project ID will be updated via settings store reactivity
-                          await refreshProjects();
-                        }
-                      }}
-                      onOpenRepository={async (path, projectId) => {
-                        await openRepository(path, projectId);
-                        // Project ID will be updated via settings store reactivity
-                        await refreshProjects();
-                      }}
-                    />
-                  )}
-                </ResizablePanel>
-
-                <ResizableHandle withHandle />
-              </>
-            )}
-
-            {/* Middle Panel: Contains file editor and/or terminal - only when repository is loaded */}
-            {hasRepository && showMiddlePanel && (hasOpenFiles || isTerminalVisible) && (
-              <>
-                <ResizablePanel
-                  id={editorAreaPanelId}
-                  order={2}
-                  className={showChatPanel ? 'border-r' : ''}
-                  defaultSize={isEditorFullscreen || isTerminalFullscreen ? 100 : 40}
-                  minSize={20}
-                  maxSize={100}
-                >
-                  <ResizablePanelGroup direction="vertical">
-                    {/* File Editor Panel - Only show if files are open and not terminal/chat fullscreen */}
-                    {hasOpenFiles && showEditor && (
-                      <>
-                        <ResizablePanel
-                          id={fileEditorPanelId}
-                          order={1}
-                          defaultSize={isEditorFullscreen ? 100 : showTerminal ? 60 : 100}
-                          minSize={20}
-                        >
-                          <div className="flex h-full flex-col">
-                            {/* File Tabs with Fullscreen Button */}
-                            <div className="flex items-center border-b">
-                              <div className="flex-1 overflow-hidden">
-                                <FileTabs
-                                  activeFileIndex={activeFileIndex}
-                                  onTabClose={closeTab}
-                                  onCloseOthers={closeOthers}
-                                  onCloseAll={closeAllFiles}
-                                  onCopyPath={handleCopyPath}
-                                  onCopyRelativePath={handleCopyRelativePath}
-                                  onAddFileToChat={handleAddFileToChat}
-                                  onTabSelect={switchToTab}
-                                  openFiles={openFiles}
-                                  rootPath={rootPath}
-                                />
-                              </div>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 mr-1"
-                                    onClick={() => toggleFullscreen('editor')}
-                                  >
-                                    {isEditorFullscreen ? (
-                                      <Minimize2 className="h-3.5 w-3.5" />
-                                    ) : (
-                                      <Maximize2 className="h-3.5 w-3.5" />
-                                    )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom">
-                                  {isEditorFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-
-                            {/* File Editor */}
-                            <div className="flex-1 overflow-auto">
-                              <FileEditor
-                                error={currentFile?.error || null}
-                                fileContent={currentFile?.content || null}
-                                filePath={currentFile?.path || null}
-                                hasUnsavedChanges={currentFile?.hasUnsavedChanges}
-                                isLoading={currentFile?.isLoading ?? false}
-                                lineNumber={currentFile?.lineNumber}
-                                onContentChange={(content) => {
-                                  if (currentFile) {
-                                    updateFileContent(currentFile.path, content, true);
-                                  }
-                                }}
-                                onGlobalSearch={() => setIsContentSearchVisible((prev) => !prev)}
-                              />
-                            </div>
-                          </div>
-                        </ResizablePanel>
-
-                        {/* Resize handle between editor and terminal */}
-                        {showTerminal && <ResizableHandle withHandle />}
-
-                        {/* Problems Panel - Show between editor and terminal */}
-                        {showProblemsPanel && (
-                          <>
-                            <ResizableHandle withHandle />
-                            <DiagnosticsPanel onDiagnosticClick={handleDiagnosticClick} />
-                          </>
-                        )}
-                      </>
-                    )}
-
-                    {/* Terminal Panel - Can be shown independently */}
-                    {showTerminal && (
-                      <ResizablePanel
-                        id={terminalPanelId}
-                        order={2}
-                        defaultSize={
-                          isTerminalFullscreen ? 100 : hasOpenFiles && showEditor ? 40 : 100
-                        }
-                        minSize={15}
-                        maxSize={100}
-                      >
-                        <TerminalPanel
-                          onCopyToChat={(content) => {
-                            if (chatBoxRef.current?.appendToInput) {
-                              chatBoxRef.current.appendToInput(`\n\n${content}`);
-                            }
-                          }}
-                          onClose={() => toggleTerminalVisible()}
-                          onToggleFullscreen={() => toggleFullscreen('terminal')}
-                          isFullscreen={isTerminalFullscreen}
-                        />
-                      </ResizablePanel>
-                    )}
-                  </ResizablePanelGroup>
-                </ResizablePanel>
-
-                {showChatPanel && <ResizableHandle withHandle />}
-              </>
-            )}
-
-            {/* Chat Panel - ALWAYS RENDERED to preserve state during project switches */}
-            {showChatPanel && (
-              <ResizablePanel
-                id={mainChatPanelId}
-                order={hasRepository ? 3 : 2}
-                className="bg-white dark:bg-gray-950"
-                defaultSize={
-                  isChatFullscreen
-                    ? 100
-                    : hasRepository
-                      ? hasOpenFiles || isTerminalVisible
-                        ? 40
-                        : 80
-                      : shouldShowSidebar
-                        ? 80
-                        : 50
+                }}
+                onSelectRepository={async () => {
+                  const newProject = await selectRepository();
+                  if (newProject) {
+                    await refreshProjects();
+                  }
+                }}
+                onOpenRepository={async (path, projectId) => {
+                  await openRepository(path, projectId);
+                  await refreshProjects();
+                }}
+                isLoadingProject={isLoading}
+                isTerminalVisible={hasRepository ? isTerminalVisible : undefined}
+                onToggleTerminal={hasRepository ? toggleTerminalVisible : undefined}
+                onOpenFileSearch={hasRepository ? openFileSearch : undefined}
+                onOpenContentSearch={
+                  hasRepository ? () => setIsContentSearchVisible(true) : undefined
                 }
-                maxSize={100}
-                minSize={hasRepository ? 20 : 30}
-              >
-                <div className="flex h-full flex-col">
-                  {/* Chat Panel Header - always show */}
-                  <ChatPanelHeader
-                    currentTaskId={currentTaskId}
-                    currentTask={currentTask}
-                    messages={currentMessages}
-                    isHistoryOpen={isHistoryOpen}
-                    onHistoryOpenChange={setIsHistoryOpen}
-                    onTaskSelect={handleHistoryTaskSelect}
-                    onNewChat={handleNewChat}
-                    isFullscreen={isChatFullscreen}
-                    onToggleFullscreen={() => toggleFullscreen('chat')}
-                  />
-                  <div className="flex-1 overflow-hidden">
-                    <ChatBox
-                      ref={chatBoxRef}
-                      taskId={currentTaskId}
-                      fileContent={hasRepository ? currentFile?.content || null : null}
-                      onTaskStart={handleTaskStart}
-                      onDiffApplied={handleDiffApplied}
-                      repositoryPath={rootPath ?? undefined}
-                      selectedFile={hasRepository ? currentFile?.path || null : null}
-                      onFileSelect={selectFile}
-                      onAddFileToChat={handleAddFileToChat}
-                      checkForConflicts={checkForConflicts}
-                    />
-                  </div>
-                </div>
-              </ResizablePanel>
+                rootPath={rootPath}
+                fileTree={fileTree}
+                expandedPaths={expandedPaths}
+                selectedFilePath={selectedFilePath}
+                onFileCreate={handleFileCreate}
+                onFileDelete={handleFileDelete}
+                onFileRename={handleFileRename}
+                onFileSelect={selectFile}
+                onRefreshFileTree={refreshFileTree}
+                onLoadChildren={loadDirectoryChildren}
+                onToggleExpansion={toggleExpansion}
+                taskSearchQuery={taskSearchQuery}
+                onTaskSearchQueryChange={setTaskSearchQuery}
+                isMaxReached={isMaxReached}
+                onNewChat={handleNewChat}
+                filteredTasks={filteredTasks}
+                tasksLoading={tasksLoading}
+                currentTaskId={currentTaskId}
+                editingId={editingId}
+                editingTitle={editingTitle}
+                onCancelEdit={cancelEditing}
+                onTaskSelect={handleHistoryTaskSelect}
+                onDeleteTask={handleDeleteTask}
+                onSaveEdit={finishEditing}
+                onStartEditing={startEditing}
+                onTitleChange={setEditingTitle}
+                runningTaskIds={runningTaskIds}
+                getWorktreeForTask={getWorktreeForTask}
+              />
+            )}
+
+            {hasRepository && showMiddlePanel && (hasOpenFiles || isTerminalVisible) && (
+              <RepositoryEditorArea
+                editorAreaPanelId={editorAreaPanelId}
+                fileEditorPanelId={fileEditorPanelId}
+                terminalPanelId={terminalPanelId}
+                showChatPanel={showChatPanel}
+                showEditor={showEditor}
+                showTerminal={showTerminal}
+                showProblemsPanel={showProblemsPanel}
+                hasOpenFiles={hasOpenFiles}
+                isEditorFullscreen={isEditorFullscreen}
+                isTerminalFullscreen={isTerminalFullscreen}
+                openFiles={openFiles}
+                activeFileIndex={activeFileIndex}
+                currentFile={currentFile}
+                rootPath={rootPath}
+                onTabClose={closeTab}
+                onCloseOthers={closeOthers}
+                onCloseAll={closeAllFiles}
+                onCopyPath={handleCopyPath}
+                onCopyRelativePath={handleCopyRelativePath}
+                onAddFileToChat={handleAddFileToChat}
+                onTabSelect={switchToTab}
+                onContentChange={(content) => {
+                  if (currentFile) {
+                    updateFileContent(currentFile.path, content, true);
+                  }
+                }}
+                onToggleContentSearch={() => setIsContentSearchVisible((prev) => !prev)}
+                onToggleEditorFullscreen={() => toggleFullscreen('editor')}
+                onDiagnosticClick={handleDiagnosticClick}
+                onCopyTerminalToChat={(content) => {
+                  if (chatBoxRef.current?.appendToInput) {
+                    chatBoxRef.current.appendToInput(`\n\n${content}`);
+                  }
+                }}
+                onCloseTerminal={toggleTerminalVisible}
+                onToggleTerminalFullscreen={() => toggleFullscreen('terminal')}
+              />
+            )}
+
+            {showChatPanel && (
+              <RepositoryChatPanel
+                mainChatPanelId={mainChatPanelId}
+                hasRepository={hasRepository}
+                hasOpenFiles={hasOpenFiles}
+                isTerminalVisible={isTerminalVisible}
+                shouldShowSidebar={shouldShowSidebar}
+                isChatFullscreen={isChatFullscreen}
+                currentTaskId={currentTaskId}
+                currentTask={currentTask}
+                messages={currentMessages}
+                isHistoryOpen={isHistoryOpen}
+                onHistoryOpenChange={setIsHistoryOpen}
+                onTaskSelect={handleHistoryTaskSelect}
+                onNewChat={handleNewChat}
+                onToggleFullscreen={() => toggleFullscreen('chat')}
+                chatBoxRef={chatBoxRef}
+                rootPath={rootPath}
+                currentFile={currentFile}
+                onTaskStart={handleTaskStart}
+                onDiffApplied={handleDiffApplied}
+                onFileSelect={selectFile}
+                onAddFileToChat={handleAddFileToChat}
+                checkForConflicts={checkForConflicts}
+              />
             )}
           </ResizablePanelGroup>
         </div>
@@ -891,10 +647,8 @@ export function RepositoryLayout() {
         <GitStatusBar />
       </div>
 
-      <WorktreeConflictDialog
-        open={!!conflictData}
-        worktreePath={conflictData?.worktreePath ?? ''}
-        changes={conflictData?.changes ?? null}
+      <RepositoryDialogs
+        conflictData={conflictData}
         isProcessing={isWorktreeProcessing}
         mergeResult={mergeResult}
         syncResult={syncResult}
@@ -903,29 +657,10 @@ export function RepositoryLayout() {
         onSync={handleSyncFromMain}
         onCancel={cancelOperation}
         onClose={resetWorktreeState}
+        deleteConfirmation={deleteConfirmation}
+        onCancelDelete={handleCancelDelete}
+        onConfirmDelete={handleConfirmDelete}
       />
-
-      {/* Worktree deletion confirmation dialog */}
-      <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Task with Uncommitted Changes?</AlertDialogTitle>
-            <AlertDialogDescription>{deleteConfirmation?.message}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelDelete}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={handleConfirmDelete}
-            >
-              Delete Anyway
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* External file change dialog */}
-      <ExternalFileChangeDialog />
     </>
   );
 }

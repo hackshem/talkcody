@@ -719,6 +719,14 @@ const en: LocaleDefinition = {
     directoryNotFound: 'Directory no longer exists',
   },
 
+  RepositoryLayout: {
+    maxConcurrentTasksReached: 'Maximum concurrent tasks reached',
+    fullscreen: 'Fullscreen',
+    exitFullscreen: 'Exit fullscreen',
+    deleteTaskWithChangesTitle: 'Delete Task with Uncommitted Changes?',
+    deleteAnyway: 'Delete Anyway',
+  },
+
   FileChanges: {
     codeReviewMessage: 'Please use the code review agent to review the current code changes.',
     reviewTooltip: 'AI will review changed files for bugs, issues, and improvements',

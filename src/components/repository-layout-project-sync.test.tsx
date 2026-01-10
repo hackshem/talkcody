@@ -187,6 +187,15 @@ const mockTranslations = {
       currentModel: 'Current model',
       noModels: 'No models available',
     },
+    autoApproveEdits: {
+      title: 'Auto-approve edits',
+      description: 'When enabled, file edits will be applied automatically without review',
+      enabled: 'Enabled',
+      disabled: 'Disabled',
+      enabledTooltip: 'Auto-approve: AI will apply edits without asking for approval',
+      disabledTooltip: 'Manual review: AI will ask for approval before applying edits',
+      toggleFailed: 'Failed to update auto-approve setting',
+    },
     planMode: {
       label: 'Plan Mode',
       title: 'Plan Mode',
@@ -616,7 +625,7 @@ describe('RepositoryLayout - Project Sync Bug Fix', () => {
     render(<RepositoryLayout />);
 
     expect(screen.queryByText('No Repository Open')).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Tasks')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search tasks...')).toBeInTheDocument();
   });
 
   it('should keep sidebar and chat panel sizing consistent between default and repository projects', () => {

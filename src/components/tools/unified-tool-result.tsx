@@ -1,6 +1,6 @@
 import { formatToolInputSummary as sharedFormatToolInputSummary } from '@talkcody/shared/utils';
 import { Check, ChevronDown, ChevronRight, X } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { getRelativePath } from '@/services/repository-utils';
 import { useFileChangesStore } from '@/stores/file-changes-store';
@@ -68,7 +68,7 @@ export function UnifiedToolResult({
   const rootPath = useRepositoryStore((state) => state.rootPath);
 
   // Determine if error based on explicit prop or output content
-  const isError = (() => {
+  const isError = useMemo(() => {
     if (explicitError !== undefined) {
       return explicitError;
     }
@@ -92,28 +92,37 @@ export function UnifiedToolResult({
     }
 
     return false;
-  })();
+  }, [explicitError, output]);
 
-  // Render specialized content for writeFile and editFile tools
-  const renderSpecializedContent = () => {
+  const inputSummary = useMemo(
+    () => formatToolInputSummary(toolName, input, { rootPath: rootPath ?? undefined, output }),
+    [toolName, input, rootPath, output]
+  );
+
+  const specializedContent = useMemo(() => {
+    if (!isOpen) {
+      return null;
+    }
+
+    const filePath = typeof input.file_path === 'string' ? input.file_path : undefined;
+    const content = typeof input.content === 'string' ? input.content : undefined;
+
     // For writeFile: get content from input
-    if (toolName === 'writeFile' && input.file_path && input.content) {
-      return (
-        <WriteFileResult filePath={input.file_path as string} content={input.content as string} />
-      );
+    if (toolName === 'writeFile' && filePath && content) {
+      return <WriteFileResult filePath={filePath} content={content} />;
     }
 
     // For editFile: get diff from file-changes-store
-    if (toolName === 'editFile' && input.file_path && taskId) {
+    if (toolName === 'editFile' && filePath && taskId) {
       const changes = useFileChangesStore.getState().getChanges(taskId);
       const fileChange = toolCallId
         ? changes.find((c) => c.toolId === toolCallId)
-        : changes.find((c) => c.filePath === input.file_path);
+        : changes.find((c) => c.filePath === filePath);
 
       if (fileChange?.originalContent && fileChange?.newContent) {
         return (
           <EditFileResult
-            filePath={input.file_path as string}
+            filePath={filePath}
             originalContent={fileChange.originalContent}
             newContent={fileChange.newContent}
           />
@@ -122,9 +131,7 @@ export function UnifiedToolResult({
     }
 
     return null;
-  };
-
-  const specializedContent = renderSpecializedContent();
+  }, [isOpen, input, toolName, taskId, toolCallId]);
 
   return (
     <Collapsible
@@ -142,7 +149,7 @@ export function UnifiedToolResult({
         </div>
         <div className="font-medium mr-2 flex-shrink-0">{toolName}</div>
         <div className="text-muted-foreground flex-1 font-mono text-xs break-all overflow-hidden line-clamp-2">
-          {formatToolInputSummary(toolName, input, { rootPath: rootPath ?? undefined, output })}
+          {inputSummary}
         </div>
         <div className="ml-2 flex-shrink-0">
           {isOpen ? (

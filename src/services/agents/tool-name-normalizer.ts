@@ -161,11 +161,11 @@ export function normalizeToolName(toolName: string): string | null {
   // Try exact match first
   if (commonMappings[cleaned]) {
     const normalized = commonMappings[cleaned];
-    logger.info('[ToolNameNormalizer] Successfully normalized tool name via mapping', {
-      originalToolName: toolName,
-      cleanedName: cleaned,
-      normalizedName: normalized,
-    });
+    // logger.info('[ToolNameNormalizer] Successfully normalized tool name via mapping', {
+    //   originalToolName: toolName,
+    //   cleanedName: cleaned,
+    //   normalizedName: normalized,
+    // });
     return normalized;
   }
 
@@ -173,14 +173,14 @@ export function normalizeToolName(toolName: string): string | null {
   const lowerCleaned = cleaned.toLowerCase();
   for (const [key, value] of Object.entries(commonMappings)) {
     if (key.toLowerCase() === lowerCleaned) {
-      logger.info(
-        '[ToolNameNormalizer] Successfully normalized tool name via case-insensitive match',
-        {
-          originalToolName: toolName,
-          cleanedName: cleaned,
-          normalizedName: value,
-        }
-      );
+      // logger.info(
+      //   '[ToolNameNormalizer] Successfully normalized tool name via case-insensitive match',
+      //   {
+      //     originalToolName: toolName,
+      //     cleanedName: cleaned,
+      //     normalizedName: value,
+      //   }
+      // );
       return value;
     }
   }

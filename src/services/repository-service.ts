@@ -133,12 +133,12 @@ export class RepositoryService {
       // Check cache and validate timestamp
       const cachedFile = this.fileCache.get(filePath);
       if (cachedFile && cachedFile.modifiedTime === currentModifiedTime) {
-        logger.info(`Using cached content for: ${filePath}`); // Debug log
+        // logger.info(`Using cached content for: ${filePath}`); // Debug log
         return cachedFile.content;
       }
 
       // File not in cache or has been modified, read from disk
-      logger.info(`Reading file from disk: ${filePath}`); // Debug log
+      // logger.info(`Reading file from disk: ${filePath}`); // Debug log
       const content = await readTextFile(filePath);
 
       // Add to cache with LRU eviction

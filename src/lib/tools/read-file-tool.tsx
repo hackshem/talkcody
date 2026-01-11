@@ -138,11 +138,11 @@ The file path should be an absolute path.`,
           message: 'Project root path is not set.',
         };
       }
-      logger.info('readFile: Normalizing file path. taskId:', {
-        file_path,
-        rootPath,
-        contextTaskId: context.taskId,
-      });
+      // logger.info('readFile: Normalizing file path. taskId:', {
+      //   file_path,
+      //   rootPath,
+      //   contextTaskId: context.taskId,
+      // });
       file_path = await normalizeFilePath(rootPath, file_path);
 
       // Check if file exists before attempting to read it
@@ -158,7 +158,7 @@ The file path should be an absolute path.`,
 
       const fullContent = await repositoryService.readFileWithCache(file_path);
       const result = extractLines(fullContent, file_path, start_line, line_count);
-      logger.info(`readFile: Reading file at path: ${file_path}`);
+      // logger.info(`readFile: Reading file at path: ${file_path}`);
       return {
         success: result.success,
         file_path,

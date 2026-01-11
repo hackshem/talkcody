@@ -59,7 +59,6 @@ class NotificationService {
       const focused = await this.isWindowFocused();
 
       if (focused) {
-        logger.info('Window is focused, skipping notification');
         return;
       }
 
@@ -77,8 +76,6 @@ class NotificationService {
         body,
         sound: 'Glass',
       });
-
-      logger.info(`Notification sent: ${title}`);
     } catch (error) {
       logger.error('Failed to send notification:', error);
     }

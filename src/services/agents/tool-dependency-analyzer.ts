@@ -116,7 +116,7 @@ export class ToolDependencyAnalyzer {
       },
     };
 
-    this.logExecutionPlan(plan);
+    // this.logExecutionPlan(plan);
 
     return plan;
   }

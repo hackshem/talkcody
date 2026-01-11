@@ -60,27 +60,18 @@ export class DependencyAnalyzer {
 
     // Pure agent calls - use AgentDependencyAnalyzer
     if (agentCalls.length > 0 && otherTools.length === 0) {
-      logger.info('Using AgentDependencyAnalyzer for pure agent delegation', {
-        agentCount: agentCalls.length,
-        agents: agentCalls.map((c) => c.toolName),
-      });
+      // logger.info('Using AgentDependencyAnalyzer for pure agent delegation', {
+      //   agentCount: agentCalls.length,
+      //   agents: agentCalls.map((c) => c.toolName),
+      // });
       return await this.agentAnalyzer.analyzeDependencies(agentCalls, tools);
     }
 
-    // Mixed calls - use ToolDependencyAnalyzer
-    // callAgent is a registered tool with targets support, so it can be handled like any other tool
-    if (agentCalls.length > 0 && otherTools.length > 0) {
-      logger.info('Mixed agent and tool calls, using ToolDependencyAnalyzer', {
-        agentCount: agentCalls.length,
-        otherToolCount: otherTools.length,
-      });
-    }
-
-    // Pure tool calls - use ToolDependencyAnalyzer
-    logger.info('Using ToolDependencyAnalyzer for regular tool execution', {
-      toolCount: toolCalls.length,
-      tools: toolCalls.map((c) => c.toolName),
-    });
+    // // Pure tool calls - use ToolDependencyAnalyzer
+    // logger.info('Using ToolDependencyAnalyzer for regular tool execution', {
+    //   toolCount: toolCalls.length,
+    //   tools: toolCalls.map((c) => c.toolName),
+    // });
     return this.toolAnalyzer.analyzeDependencies(toolCalls, tools);
   }
 

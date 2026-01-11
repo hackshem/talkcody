@@ -54,15 +54,15 @@ export async function getEffectiveWorkspaceRoot(taskId: string): Promise<string>
 
   // Check if the task is using a worktree
   const worktreePath = worktreeStore.getState().getEffectiveRootPath(effectiveTaskId);
-  const taskWorktreeMap = worktreeStore.getState().taskWorktreeMap;
+  // const taskWorktreeMap = worktreeStore.getState().taskWorktreeMap;
 
-  logger.info('[getEffectiveWorkspaceRoot]', {
-    taskId: effectiveTaskId,
-    baseRoot,
-    worktreePath,
-    hasWorktreeMapping: taskWorktreeMap.has(effectiveTaskId),
-    taskWorktreeMapSize: taskWorktreeMap.size,
-  });
+  // logger.info('[getEffectiveWorkspaceRoot]', {
+  //   taskId: effectiveTaskId,
+  //   baseRoot,
+  //   worktreePath,
+  //   hasWorktreeMapping: taskWorktreeMap.has(effectiveTaskId),
+  //   taskWorktreeMapSize: taskWorktreeMap.size,
+  // });
 
   // Return worktree path if available and different from base, otherwise return base
   return worktreePath && worktreePath !== baseRoot ? worktreePath : baseRoot;

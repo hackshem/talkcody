@@ -34,7 +34,7 @@ const setTodos = async (todos: TodoItem[]): Promise<void> => {
 
     const fileTodos = todos.map(convertToolTodoToFileTodo);
     await fileTodoService.saveTodos(taskId, fileTodos);
-    logger.info(`Saved ${todos.length} todos for task ${taskId}`);
+    // logger.info(`Saved ${todos.length} todos for task ${taskId}`);
   } catch (error) {
     logger.error('Error setting todos:', error);
     throw error;
@@ -93,7 +93,7 @@ function validateTodos(todos: TodoItem[]): { isValid: boolean; error?: string } 
 // Execute function that will handle the todo updates
 async function executeTodoWrite(params: z.infer<typeof inputSchema>) {
   const { todos } = params;
-  logger.info('Executing TodoWrite with todos:', todos);
+  // logger.info('Executing TodoWrite with todos:', todos);
 
   // Validate todos
   const validation = validateTodos(todos as TodoItem[]);

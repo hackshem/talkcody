@@ -441,16 +441,16 @@ export class LLMService {
           loopState.currentIteration++;
 
           const filteredTools = { ...tools };
-          const isPlanModeEnabled = usePlanModeStore.getState().isPlanModeEnabled;
+          // const isPlanModeEnabled = usePlanModeStore.getState().isPlanModeEnabled;
 
-          const availableTools = Object.keys(filteredTools);
+          // const availableTools = Object.keys(filteredTools);
 
-          logger.info(`Agent loop Step ${loopState.currentIteration}`, {
-            iteration: loopState.currentIteration,
-            messageCount: loopState.messages.length,
-            isPlanModeEnabled,
-            availableTools,
-          });
+          // logger.info(`Agent loop Step ${loopState.currentIteration}`, {
+          //   iteration: loopState.currentIteration,
+          //   messageCount: loopState.messages.length,
+          //   isPlanModeEnabled,
+          //   availableTools,
+          // });
           onStatus?.(t.LLMService.status.step(loopState.currentIteration));
 
           // Reset stream processor state for new iteration
@@ -514,14 +514,14 @@ export class LLMService {
 
           // Log request context before calling streamText
           const requestStartTime = Date.now();
-          logger.info('Calling streamText', {
-            model: providerModel.modelId,
-            agentId,
-            provider: providerModel.provider,
-            messageCount: loopState.messages.length,
-            iteration: loopState.currentIteration,
-            timestamp: new Date().toISOString(),
-          });
+          // logger.info('Calling streamText', {
+          //   model: providerModel.modelId,
+          //   agentId,
+          //   provider: providerModel.provider,
+          //   messageCount: loopState.messages.length,
+          //   iteration: loopState.currentIteration,
+          //   timestamp: new Date().toISOString(),
+          // });
 
           // Create tool definitions WITHOUT execute methods for AI SDK
           // This prevents AI SDK from auto-executing tools, which would bypass ToolExecutor
@@ -631,44 +631,11 @@ export class LLMService {
                     });
                   }
 
-                  // Filter out file content with large base64Data from steps to avoid huge logs
-                  const filteredSteps = steps?.map((step) => {
-                    if (!step.content || !Array.isArray(step.content)) {
-                      return step;
-                    }
-                    const hasFileContent = step.content.some(
-                      (item: { type?: string }) => item.type === 'file'
-                    );
-                    if (hasFileContent) {
-                      return {
-                        ...step,
-                        content: step.content.map((item: { type?: string }) =>
-                          item.type === 'file'
-                            ? { type: 'file', omitted: 'base64Data omitted for logging' }
-                            : item
-                        ),
-                      };
-                    }
-                    return step;
-                  });
-
                   logger.info('onFinish', {
                     finishReason,
                     requestDuration,
                     totalUsage: totalUsage,
                     lastRequestTokens: loopState.lastRequestTokens,
-                    steps: filteredSteps,
-                    request: request
-                      ? {
-                          body: request.body,
-                        }
-                      : undefined,
-                    response: response
-                      ? {
-                          headers: response.headers,
-                          messages: response.messages,
-                        }
-                      : undefined,
                   });
                 },
                 tools: toolsForAI as ToolSet, // Use tool definitions WITHOUT execute methods
@@ -870,11 +837,11 @@ export class LLMService {
             continue;
           }
 
-          loopState.lastFinishReason = await streamResult.finishReason;
-          const providerMetadata = await streamResult.providerMetadata;
+          // loopState.lastFinishReason = await streamResult.finishReason;
+          // const providerMetadata = await streamResult.providerMetadata;
 
-          logger.info('Finish reason', { finishReason: loopState.lastFinishReason });
-          logger.info('Provider metadata', { providerMetadata });
+          // logger.info('Finish reason', { finishReason: loopState.lastFinishReason });
+          // logger.info('Provider metadata', { providerMetadata });
 
           // Handle "unknown" finish reason by retrying without modifying messages
           if (loopState.lastFinishReason === 'unknown' && toolCalls.length === 0) {

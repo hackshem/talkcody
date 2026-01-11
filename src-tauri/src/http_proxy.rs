@@ -397,12 +397,12 @@ pub async fn stream_fetch(
     // Use request-specific event name to avoid global event broadcasting
     let event_name = format!("stream-response-{}", request_id);
 
-    log::info!(
-        "Stream fetch request to: {} {} (request_id: {})",
-        request.method,
-        request.url,
-        request_id
-    );
+    // log::info!(
+    //     "Stream fetch request to: {} {} (request_id: {})",
+    //     request.method,
+    //     request.url,
+    //     request_id
+    // );
 
     // Validate URL to prevent SSRF attacks
     validate_url(&request.url)?;

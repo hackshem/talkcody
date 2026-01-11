@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { timedMethod } from '@/lib/timer';
 
 // Maximum lines for LCS diff computation to prevent O(m×n) memory explosion
 const MAX_LINES_FOR_DIFF = 2000;

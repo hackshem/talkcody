@@ -334,15 +334,6 @@ class TaskService {
       } else {
         taskStore.addTasks(tasks);
       }
-
-      logger.info('[TaskService] Tasks loaded with pagination', {
-        projectId,
-        limit,
-        offset,
-        count: tasks.length,
-        replace,
-      });
-
       return tasks;
     } catch (error) {
       logger.error('[TaskService] Failed to load tasks with pagination:', error);

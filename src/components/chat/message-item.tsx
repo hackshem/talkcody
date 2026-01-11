@@ -27,11 +27,6 @@ export interface MessageItemProps {
   onDelete?: (messageId: string) => void;
 }
 
-const hasActualContent = (content: string): boolean => {
-  const cleaned = content.replace(/^[>\s]+/gm, '').trim();
-  return cleaned.length > 0;
-};
-
 function MessageItemComponent({
   message,
   isLastAssistantInTurn,
@@ -316,7 +311,6 @@ function MessageItemComponent({
         {!message.isStreaming &&
           message.role !== 'tool' &&
           typeof message.content === 'string' &&
-          hasActualContent(message.content) &&
           (message.role === 'user' || isLastAssistantInTurn) && (
             <Actions className="mt-2">
               <Action label={hasCopied ? 'Copied' : 'Copy'} onClick={handleCopy}>

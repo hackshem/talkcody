@@ -216,11 +216,6 @@ export const useExecutionStore = create<ExecutionState>()(
 
         const abortController = new AbortController();
 
-        logger.info('[ExecutionStore] Starting execution', {
-          taskId,
-          runningCount: runningCount + 1,
-        });
-
         set(
           (state) => {
             const newExecutions = new Map(state.executions);
@@ -249,8 +244,6 @@ export const useExecutionStore = create<ExecutionState>()(
           return;
         }
 
-        logger.info('[ExecutionStore] Stopping execution', { taskId });
-
         // Abort the execution
         execution.abortController.abort();
 
@@ -273,7 +266,6 @@ export const useExecutionStore = create<ExecutionState>()(
       },
 
       completeExecution: (taskId) => {
-        logger.info('[ExecutionStore] Completing execution', { taskId });
         set(
           (state) => {
             const newExecutions = new Map(state.executions);

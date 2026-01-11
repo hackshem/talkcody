@@ -10,7 +10,6 @@ import {
   warn as tauriWarn,
 } from '@tauri-apps/plugin-log';
 
-// For users who prefer the logger object interface with parameter support
 export const logger = {
   trace: (message: string, ...args: any[]) => {
     const formattedMessage =

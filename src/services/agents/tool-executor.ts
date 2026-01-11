@@ -173,13 +173,13 @@ export class ToolExecutor {
     // Generate execution plan using dependency analyzer
     const plan = await this.dependencyAnalyzer.analyzeDependencies(toolCalls, options.tools);
 
-    logger.info('Executing with smart concurrency', {
-      totalTools: this.getTotalTools(plan),
-      totalStages: this.getTotalStages(plan),
-      totalGroups: this.getTotalGroups(plan),
-      concurrentGroups: this.getConcurrentGroups(plan),
-      taskId: options.taskId,
-    });
+    // logger.info('Executing with smart concurrency', {
+    //   totalTools: this.getTotalTools(plan),
+    //   totalStages: this.getTotalStages(plan),
+    //   totalGroups: this.getTotalGroups(plan),
+    //   concurrentGroups: this.getConcurrentGroups(plan),
+    //   taskId: options.taskId,
+    // });
 
     // Execute all stages sequentially
     const allResults: Array<{ toolCall: ToolCallInfo; result: unknown }> = [];
@@ -259,28 +259,28 @@ export class ToolExecutor {
     options: ToolExecutionOptions,
     onStatus?: (status: string) => void
   ): Promise<Array<{ toolCall: ToolCallInfo; result: unknown }>> {
-    logger.info(`Executing stage: ${stage.name}`, {
-      description: stage.description,
-      groupCount: stage.groups.length,
-    });
+    // logger.info(`Executing stage: ${stage.name}`, {
+    //   description: stage.description,
+    //   groupCount: stage.groups.length,
+    // });
 
     const results: Array<{ toolCall: ToolCallInfo; result: unknown }> = [];
 
     // Execute all groups in this stage sequentially
     for (const group of stage.groups) {
-      const tools = this.getToolsFromGroup(group);
-      const maxConcurrency = this.getMaxConcurrencyFromGroup(group);
+      // const tools = this.getToolsFromGroup(group);
+      // const maxConcurrency = this.getMaxConcurrencyFromGroup(group);
 
-      logger.info(`Executing group: ${group.id}`, {
-        concurrent: group.concurrent,
-        toolCount: tools.length,
-        toolNames: tools.map((tool) => tool.toolName),
-        toolCallIds: tools.map((tool) => tool.toolCallId),
-        maxConcurrency: maxConcurrency,
-        reason: group.reason,
-        targetFiles: group.targetFiles,
-        groupType: 'tools' in group ? 'regular' : 'agent',
-      });
+      // logger.info(`Executing group: ${group.id}`, {
+      //   concurrent: group.concurrent,
+      //   toolCount: tools.length,
+      //   toolNames: tools.map((tool) => tool.toolName),
+      //   toolCallIds: tools.map((tool) => tool.toolCallId),
+      //   maxConcurrency: maxConcurrency,
+      //   reason: group.reason,
+      //   targetFiles: group.targetFiles,
+      //   groupType: 'tools' in group ? 'regular' : 'agent',
+      // });
 
       const groupResults = await this.executeToolGroup(group, options, onStatus);
 
@@ -304,11 +304,11 @@ export class ToolExecutor {
 
     const toolStartTime = Date.now();
 
-    logger.info('Starting tool execution', {
-      toolName: toolCall.toolName,
-      toolCallId: toolCall.toolCallId,
-      task: options.taskId,
-    });
+    // logger.info('Starting tool execution', {
+    //   toolName: toolCall.toolName,
+    //   toolCallId: toolCall.toolCallId,
+    //   task: options.taskId,
+    // });
 
     try {
       // Validate and normalize tool name to prevent API errors
@@ -327,11 +327,11 @@ export class ToolExecutor {
 
         if (normalized) {
           normalizedToolName = normalized;
-          logger.info('[ToolExecutor] Successfully normalized tool name', {
-            originalToolName,
-            normalizedToolName,
-            toolCallId: toolCall.toolCallId,
-          });
+          // logger.info('[ToolExecutor] Successfully normalized tool name', {
+          //   originalToolName,
+          //   normalizedToolName,
+          //   toolCallId: toolCall.toolCallId,
+          // });
         } else {
           // If normalization fails, let it proceed with original name
           // The tool-not-found handler will provide better error messages
@@ -438,15 +438,15 @@ export class ToolExecutor {
           taskId: options.taskId,
           toolId: toolCall.toolCallId,
         });
-        const toolDuration = Date.now() - toolStartTime;
+        // const toolDuration = Date.now() - toolStartTime;
 
-        logger.info('Tool execution completed', {
-          toolName: toolCall.toolName,
-          toolCallId: toolCall.toolCallId,
-          args: toolArgs,
-          duration: toolDuration,
-          success: true,
-        });
+        // logger.info('Tool execution completed', {
+        //   toolName: toolCall.toolName,
+        //   toolCallId: toolCall.toolCallId,
+        //   args: toolArgs,
+        //   duration: toolDuration,
+        //   success: true,
+        // });
 
         // Create tool-result message after execution
         if (onToolMessage) {
@@ -604,10 +604,10 @@ export class ToolExecutor {
     options: ToolExecutionOptions,
     onStatus?: (status: string) => void
   ): Promise<Array<{ toolCall: ToolCallInfo; result: unknown }>> {
-    logger.info(`Executing ${toolCalls.length} tools sequentially`, {
-      toolCallIds: toolCalls.map((tool) => tool.toolCallId),
-      toolNames: toolCalls.map((tool) => tool.toolName),
-    });
+    // logger.info(`Executing ${toolCalls.length} tools sequentially`, {
+    //   toolCallIds: toolCalls.map((tool) => tool.toolCallId),
+    //   toolNames: toolCalls.map((tool) => tool.toolName),
+    // });
 
     const results: Array<{ toolCall: ToolCallInfo; result: unknown }> = [];
 

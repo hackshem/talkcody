@@ -261,15 +261,15 @@ export class StreamProcessor {
     toolCall: { toolCallId: string; toolName: string; input: unknown },
     callbacks: StreamProcessorCallbacks
   ): void {
-    logger.info('Processing tool call:', {
-      toolCallId: toolCall.toolCallId,
-      toolName: toolCall.toolName,
-      inputType: typeof toolCall.input,
-      inputSize: (() => {
-        const json = JSON.stringify(toolCall.input);
-        return typeof json === 'string' ? json.length : 0;
-      })(),
-    });
+    // logger.info('Processing tool call:', {
+    //   toolCallId: toolCall.toolCallId,
+    //   toolName: toolCall.toolName,
+    //   inputType: typeof toolCall.input,
+    //   inputSize: (() => {
+    //     const json = JSON.stringify(toolCall.input);
+    //     return typeof json === 'string' ? json.length : 0;
+    //   })(),
+    // });
 
     // Decode HTML entities in tool call input
     let decodedInput = decodeObjectHtmlEntities(toolCall.input);

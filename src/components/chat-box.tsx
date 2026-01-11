@@ -91,8 +91,7 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
     const status: ChatStatus = isLoading ? 'streaming' : 'ready';
 
     // useTasks first to get currentTaskId
-    const { currentTaskId, setCurrentTaskId, setError, loadTask, createTask, getTaskDetails } =
-      useTasks(onTaskStart);
+    const { currentTaskId, setError, createTask } = useTasks(onTaskStart);
 
     // useMessages with taskId for per-task message caching
     const { messages, stopStreaming, deleteMessage, deleteMessagesFromIndex, findMessageIndex } =
@@ -134,34 +133,6 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
     useEffect(() => {
       displayedTaskIdRef.current = taskId;
     }, [taskId]);
-
-    useEffect(() => {
-      const handleTaskLoad = async () => {
-        logger.info('[ChatBox] Loading task:', taskId, currentTaskId);
-        if (taskId && taskId !== currentTaskId) {
-          const taskStore = useTaskStore.getState();
-
-          // Check if messages exist in memory
-          const hasMessagesInMemory = taskStore.getMessages(taskId).length > 0;
-
-          if (hasMessagesInMemory) {
-            // Messages exist in memory, don't reload from DB to avoid overwriting
-            // This preserves user messages that were just added but not yet persisted
-            logger.info('[ChatBox] Skipping DB load - messages exist in memory', {
-              taskId,
-            });
-            // Still need to update currentTaskId for UI to switch
-            setCurrentTaskId(taskId);
-          } else {
-            // No messages in memory, fetch from database
-            // Note: loadTask already calls taskStore.setMessages via taskService.loadMessages
-            await loadTask(taskId);
-          }
-        }
-      };
-
-      handleTaskLoad();
-    }, [taskId, currentTaskId, loadTask, setCurrentTaskId]);
 
     // Note: State sync effect removed - isLoading and serverStatus now derived from store
     // Note: Streaming content sync effect removed - executionService handles message updates
@@ -297,11 +268,11 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
         if (agent?.dynamicPrompt?.enabled) {
           try {
             const root = await getEffectiveWorkspaceRoot(activeTaskId);
-            logger.info('[ChatBox] Building system prompt with workspaceRoot', {
-              activeTaskId,
-              isNewTask,
-              workspaceRoot: root,
-            });
+            // logger.info('[ChatBox] Building system prompt with workspaceRoot', {
+            //   activeTaskId,
+            //   isNewTask,
+            //   workspaceRoot: root,
+            // });
             const { finalSystemPrompt } = await previewSystemPrompt({
               agent: agent,
               workspaceRoot: root,
@@ -339,14 +310,6 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
             },
           }
         );
-
-        if (activeTaskId) {
-          // Fetch the updated task data for cost logging
-          const updatedTask = await getTaskDetails(activeTaskId);
-          if (updatedTask) {
-            logger.info('Updated task cost:', updatedTask.cost);
-          }
-        }
       } catch (error) {
         // executionService handles abort internally, so errors here are real errors
         const errorMessage =

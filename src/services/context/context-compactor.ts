@@ -537,13 +537,13 @@ export class ContextCompactor {
 
     // Use actual token count from last AI request if available
     if (!lastTokenCount) {
-      logger.info('No token count available, skipping compression check');
+      // logger.info('No token count available, skipping compression check');
       return false;
     }
 
-    logger.info('Actual token count for messages', { lastTokenCount });
+    // logger.info('Actual token count for messages', { lastTokenCount });
     const maxContextTokens = currentModel ? getContextLength(currentModel) : 200000;
-    logger.info('Max context tokens for model', { currentModel, maxContextTokens });
+    // logger.info('Max context tokens for model', { currentModel, maxContextTokens });
     const thresholdTokens = maxContextTokens * config.compressionThreshold;
 
     if (lastTokenCount > thresholdTokens) {

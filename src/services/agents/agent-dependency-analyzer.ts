@@ -141,7 +141,7 @@ export class AgentDependencyAnalyzer {
       },
     };
 
-    this.logAgentExecutionPlan(plan);
+    // this.logAgentExecutionPlan(plan);
     return plan;
   }
 

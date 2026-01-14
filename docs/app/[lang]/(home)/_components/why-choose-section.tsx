@@ -16,7 +16,7 @@ const translations = {
         icon: DollarSign,
         title: "Maximum Flexibility, Minimum Cost",
         description:
-          "9 ways to use completely free. Leverage your existing Claude Pro/ChatGPT Plus/GitHub Copilot subscriptions. Or use any AI model from any provider—OpenAI, Anthropic, Google, or local models. Zero vendor lock-in.",
+          "8 ways to use completely free. Leverage your existing ChatGPT Plus/GitHub Copilot subscriptions. Or use any AI model from any provider—OpenAI, Anthropic, Google, or local models. Zero vendor lock-in.",
       },
       {
         icon: Layers,
@@ -47,7 +47,7 @@ const translations = {
         icon: DollarSign,
         title: "灵活性最大，成本最低",
         description:
-          "9 种完全免费的使用方式。充分利用您现有的 Claude Pro/ChatGPT Plus/GitHub Copilot 订阅。或使用任何提供商的任何 AI 模型——OpenAI、Anthropic、Google 或本地模型。零供应商锁定。",
+          "8 种完全免费的使用方式。充分利用您现有的 ChatGPT Plus/GitHub Copilot 订阅。或使用任何提供商的任何 AI 模型——OpenAI、Anthropic、Google 或本地模型。零供应商锁定。",
       },
       {
         icon: Layers,

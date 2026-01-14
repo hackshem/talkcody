@@ -1,7 +1,8 @@
 // Marketplace agent card component
 
 import type { RemoteAgentConfig } from '@talkcody/shared/types/remote-agents';
-import { User } from 'lucide-react';
+import { open } from '@tauri-apps/plugin-shell';
+import { Bot, Download, ExternalLink, Github } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,22 +27,30 @@ export function MarketplaceAgentCard({
   onInstall,
   isInstalling = false,
 }: MarketplaceAgentCardProps) {
+  const handleGithubClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    open(`https://github.com/${agent.repository}/tree/main/${agent.githubPath}`);
+  };
+
   return (
     <Card className="cursor-pointer hover:bg-accent transition-colors" onClick={onClick}>
       <CardHeader>
         <div className="flex items-start gap-3">
           <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center">
-            <User className="h-6 w-6 text-primary" />
+            <Bot className="h-6 w-6 text-primary" />
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <CardTitle className="text-lg truncate">{agent.name}</CardTitle>
               {agent.isBeta && (
                 <Badge variant="default" className="shrink-0">
                   Beta
                 </Badge>
               )}
+              <Badge variant="outline" className="mt-0 shrink-0">
+                {agent.category}
+              </Badge>
             </div>
 
             <CardDescription className="text-xs line-clamp-2 mt-1">
@@ -51,36 +60,37 @@ export function MarketplaceAgentCard({
         </div>
       </CardHeader>
 
-      <CardContent>
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <span className="font-medium">{agent.category}</span>
-          </div>
-        </div>
-      </CardContent>
-
       <CardFooter className="gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          className="flex-1"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-          }}
+        {/* GitHub repository link */}
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors group cursor-pointer"
+          onClick={handleGithubClick}
+          title={`View on GitHub: ${agent.githubPath}`}
         >
-          View Details
-        </Button>
+          <Github className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate max-w-[150px]">{agent.repository}</span>
+          <ExternalLink className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+
+        <div className="flex-1" />
+
         <Button
           size="sm"
-          className="flex-1"
           onClick={(e) => {
             e.stopPropagation();
             onInstall?.(agent);
           }}
           disabled={isInstalling || !onInstall}
         >
-          {isInstalling ? 'Installing...' : 'Install'}
+          {isInstalling ? (
+            'Installing...'
+          ) : (
+            <>
+              <Download className="h-4 w-4 mr-2" />
+              Install
+            </>
+          )}
         </Button>
       </CardFooter>
     </Card>

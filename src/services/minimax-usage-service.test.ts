@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { parseCurlCommand, fetchMinimaxUsage, testMinimaxCookie } from './minimax-usage-service';
 import { settingsManager } from '@/stores/settings-store';
+import { simpleFetch } from '@/lib/tauri-fetch';
 
 // Mock dependencies
 vi.mock('@/lib/tauri-fetch');
@@ -68,6 +69,21 @@ describe('MiniMax Usage Service', () => {
       vi.mocked(settingsManager.getMinimaxCookie).mockReturnValue('curl invalid-url');
 
       await expect(fetchMinimaxUsage()).rejects.toThrow('Invalid cookie format');
+    });
+
+    it('should map API 1004/cookie missing to SESSION_EXPIRED for UI recovery', async () => {
+      vi.mocked(settingsManager.getMinimaxCookie).mockReturnValue('cookie=value');
+
+      const mockResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          base_resp: { status_code: 1004, status_msg: 'cookie is missing, log in again' },
+        }),
+      } as unknown as Response;
+
+      vi.mocked(simpleFetch).mockResolvedValue(mockResponse);
+
+      await expect(fetchMinimaxUsage()).rejects.toThrow('SESSION_EXPIRED');
     });
   });
 

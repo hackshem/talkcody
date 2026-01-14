@@ -197,7 +197,7 @@ export async function seedTestAgents(testUsers: any[], testCategories: any[], te
         longDescription:
           'This agent helps with Python development tasks including debugging, code review, and best practices.',
         authorId: testUsers[0].id,
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'deepseek-reasoner',
         systemPrompt:
           'You are an expert Python developer with deep knowledge of Python best practices.',
         toolsConfig: { bash: true, read: true, write: true },
@@ -217,7 +217,7 @@ export async function seedTestAgents(testUsers: any[], testCategories: any[], te
         longDescription:
           'Helps with TypeScript projects, type definitions, and modern JavaScript development.',
         authorId: testUsers[1].id,
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'deepseek-reasoner',
         systemPrompt: 'You are a TypeScript expert helping developers write type-safe code.',
         toolsConfig: { bash: true, read: true },
         latestVersion: '2.1.0',
@@ -234,7 +234,7 @@ export async function seedTestAgents(testUsers: any[], testCategories: any[], te
         description: 'Analyze data with AI',
         longDescription: 'Advanced data analysis agent for statistical analysis and insights.',
         authorId: testUsers[0].id,
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'deepseek-reasoner',
         systemPrompt: 'You are a data analysis expert specializing in statistical analysis.',
         toolsConfig: { bash: true },
         latestVersion: '1.5.0',
@@ -250,7 +250,7 @@ export async function seedTestAgents(testUsers: any[], testCategories: any[], te
         name: 'Draft Agent',
         description: 'This is an unpublished draft agent',
         authorId: testUsers[1].id,
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'deepseek-reasoner',
         systemPrompt: 'Draft agent for testing purposes',
         toolsConfig: {},
         latestVersion: '0.1.0',

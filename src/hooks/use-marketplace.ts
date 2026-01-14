@@ -7,7 +7,10 @@ import { API_BASE_URL } from '@/lib/config';
 import { logger } from '@/lib/logger';
 import { simpleFetch } from '@/lib/tauri-fetch';
 import { agentRegistry } from '@/services/agents/agent-registry';
-import type { AgentToolSet } from '@/types/agent';
+import {
+  importAgentFromGitHub,
+  resolveAgentTools,
+} from '@/services/agents/github-import-agent-service';
 import type { ModelType } from '@/types/model-types';
 
 interface UseMarketplaceReturn {
@@ -120,13 +123,43 @@ export function useMarketplace(): UseMarketplaceReturn {
 
   const installAgent = useCallback(async (slug: string, _version: string) => {
     try {
+      // Step 1: Get agent metadata from API
       const agentResponse = await simpleFetch(`${API_BASE_URL}/api/remote-agents/${slug}`);
 
       if (!agentResponse.ok) {
         throw new Error('Failed to download agent configuration');
       }
 
-      const remoteAgent: RemoteAgentConfig = await agentResponse.json();
+      const remoteAgentMetadata: RemoteAgentConfig = await agentResponse.json();
+
+      // Step 2: Fetch full agent details from GitHub using the existing github-import logic
+      // This ensures tools, systemPrompt, and other fields are properly parsed
+      const repository = remoteAgentMetadata.repository;
+      const githubPath = remoteAgentMetadata.githubPath;
+
+      if (!repository || !githubPath) {
+        throw new Error('Invalid agent configuration: missing repository or githubPath');
+      }
+
+      // Use importAgentFromGitHub to properly parse the agent from GitHub
+      // This handles tools parsing, frontmatter extraction, etc.
+      const fullAgentConfigs = await importAgentFromGitHub({
+        repository,
+        path: githubPath,
+        agentId: slug,
+      });
+
+      if (fullAgentConfigs.length === 0) {
+        throw new Error('Failed to parse agent from GitHub');
+      }
+
+      const remoteAgent = fullAgentConfigs[0];
+      if (!remoteAgent) {
+        throw new Error('Failed to parse agent from GitHub');
+      }
+
+      // Convert tool IDs to actual tool references using shared resolver
+      const tools = await resolveAgentTools(remoteAgent);
 
       // Generate unique local ID based on slug
       const baseId = remoteAgent.id
@@ -145,9 +178,10 @@ export function useMarketplace(): UseMarketplaceReturn {
         id: localId,
         name: remoteAgent.name,
         description: remoteAgent.description || '',
-        modelType: remoteAgent.modelType as ModelType,
+        // Default modelType to 'main_model' if not provided (fixes NOT NULL constraint)
+        modelType: (remoteAgent.modelType as ModelType) || ('main_model' as ModelType),
         systemPrompt: remoteAgent.systemPrompt,
-        tools: (remoteAgent.tools || {}) as AgentToolSet,
+        tools,
         hidden: remoteAgent.hidden || false,
         rules: remoteAgent.rules,
         outputFormat: remoteAgent.outputFormat,

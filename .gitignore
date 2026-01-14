@@ -93,9 +93,6 @@ design/*
 *.db-shm
 *.db-wal
 
-# Claude Code local settings (contains developer-specific paths)
-.claude/settings.local.json
-
 # Vercel project config (contains project/org IDs)
 docs/.vercel/
 

@@ -20,6 +20,36 @@ export interface ChangelogEntry {
 // Only include the most recent versions that users care about
 export const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '0.2.6',
+    date: '2026-01-14',
+    en: {
+      added: [
+        'Agent Compatible with Claude Code Subagent Definition: Support for importing and using Claude Code subagent-defined agents from GitHub repositories, with more excellent built-in agents',
+      ],
+      changed: [
+        'Task Title Generation Optimization: Improved task title generation logic for better user experience',
+      ],
+      fixed: [
+        'Fixed Lint feature compatibility issue on Windows platform',
+        'Fixed MiniMax Usage Cookie missing or expired issue',
+        'Fixed Custom Tool refresh bug',
+        'Fixed Chinese input method Enter key directly sending bug',
+      ],
+    },
+    zh: {
+      added: [
+        'Agent 兼容Claude Code subagent 定义：支持从 GitHub 仓库导入和使用 Claude Code subagent 定义的智能体，内置更多优秀的智能体',
+      ],
+      changed: ['任务标题生成优化：改进任务标题生成逻辑，提升用户体验'],
+      fixed: [
+        '修复 lint 功能在 windows 平台的兼容性问题',
+        '修复 MiniMax Usage Cookie 缺失或过期问题',
+        '修复 custom tool 刷新的 Bug',
+        '修复 中文输入法 enter 直接发送的 bug',
+      ],
+    },
+  },
+  {
     version: '0.2.5',
     date: '2026-01-11',
     en: {

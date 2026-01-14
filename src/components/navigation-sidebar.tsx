@@ -1,3 +1,4 @@
+import { SiX } from '@icons-pack/react-simple-icons';
 import { open } from '@tauri-apps/plugin-shell';
 import {
   Activity,
@@ -72,6 +73,10 @@ export function NavigationSidebar({ activeView, onViewChange }: NavigationSideba
     open('https://github.com/talkcody/talkcody');
   };
 
+  const handleXClick = () => {
+    open('https://twitter.com/talkcody');
+  };
+
   const bottomNavigationItems = [
     {
       id: NavigationView.TOOLS_PLAYGROUND,
@@ -84,6 +89,12 @@ export function NavigationSidebar({ activeView, onViewChange }: NavigationSideba
       icon: Github,
       tooltip: t.Navigation.githubTooltip,
       action: handleGitHubClick,
+    },
+    {
+      id: 'x',
+      icon: SiX,
+      tooltip: 'Twitter',
+      action: handleXClick,
     },
     {
       id: NavigationView.LOGS,

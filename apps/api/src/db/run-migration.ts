@@ -10,7 +10,7 @@ async function runMigration() {
     // Add missing columns to marketplace_agents
     await db.run(sql`
       ALTER TABLE marketplace_agents
-      ADD COLUMN IF NOT EXISTS model varchar(100) NOT NULL DEFAULT 'claude-3-5-sonnet-20241022',
+      ADD COLUMN IF NOT EXISTS model varchar(100) NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS system_prompt text NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS tools_config jsonb NOT NULL DEFAULT '{}'::jsonb,
       ADD COLUMN IF NOT EXISTS rules text,

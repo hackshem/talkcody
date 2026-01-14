@@ -159,11 +159,11 @@ export function FeaturesSection({ lang }: { lang: string }) {
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,120,120,0.1),rgba(0,0,0,0))]" />
             <div className="grid grid-cols-2 gap-4 p-8 w-full">
               {[
-                "GPT-5",
-                "Claude 4.5",
+                "GPT-5.2",
+                "DeepSeek",
                 "Gemini 3",
-                "GLM 4.6",
-                "MiniMax M2",
+                "GLM 4.7",
+                "MiniMax M2.1",
                 "Kimi K2",
               ].map((model, i) => (
                 <div

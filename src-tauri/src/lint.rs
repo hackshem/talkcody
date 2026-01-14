@@ -46,9 +46,11 @@ fn is_bun_available() -> bool {
     *BUN_AVAILABLE.get_or_init(|| {
         let mut cmd = Command::new("bun");
         cmd.arg("--version");
-        // On Windows, hide the console window to avoid flashing cmd.exe
         #[cfg(windows)]
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        {
+            // Hide the console window to avoid flashing cmd.exe
+            cmd.creation_flags(0x08000000);
+        }
         cmd.output()
             .map(|output| output.status.success())
             .unwrap_or(false)
@@ -58,9 +60,14 @@ fn is_bun_available() -> bool {
 /// Check if node is available on the system
 fn is_node_available() -> bool {
     *NODE_AVAILABLE.get_or_init(|| {
-        Command::new("node")
-            .arg("--version")
-            .output()
+        let mut cmd = Command::new("node");
+        cmd.arg("--version");
+        #[cfg(windows)]
+        {
+            // Hide the console window to avoid flashing cmd.exe
+            cmd.creation_flags(0x08000000);
+        }
+        cmd.output()
             .map(|output| output.status.success())
             .unwrap_or(false)
     })
@@ -129,10 +136,16 @@ fn execute_biome_lint(file_path: &str, root_path: &str, request_id: &str) -> Lin
 
     // Run biome lint directly on the original file
     // Set current_dir to root_path so biome can find biome.json
-    let output = Command::new(executor)
+    let mut biome_cmd = Command::new(executor);
+    biome_cmd
         .args(["biome", "lint", file_path, "--reporter", "json"])
-        .current_dir(root_path)
-        .output();
+        .current_dir(root_path);
+    #[cfg(windows)]
+    {
+        // Hide the console window to avoid flashing cmd.exe
+        biome_cmd.creation_flags(0x08000000);
+    }
+    let output = biome_cmd.output();
 
     let diagnostics = match output {
         Ok(output) => {

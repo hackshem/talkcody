@@ -41,6 +41,7 @@ export function adaptCustomTool(definition: CustomToolDefinition): ToolWithUI {
     inputSchema: definition.inputSchema,
     canConcurrent: definition.canConcurrent ?? false,
     hidden: definition.hidden,
+    showResultUIAlways: definition.showResultUIAlways,
     execute: definition.execute,
     renderToolDoing,
     renderToolResult,

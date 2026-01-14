@@ -172,6 +172,16 @@ export async function fetchMinimaxUsage(): Promise<MinimaxUsageData> {
         );
       }
 
+      // MiniMax sometimes returns 4xx with body indicating cookie missing
+      if (response.status === 400 || response.status === 404) {
+        const lower = errorText.toLowerCase();
+        if (lower.includes('cookie is missing')) {
+          throw new Error(
+            'SESSION_EXPIRED: Your MiniMax session cookie is missing or expired. Please update your cookie.'
+          );
+        }
+      }
+
       throw new Error(`MiniMax Usage API error: ${response.status} - ${errorText}`);
     }
 
@@ -182,13 +192,23 @@ export async function fetchMinimaxUsage(): Promise<MinimaxUsageData> {
 
     // Check API response status
     if (apiData.base_resp?.status_code !== 0) {
+      const statusCode = apiData.base_resp?.status_code;
       const errorMsg = apiData.base_resp?.status_msg || 'Unknown error';
+      const normalizedMsg = errorMsg.toLowerCase();
       logger.error('[MinimaxUsage] API error:', {
-        status_code: apiData.base_resp?.status_code,
+        status_code: statusCode,
         status_msg: errorMsg,
         fullResponse: apiData,
       });
-      throw new Error(`API returned error (status ${apiData.base_resp?.status_code}): ${errorMsg}`);
+
+      // Treat MiniMax cookie missing/expired as session expired so UI can prompt re-entry
+      if (statusCode === 1004 || normalizedMsg.includes('cookie is missing')) {
+        throw new Error(
+          'SESSION_EXPIRED: Your MiniMax session cookie is missing or expired. Please update your cookie.'
+        );
+      }
+
+      throw new Error(`API returned error (status ${statusCode}): ${errorMsg}`);
     }
 
     if (!apiData.model_remains || apiData.model_remains.length === 0) {

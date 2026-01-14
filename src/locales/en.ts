@@ -566,6 +566,9 @@ const en: LocaleDefinition = {
       title: 'Custom Tools',
       description:
         'Load tools from a custom directory, workspace .talkcody/tools, or home ~/.talkcody/tools.',
+      tooltipTitle: 'Custom Tools',
+      tooltipDescription:
+        'Custom tools are user-defined functions that extend the AI agent capabilities. Create, test, and install tools to enhance your workflow.',
       locationLabel: 'Tool directory',
       selectDirectory: 'Select directory',
       customDirectoryLabel: 'Custom directory',
@@ -906,7 +909,7 @@ const en: LocaleDefinition = {
     toolsPlayground: 'Tool Playground',
     toolsPlaygroundTooltip: 'Test and develop custom tools',
     usage: 'Usage',
-    usageTooltip: 'View Claude subscription usage',
+    usageTooltip: 'View subscription and coding plan usage',
     logs: 'Logs',
     logsTooltip: 'View application logs',
     settings: 'Settings',
@@ -1785,6 +1788,14 @@ const en: LocaleDefinition = {
 
     plan: {
       title: 'Coding Plan',
+    },
+  },
+
+  CustomTools: {
+    page: {
+      tooltipTitle: 'Custom Tools',
+      tooltipDescription:
+        'Custom tools are user-defined functions that extend the AI agent capabilities. Create, test, and install tools to enhance your workflow.',
     },
   },
 

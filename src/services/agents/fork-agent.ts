@@ -42,7 +42,8 @@ export async function forkAgent(sourceAgentId: string): Promise<string | null> {
       id: newId,
       name: newName,
       description: sourceAgent.description || '',
-      modelType: sourceAgent.modelType,
+      // Default modelType to 'main_model' if not provided (fixes NOT NULL constraint)
+      modelType: sourceAgent.modelType || 'main_model',
       systemPrompt: sourceAgent.systemPrompt,
       tools: sourceAgent.tools || {},
       hidden: false,

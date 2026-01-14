@@ -38,7 +38,6 @@ function getLevelColor(level: string): string {
 
 export function MinimaxUsageTab() {
   const { t } = useLocale();
-  const cookieTextareaId = useId();
   const cookieUpdateTextareaId = useId();
 
   // Usage state
@@ -47,6 +46,7 @@ export function MinimaxUsageTab() {
   const error = useMinimaxUsageStore((state) => state.error);
   const initialize = useMinimaxUsageStore((state) => state.initialize);
   const refresh = useMinimaxUsageStore((state) => state.refresh);
+  const reset = useMinimaxUsageStore((state) => state.reset);
 
   // Cookie configuration state
   const [cookieInput, setCookieInput] = useState('');
@@ -73,8 +73,9 @@ export function MinimaxUsageTab() {
       // Save to settings
       await settingsManager.setMinimaxCookie(cookieInput);
 
-      // Clear input
+      // Clear input and reset store state before refresh
       setCookieInput('');
+      reset();
 
       toast.success('Cookie saved successfully!');
 
@@ -112,8 +113,13 @@ export function MinimaxUsageTab() {
     await refresh();
   };
 
-  // Not configured state (no cookie)
-  if (error?.includes('cookie not configured')) {
+  // Missing/expired cookie state (initial not configured or expired/missing from API)
+  const isCookieMissing =
+    error?.includes('cookie not configured') ||
+    error?.includes('SESSION_EXPIRED') ||
+    error?.toLowerCase().includes('cookie is missing');
+
+  if (isCookieMissing) {
     return (
       <Card>
         <CardHeader>
@@ -121,111 +127,29 @@ export function MinimaxUsageTab() {
           <CardDescription>{t.minimaxUsage.description}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Configuration Instructions */}
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Configuration Required</AlertTitle>
-            <AlertDescription>
-              Follow the steps below to configure your MiniMax session cookie.
-            </AlertDescription>
-          </Alert>
+          {/* Error / info */}
+          {error?.includes('SESSION_EXPIRED') ||
+          error?.toLowerCase().includes('cookie is missing') ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>{t.minimaxUsage.sessionExpired}</AlertTitle>
+              <AlertDescription>{t.minimaxUsage.sessionExpiredDescription}</AlertDescription>
+            </Alert>
+          ) : (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Configuration Required</AlertTitle>
+              <AlertDescription>
+                Follow the steps below to configure your MiniMax session cookie.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Step-by-step Guide */}
           <div className="space-y-4">
-            <h3 className="font-semibold">How to get your cookie:</h3>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>
-                Open{' '}
-                <a
-                  href="https://platform.minimaxi.com/user-center/payment/coding-plan"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:underline"
-                >
-                  MiniMax Coding Plan page
-                </a>
-              </li>
-              <li>Open Browser DevTools (Press F12)</li>
-              <li>
-                Go to the <strong>Network</strong> tab
-              </li>
-              <li>Refresh the page</li>
-              <li>
-                Find the request to <code className="bg-muted px-1 rounded">remains</code>
-              </li>
-              <li>
-                Right-click on the request → <strong>Copy</strong> → <strong>Copy as cURL</strong>
-              </li>
-              <li>Paste the entire cURL command below</li>
-            </ol>
-          </div>
-
-          {/* Input Area */}
-          <div className="space-y-2">
-            <Label htmlFor={cookieTextareaId}>Paste cURL Command</Label>
-            <textarea
-              id={cookieTextareaId}
-              className="w-full min-h-[120px] p-3 text-sm border rounded-md font-mono"
-              placeholder="curl 'https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains?GroupId=...' ..."
-              value={cookieInput}
-              onChange={(e) => setCookieInput(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              💡 Tip: You can paste the entire cURL command. We'll automatically extract the cookie.
-            </p>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2">
-            <Button
-              onClick={handleTestCookie}
-              disabled={isTesting || !cookieInput.trim()}
-              variant="outline"
-            >
-              {isTesting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                'Test Connection'
-              )}
-            </Button>
-            <Button onClick={handleSaveCookie} disabled={isSaving || !cookieInput.trim()}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save & Connect'
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Session expired state
-  if (error?.includes('SESSION_EXPIRED')) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.minimaxUsage.title}</CardTitle>
-          <CardDescription>{t.minimaxUsage.description}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Error Alert */}
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>{t.minimaxUsage.sessionExpired}</AlertTitle>
-            <AlertDescription>{t.minimaxUsage.sessionExpiredDescription}</AlertDescription>
-          </Alert>
-
-          {/* Update Instructions */}
-          <div className="space-y-4">
-            <h3 className="font-semibold">Update your cookie:</h3>
+            <h3 className="font-semibold">
+              {error ? 'Update your cookie:' : 'How to get your cookie:'}
+            </h3>
             <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
               <li>
                 Open{' '}
@@ -258,6 +182,9 @@ export function MinimaxUsageTab() {
               value={cookieInput}
               onChange={(e) => setCookieInput(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              💡 Tip: You can paste the entire cURL command. We'll automatically extract the cookie.
+            </p>
           </div>
 
           {/* Action Buttons */}
@@ -282,8 +209,10 @@ export function MinimaxUsageTab() {
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Saving...
                 </>
-              ) : (
+              ) : error ? (
                 'Update & Reconnect'
+              ) : (
+                'Save & Connect'
               )}
             </Button>
           </div>

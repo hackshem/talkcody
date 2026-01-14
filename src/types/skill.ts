@@ -171,9 +171,6 @@ export interface SkillFilter {
   isBuiltIn?: boolean;
 }
 
-/**
- * Skill sort options
- */
 export type SkillSortOption = 'name' | 'downloads' | 'installs' | 'rating' | 'recent' | 'updated';
 
 /**

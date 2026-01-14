@@ -16,7 +16,6 @@ import { settingsManager } from '@/stores/settings-store';
 import type { ToolWithUI } from '@/types/tool';
 import { logger } from '../logger';
 import { registerToolUIRenderers } from '../tool-adapter';
-// Import all tools explicitly to avoid dynamic import issues
 import { askUserQuestionsTool } from './ask-user-questions-tool';
 import { bashTool } from './bash-tool';
 
@@ -352,19 +351,29 @@ export async function getTool(toolName: ToolName): Promise<ToolWithUI | undefine
  */
 export function getToolMetadata(toolName: string): ToolMetadata {
   const definition = TOOL_DEFINITIONS[toolName as ToolName];
+  if (definition) {
+    return definition.metadata;
+  }
 
-  if (!definition) {
-    // Return default metadata for unknown tools
+  const customTool = customToolsCache[toolName];
+  if (customTool) {
     return {
       category: 'other',
-      canConcurrent: false,
+      canConcurrent: customTool.canConcurrent ?? false,
       fileOperation: false,
       renderDoingUI: true,
-      showResultUIAlways: false,
+      showResultUIAlways: customTool.showResultUIAlways ?? false,
     };
   }
 
-  return definition.metadata;
+  // Return default metadata for unknown tools
+  return {
+    category: 'other',
+    canConcurrent: false,
+    fileOperation: false,
+    renderDoingUI: true,
+    showResultUIAlways: false,
+  };
 }
 
 /**

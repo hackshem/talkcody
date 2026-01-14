@@ -13,12 +13,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTranslation } from '@/hooks/use-locale';
+import { getDocLinks } from '@/lib/doc-links';
 import { usePlaygroundStore } from '@/stores/playground-store';
 import type { PlaygroundConfig } from '@/types/playground';
 
@@ -141,6 +143,11 @@ export default function ToolPlayground() {
           <div className="flex items-center gap-2">
             <Terminal className="w-5 h-5 text-primary" />
             <h1 className="font-semibold text-lg">Tool Playground</h1>
+            <HelpTooltip
+              title={t.CustomTools?.page.tooltipTitle ?? 'Custom Tools'}
+              description={t.CustomTools?.page.tooltipDescription ?? ''}
+              docUrl={getDocLinks().features.customTools}
+            />
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>{toolName}</span>

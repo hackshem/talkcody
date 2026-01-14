@@ -22,7 +22,7 @@ Unlike cloud-only AI tools that lock you into a single model or upload your code
 - **True Freedom** - Use any AI model (OpenAI, Anthropic, Google, local models) without vendor lock-in
 - **Maximum Speed** - Unique four-level parallelism runs multiple tasks simultaneously
 - **Your Privacy** - Everything runs locally, your code never leaves your machine
-- **Your Money** - 9 ways to use completely free, or leverage your existing Claude Pro/ChatGPT Plus/GitHub Copilot
+- **Your Money** - 9 ways to use completely free, or leverage your existing ChatGPT Plus/GitHub Copilot
 
 **Built by developers, for developers who value speed, cost, control, and privacy.**
 
@@ -33,7 +33,7 @@ Unlike cloud-only AI tools that lock you into a single model or upload your code
 
 #### 💰 Maximum Flexibility, Minimum Cost
 - **[9 Ways to Use Free](https://www.talkcody.com/docs/guides/free-use)** - Local models, free tiers, and more
-- **Leverage Existing Subscriptions** - Use your [Claude Pro/Max](https://www.talkcody.com/docs/features/claude-pro-plan), [ChatGPT Plus/Pro](https://www.talkcody.com/docs/features/openai-plus-plan), or [GitHub Copilot](https://www.talkcody.com/docs/features/github-copilot) accounts
+- **Leverage Existing Subscriptions** - Use your [ChatGPT Plus/Pro](https://www.talkcody.com/docs/features/openai-plus-plan), or [GitHub Copilot](https://www.talkcody.com/docs/features/github-copilot) accounts
 - **Any Model, Any Provider** - Switch between OpenAI, Anthropic, Google, or local models instantly
 
 #### 🔒 Privacy You Can Trust

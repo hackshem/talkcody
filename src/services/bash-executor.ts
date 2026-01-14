@@ -639,9 +639,7 @@ export class BashExecutor {
         this.logger.info('No rootPath set, executing in default directory');
       }
 
-      // Execute command
       const result = await this.executeCommand(command, rootPath || null, 300000, 60000);
-      this.logger.info('Command result:', result);
 
       return this.formatResult(result, command);
     } catch (error) {

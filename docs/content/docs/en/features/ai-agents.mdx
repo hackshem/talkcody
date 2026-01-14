@@ -214,3 +214,137 @@ For each issue found:
 
 **Model**: Main Model
 **Tools**: Read File, Code Search
+
+## Import Agents from GitHub Repository
+
+TalkCody supports importing Claude Code subagent configurations directly from GitHub repositories without manual creation. Simply provide the GitHub repository address and agent file path, and the system will automatically parse the Markdown frontmatter and create the agent.
+
+### Supported Format
+
+The standard Claude Code subagent definition: The imported agent file needs to use Markdown format with YAML frontmatter at the beginning:
+
+```markdown
+---
+name: Agent Name
+description: Agent Description
+tools:
+  - readFile
+  - writeFile
+  - codeSearch
+model: main_model
+role: read
+canBeSubagent: true
+category: github
+---
+
+Here is your system prompt content...
+```
+
+### Import Steps
+
+<Steps>
+
+<Step>
+### Open Import Interface
+
+1. Open TalkCody
+2. Click on the **Agents** tab in the sidebar
+3. Click the **Import from GitHub** button
+</Step>
+
+<Step>
+### Enter Repository Information
+
+**Repository Address**
+- Format: `owner/repository` (e.g., `talkcody/agents`)
+- Supports specifying branch: `owner/repository@branch` (e.g., `talkcody/agents@main`)
+
+**File Path**
+- Single file: Enter the `.md` file path directly (e.g., `agents/coding/agent.md`)
+- Entire directory: Enter the directory path, the system will automatically scan and import all valid agent files (e.g., `agents/`)
+
+<Callout type="tip">
+Using directory import is recommended, as it allows you to get all agent configurations from the repository at once.
+</Callout>
+</Step>
+
+<Step>
+### Confirm and Import
+
+1. Click the **Start Import** button
+2. The system will automatically:
+   - Try to fetch files from `main` or `master` branch
+   - Parse the frontmatter in Markdown files
+   - Validate tool configuration and system prompts
+   - Create the corresponding agents
+
+3. After import is complete, you can view and manage imported agents in the **My Agents** tab
+</Step>
+
+</Steps>
+
+### Advanced Usage
+
+**Import all agents from an entire directory**:
+```
+repository: talkcody/agents
+path: agents/
+```
+
+**Import a single agent file**:
+```
+repository: talkcody/agents
+path: agents/coding/coder.md
+```
+
+<Callout type="info">
+Imported agents will have dynamic prompt feature enabled by default, fetching context information from the current project's `agents.md` file.
+</Callout>
+
+## Install from Remote Agent List
+
+TalkCody provides an agent marketplace that gathers various specialized agents contributed by the community. You can install agents with one click to quickly expand your agent library.
+
+### Browse Agent List
+
+<Steps>
+
+<Step>
+### Open Agent Marketplace
+
+1. Open TalkCody
+2. Click on the **Agents** tab in the sidebar
+3. Switch to the **Remote Agents** tab
+</Step>
+
+<Step>
+### Search and Filter
+
+**Search Function**
+- Enter keywords in the search box
+- Supports searching by name, description, and agent ID
+
+**Category Filter**
+- Use the category dropdown to filter specific types of agents
+- Categories include: Programming, Testing, Documentation, Security, Analysis, etc.
+
+**Refresh List**
+- Click the refresh button to get the latest agent list
+</Step>
+
+<Step>
+### Install Agent
+
+1. On the agent detail page or card, click the **Install** button
+2. Wait for installation to complete
+3. After successful installation:
+   - The agent is automatically added to the **My Agents** list
+   - You can start using it immediately
+   - You can edit the configuration to customize its behavior
+
+<Callout type="success">
+Installed agents are exactly the same as agents you create yourself - you can freely edit, copy, or delete them.
+</Callout>
+</Step>
+
+</Steps>

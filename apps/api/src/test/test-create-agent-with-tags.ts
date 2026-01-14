@@ -37,7 +37,7 @@ async function testCreateAgentWithTags() {
     const agent = await agentService.createAgent(userId, {
       name: 'Test Agent with Tags',
       description: 'Testing tags functionality',
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'deepseek-reasoner',
       systemPrompt: 'You are a helpful assistant',
       categoryIds: ['coding'],
       tags: ['ai', 'chat', 'assistant'],

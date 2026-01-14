@@ -117,11 +117,6 @@ export function SkillCard({
                   System
                 </Badge>
               )}
-              {/* {isLocalCustom && (
-                <Badge variant="default" className="shrink-0 text-xs">
-                  Custom
-                </Badge>
-              )} */}
               {isActive && (
                 <Badge variant="default" className="shrink-0 text-xs bg-green-600">
                   Active
@@ -161,7 +156,7 @@ export function SkillCard({
               </Tooltip>
             )}
 
-            <CardDescription className="text-xs line-clamp-2 mt-2">
+            <CardDescription className="text-xs line-clamp-4 mt-2">
               {skill.description}
             </CardDescription>
           </div>

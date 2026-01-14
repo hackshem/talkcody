@@ -87,8 +87,8 @@ Use this to find code patterns, function definitions, variable usage, or any tex
           }
         }
 
-        logger.info(`Total matches found: ${totalMatches}`);
-        logger.info(`Search results:\n${formattedResults.trim()}`);
+        // logger.info(`Total matches found: ${totalMatches}`);
+        // logger.info(`Search results:\n${formattedResults.trim()}`);
 
         return {
           success: true,

@@ -51,16 +51,9 @@ export function createTool(options: CreateToolOptions): ToolWithUI {
     execute: timedExecute,
     renderToolDoing,
     renderToolResult,
+    hidden,
     canConcurrent,
+    showResultUIAlways,
   };
-
-  if (hidden) {
-    tool.hidden = hidden;
-  }
-
-  if (showResultUIAlways !== undefined) {
-    tool.showResultUIAlways = showResultUIAlways;
-  }
-
   return tool;
 }

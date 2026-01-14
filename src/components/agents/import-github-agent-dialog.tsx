@@ -19,8 +19,10 @@ import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-locale';
 import { logger } from '@/lib/logger';
 import { agentRegistry } from '@/services/agents/agent-registry';
-import { importAgentFromGitHub } from '@/services/agents/github-import-agent-service';
-import { getAvailableToolsForUISync } from '@/services/agents/tool-registry';
+import {
+  importAgentFromGitHub,
+  resolveAgentTools,
+} from '@/services/agents/github-import-agent-service';
 import type { AgentToolSet } from '@/types/agent';
 import type { ModelType } from '@/types/model-types';
 
@@ -124,9 +126,6 @@ export function ImportGitHubAgentDialog({
         branch: parsed.branch,
       });
 
-      const availableTools = getAvailableToolsForUISync();
-      const toolIds = new Set(availableTools.map((tool) => tool.id));
-
       const succeeded: string[] = [];
       const failed: Array<{ name: string; error: string }> = [];
 
@@ -144,26 +143,17 @@ export function ImportGitHubAgentDialog({
             localId = `${baseId || agentId}-${counter++}`;
           }
 
-          const resolvedTools: Record<string, unknown> = {};
-          const toolList = Array.isArray(agentConfig.tools)
-            ? agentConfig.tools
-            : Object.keys((agentConfig.tools || {}) as Record<string, unknown>);
-
-          for (const toolId of toolList) {
-            if (!toolIds.has(toolId)) continue;
-            const match = availableTools.find((tool) => tool.id === toolId);
-            if (match) {
-              resolvedTools[toolId] = match.ref;
-            }
-          }
+          // Convert tool IDs to actual tool references using shared resolver
+          const tools = await resolveAgentTools(agentConfig);
 
           await agentRegistry.forceRegister({
             id: localId,
             name: agentConfig.name,
             description: agentConfig.description,
-            modelType: agentConfig.modelType as ModelType,
+            // Default modelType to 'main_model' if not provided (fixes NOT NULL constraint)
+            modelType: (agentConfig.modelType as ModelType) || 'main_model',
             systemPrompt: agentConfig.systemPrompt,
-            tools: resolvedTools as AgentToolSet,
+            tools: tools as AgentToolSet,
             hidden: agentConfig.hidden,
             rules: agentConfig.rules,
             outputFormat: agentConfig.outputFormat,

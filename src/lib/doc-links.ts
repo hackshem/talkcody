@@ -20,6 +20,7 @@ export function getDocLinks() {
       skills: `${BASE_URL}/features/skills`,
       agents: `${BASE_URL}/features/ai-agents`,
       mcpServers: `${BASE_URL}/features/mcp-servers`,
+      customTools: `${BASE_URL}/features/custom-tools`,
       models: `${BASE_URL}/configuration/model-settings`,
       planMode: `${BASE_URL}/features/plan-mode`,
       worktree: `${BASE_URL}/features/worktree`,

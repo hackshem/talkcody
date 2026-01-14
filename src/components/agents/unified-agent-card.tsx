@@ -1,7 +1,7 @@
 // Unified agent card component for both marketplace and local agents
 
 import type { RemoteAgentConfig } from '@talkcody/shared/types/remote-agents';
-import { GitFork, Pause, Pencil, Play, Star, Trash2, User } from 'lucide-react';
+import { Bot, GitFork, Pause, Pencil, Play, Star, Trash2 } from 'lucide-react';
 import { BetaBadge } from '@/components/beta-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -101,7 +101,7 @@ export function UnifiedAgentCard({
               </div>
             ) : (
               <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 flex items-center justify-center ring-2 ring-border/50 group-hover:ring-primary/30 transition-all backdrop-blur-sm">
-                <User className="h-7 w-7 text-primary" />
+                <Bot className="h-7 w-7 text-primary" />
               </div>
             )}
 

@@ -12,7 +12,8 @@ export class AgentService {
       id: data.id,
       name: data.name,
       description: data.description || '',
-      model_type: data.model_type,
+      // Default model_type to 'main_model' if not provided (fixes NOT NULL constraint)
+      model_type: data.model_type || 'main_model',
       system_prompt: data.system_prompt,
       tools_config: data.tools_config || '{}',
       rules: data.rules || '',

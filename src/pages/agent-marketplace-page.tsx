@@ -1,7 +1,7 @@
 // Marketplace page for discovering and installing agents
 
 import type { RemoteAgentConfig } from '@talkcody/shared/types/remote-agents';
-import { Bot, Clock, Download, Plus, RefreshCw, Search, Star } from 'lucide-react';
+import { Bot, Download, Plus, RefreshCw, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AgentEditorDialog } from '@/components/agents/agent-editor-dialog';
@@ -48,7 +48,6 @@ export function AgentMarketplacePage() {
   const [activeTab, setActiveTab] = useState('myagents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [_sortBy, _setSortBy] = useState<'popular' | 'recent' | 'name'>('popular');
   const [selectedAgent, setSelectedAgent] = useState<RemoteAgentConfig | null>(null);
   const [installingAgentId, setInstallingAgentId] = useState<string | null>(null);
 
@@ -93,25 +92,8 @@ export function AgentMarketplacePage() {
       );
     }
 
-    // Apply sorting
-    switch (_sortBy) {
-      case 'name':
-        result.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      case 'recent':
-        result.sort((a, b) => {
-          const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return bTime - aTime;
-        });
-        break;
-      default:
-        // For 'popular', 'downloads', 'installs', keep original order
-        break;
-    }
-
     return result;
-  }, [myAgents, searchQuery, _sortBy]);
+  }, [myAgents, searchQuery]);
 
   const filteredMarketplaceAgents = useMemo(() => {
     let result = [...marketplaceAgents];
@@ -212,10 +194,6 @@ export function AgentMarketplacePage() {
     setSelectedCategory(value);
   };
 
-  const handleSortChange = (_value: 'popular' | 'recent' | 'name') => {
-    _setSortBy('popular');
-  };
-
   const handleAgentClick = (agent: RemoteAgentConfig) => {
     setSelectedAgent(agent);
   };
@@ -313,7 +291,8 @@ export function AgentMarketplacePage() {
             id: newId,
             name: agentData.name,
             description: agentData.description,
-            modelType: agentData.modelType,
+            // Default modelType to 'main_model' if not provided (fixes NOT NULL constraint)
+            modelType: agentData.modelType || 'main_model',
             systemPrompt: agentData.systemPrompt,
             tools,
             rules: agentData.rules,
@@ -487,27 +466,6 @@ export function AgentMarketplacePage() {
               })}
             </SelectContent>
           </Select>
-
-          <Select value={_sortBy} onValueChange={handleSortChange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="popular">
-                <div className="flex items-center gap-2">
-                  <Star className="h-4 w-4" />
-                  {t.Agents.page.sortPopular}
-                </div>
-              </SelectItem>
-              <SelectItem value="recent">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  {t.Agents.page.sortRecent}
-                </div>
-              </SelectItem>
-              <SelectItem value="name">{t.Agents.page.sortName}</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
@@ -547,30 +505,6 @@ export function AgentMarketplacePage() {
               </div>
             )}
           </TabsContent>
-
-          {/* <TabsContent value="featured" className="px-6 pb-6 mt-4">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="text-muted-foreground">Loading featured agents...</div>
-              </div>
-            ) : featuredAgents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-center">
-                <p className="text-muted-foreground mb-2">No featured agents yet</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {featuredAgents.map((agent) => (
-                  <MarketplaceAgentCard
-                    key={agent.id}
-                    agent={agent}
-                    onClick={() => handleAgentClick(agent)}
-                    onInstall={handleInstall}
-                    isInstalling={installingAgentId === agent.id}
-                  />
-                ))}
-              </div>
-            )}
-          </TabsContent> */}
 
           <TabsContent value="myagents" className="px-6 pb-6 mt-4">
             {isLoading ? (

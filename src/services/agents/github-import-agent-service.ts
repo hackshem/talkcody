@@ -6,6 +6,7 @@
 import type { RemoteAgentConfig } from '@talkcody/shared/types/remote-agents';
 import { logger } from '@/lib/logger';
 import { simpleFetch } from '@/lib/tauri-fetch';
+import type { AgentToolSet } from '@/types/agent';
 import { isValidModelType, ModelType } from '@/types/model-types';
 
 export interface ImportAgentFromGitHubOptions {
@@ -34,16 +35,20 @@ type ParsedAgentMarkdown = {
 const TOOL_ALIAS_MAP: Record<string, string> = {
   read: 'readFile',
   write: 'writeFile',
+  multiedit: 'editFile',
   edit: 'editFile',
   glob: 'glob',
   grep: 'codeSearch',
-  search: 'codeSearch',
   bash: 'bash',
-  list: 'listFiles',
+  ls: 'listFiles',
   listfiles: 'listFiles',
   websearch: 'webSearch',
   webfetch: 'webFetch',
   todowrite: 'todoWrite',
+  exitplanmode: 'exitPlanMode',
+  skill: 'bash',
+  task: 'explore',
+  askuserquestion: 'askUserQuestions',
 };
 
 function slugify(value: string): string {
@@ -192,6 +197,54 @@ export function parseAgentMarkdown(content: string): ParsedAgentMarkdown {
   };
 }
 
+function extractMarkdownPathsFromJson(html: string, basePath: string): string[] {
+  try {
+    // GitHub now embeds file list in JSON data within a script tag
+    const jsonMatch = html.match(
+      /<script\s+type="application\/json"\s+data-target="react-app\.embeddedData">\s*({.*?})\s*<\/script>/s
+    );
+
+    if (!jsonMatch) {
+      return [];
+    }
+
+    const jsonContent = jsonMatch[1];
+    if (!jsonContent) {
+      return [];
+    }
+
+    const jsonData = JSON.parse(jsonContent);
+    const treeItems = jsonData?.payload?.tree?.items;
+
+    if (!Array.isArray(treeItems)) {
+      return [];
+    }
+
+    const normalizedBase = basePath ? `${basePath.replace(/\/+$/, '')}` : '';
+    const paths: string[] = [];
+
+    for (const item of treeItems) {
+      // Filter for markdown files only
+      if (item.contentType === 'file' && item.path?.endsWith('.md')) {
+        const filePath = item.path as string;
+        // Apply basePath filter if specified
+        if (
+          !normalizedBase ||
+          filePath === normalizedBase ||
+          filePath.startsWith(normalizedBase + '/')
+        ) {
+          paths.push(filePath);
+        }
+      }
+    }
+
+    return paths;
+  } catch {
+    // If JSON parsing fails, return empty array and let fallback handle it
+    return [];
+  }
+}
+
 export function extractMarkdownPathsFromHtml(
   html: string,
   owner: string,
@@ -199,6 +252,13 @@ export function extractMarkdownPathsFromHtml(
   branch: string,
   basePath: string
 ): string[] {
+  // Priority 1: Try new GitHub JSON format (embedded data)
+  const jsonPaths = extractMarkdownPathsFromJson(html, basePath);
+  if (jsonPaths.length > 0) {
+    return jsonPaths;
+  }
+
+  // Priority 2: Fallback to legacy anchor tag format for compatibility
   const normalizedBase = basePath ? `${basePath.replace(/\/+$/, '')}/` : '';
   const pattern = new RegExp(`href="/${owner}/${repo}/blob/${branch}/([^"#]+\\.md)"`, 'g');
   const matches = new Set<string>();
@@ -214,6 +274,30 @@ export function extractMarkdownPathsFromHtml(
   return Array.from(matches.values());
 }
 
+/**
+ * Convert tool IDs to actual tool references by matching with available tools.
+ * This is used after importing an agent from GitHub to resolve tool names to actual tool objects.
+ * Uses dynamic import to avoid circular dependencies.
+ */
+export async function resolveAgentTools(agentConfig: RemoteAgentConfig): Promise<AgentToolSet> {
+  const { getAvailableToolsForUISync } = await import('@/services/agents/tool-registry');
+  const availableTools = getAvailableToolsForUISync();
+  const toolIds = new Set(availableTools.map((tool) => tool.id));
+
+  const resolvedTools: Record<string, unknown> = {};
+  const toolList = Object.keys((agentConfig.tools || {}) as Record<string, unknown>);
+
+  for (const toolId of toolList) {
+    if (!toolIds.has(toolId)) continue;
+    const match = availableTools.find((tool) => tool.id === toolId);
+    if (match) {
+      resolvedTools[toolId] = match.ref;
+    }
+  }
+
+  return resolvedTools as AgentToolSet;
+}
+
 function buildRemoteAgentConfig(params: {
   parsed: ParsedAgentMarkdown;
   repository: string;
@@ -224,7 +308,7 @@ function buildRemoteAgentConfig(params: {
   const name = parsed.frontmatter.name ? String(parsed.frontmatter.name).trim() : fallbackId;
   const description = parsed.frontmatter.description
     ? String(parsed.frontmatter.description).trim()
-    : undefined;
+    : '';
   const prompt = parsed.prompt;
 
   if (!prompt) {
@@ -236,6 +320,19 @@ function buildRemoteAgentConfig(params: {
   for (const toolName of toolNames) {
     tools[toolName] = {};
   }
+
+  // Default dynamic prompt configuration for GitHub-imported agents
+  const dynamicPrompt: RemoteAgentConfig['dynamicPrompt'] = {
+    enabled: true,
+    providers: ['env', 'agents_md'],
+    variables: {},
+    providerSettings: {
+      agents_md: {
+        maxChars: 8000,
+        searchStrategy: 'root-only',
+      },
+    },
+  };
 
   return {
     id: slugify(name) || fallbackId,
@@ -250,6 +347,7 @@ function buildRemoteAgentConfig(params: {
     role: parsed.frontmatter.role,
     canBeSubagent: parsed.frontmatter.canBeSubagent,
     version: parsed.frontmatter.version ? String(parsed.frontmatter.version) : undefined,
+    dynamicPrompt,
   };
 }
 

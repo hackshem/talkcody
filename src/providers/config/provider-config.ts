@@ -20,31 +20,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     type: 'custom',
     createProvider: () => createTalkCodyProvider(),
   },
-
-  anthropic: {
-    id: 'anthropic',
-    name: 'Anthropic',
-    apiKeyName: 'ANTHROPIC_API_KEY',
-    required: false,
-    type: 'custom',
-    supportsOAuth: false,
-    createProvider: (apiKey: string, baseUrl?: string) =>
-      createAnthropic({
-        apiKey,
-        ...(baseUrl && { baseURL: baseUrl }),
-        // Add Authorization header for third-party APIs that use Bearer token auth
-        // Official Anthropic API uses x-api-key (handled by SDK), third-party APIs often use Bearer
-        ...(baseUrl && {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        }),
-        // Use Tauri fetch to bypass webview CORS restrictions
-        // This works for both official Anthropic API and third-party compatible APIs
-        fetch: streamFetch as typeof fetch,
-      }),
-  },
-
   openai: {
     id: 'openai',
     name: 'OpenAI',
@@ -215,6 +190,30 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
         name: 'ollama',
         baseURL: 'http://127.0.0.1:11434/v1',
         apiKey: 'ollama', // Ollama doesn't require a real API key
+        fetch: streamFetch as typeof fetch,
+      }),
+  },
+
+  anthropic: {
+    id: 'anthropic',
+    name: 'Anthropic',
+    apiKeyName: 'ANTHROPIC_API_KEY',
+    required: false,
+    type: 'custom',
+    supportsOAuth: false,
+    createProvider: (apiKey: string, baseUrl?: string) =>
+      createAnthropic({
+        apiKey,
+        ...(baseUrl && { baseURL: baseUrl }),
+        // Add Authorization header for third-party APIs that use Bearer token auth
+        // Official Anthropic API uses x-api-key (handled by SDK), third-party APIs often use Bearer
+        ...(baseUrl && {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+        }),
+        // Use Tauri fetch to bypass webview CORS restrictions
+        // This works for both official Anthropic API and third-party compatible APIs
         fetch: streamFetch as typeof fetch,
       }),
   },

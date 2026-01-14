@@ -2,7 +2,8 @@ import { formatToolInputSummary as sharedFormatToolInputSummary } from '@talkcod
 import { Check, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { getAllToolsSync, getToolMetadata } from '@/lib/tools';
+import { logger } from '@/lib/logger';
+import { getToolMetadata } from '@/lib/tools';
 import { getRelativePath } from '@/services/repository-utils';
 import { useFileChangesStore } from '@/stores/file-changes-store';
 import { useRepositoryStore } from '@/stores/window-scoped-repository-store';
@@ -65,25 +66,15 @@ export function UnifiedToolResult({
   taskId,
   toolCallId,
 }: UnifiedToolResultProps) {
-  const shouldExpandByDefault = useMemo(() => {
-    try {
-      // Try to get tool from registry first
-      const tools = getAllToolsSync();
-      const tool = tools[toolName];
-      if (tool?.showResultUIAlways) {
-        return true;
-      }
-    } catch {
-      // Tools not loaded yet, fall back to metadata
-    }
+  const rootPath = useRepositoryStore((state) => state.rootPath);
 
-    // Use metadata
+  // Calculate whether to expand by default on every render
+  const shouldExpandByDefault = useMemo(() => {
     const metadata = getToolMetadata(toolName);
-    return metadata.showResultUIAlways === true;
+    return metadata?.showResultUIAlways === true;
   }, [toolName]);
 
   const [isOpen, setIsOpen] = useState(shouldExpandByDefault);
-  const rootPath = useRepositoryStore((state) => state.rootPath);
 
   // Determine if error based on explicit prop or output content
   const isError = useMemo(() => {

@@ -542,6 +542,8 @@ export interface LocaleDefinition {
     customTools: {
       title: string;
       description: string;
+      tooltipTitle: string;
+      tooltipDescription: string;
       locationLabel: string;
       empty: string;
       selectDirectory: string;
@@ -1732,6 +1734,13 @@ export interface LocaleDefinition {
     openInBrowser: string;
     passwordSet: string;
     createLink: string;
+  };
+
+  CustomTools?: {
+    page: {
+      tooltipTitle: string;
+      tooltipDescription: string;
+    };
   };
 
   playground: {

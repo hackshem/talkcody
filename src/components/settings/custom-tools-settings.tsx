@@ -3,7 +3,9 @@ import { AlertCircle, FolderOpen, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
 import { useLocale } from '@/hooks/use-locale';
+import { getDocLinks } from '@/lib/doc-links';
 import { useCustomToolsStore } from '@/stores/custom-tools-store';
 import { useSettingsStore } from '@/stores/settings-store';
 
@@ -52,6 +54,11 @@ export function CustomToolsSettings() {
           <div className="flex items-center gap-2">
             <FolderOpen className="h-5 w-5" />
             <CardTitle className="text-lg">{t.Settings.customTools.title}</CardTitle>
+            <HelpTooltip
+              title={t.Settings.customTools.tooltipTitle}
+              description={t.Settings.customTools.tooltipDescription}
+              docUrl={getDocLinks().features.customTools}
+            />
           </div>
           <CardDescription>{t.Settings.customTools.description}</CardDescription>
         </CardHeader>

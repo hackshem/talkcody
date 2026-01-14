@@ -78,7 +78,7 @@ function convertRemoteSkillToSkill(remoteSkill: RemoteSkillConfig): Skill {
 export function SkillsMarketplacePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<SkillSortOption>('downloads');
+  const [sortBy] = useState<SkillSortOption>('name');
   const [selectedSkill, setSelectedSkill] = useState<Skill | RemoteSkillConfig | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'local'>('local');
   const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
@@ -157,10 +157,6 @@ export function SkillsMarketplacePage() {
 
   const handleCategoryChange = (value: string) => {
     setSelectedCategory(value);
-  };
-
-  const handleSortChange = (value: SkillSortOption) => {
-    setSortBy(value);
   };
 
   const handleSkillClick = (skill: Skill | RemoteSkillConfig) => {
@@ -314,7 +310,6 @@ export function SkillsMarketplacePage() {
   const handleShare = (skill: Skill) => {
     // TODO: Implement share functionality
     logger.info('Share skill:', skill.name);
-    toast.info('Share functionality coming soon');
   };
 
   // Get unique categories based on active tab
@@ -386,22 +381,6 @@ export function SkillsMarketplacePage() {
                   {category}
                 </SelectItem>
               ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={sortBy}
-            onValueChange={(value) => handleSortChange(value as SkillSortOption)}
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">{t.Skills.page.sortName}</SelectItem>
-              <SelectItem value="downloads">{t.Skills.page.sortDownloads}</SelectItem>
-              <SelectItem value="rating">{t.Skills.page.sortRating}</SelectItem>
-              <SelectItem value="recent">{t.Skills.page.sortRecent}</SelectItem>
-              <SelectItem value="updated">{t.Skills.page.sortUpdated}</SelectItem>
             </SelectContent>
           </Select>
         </div>

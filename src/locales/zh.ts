@@ -549,6 +549,9 @@ const zh: LocaleDefinition = {
     customTools: {
       title: '自定义工具',
       description: '从自定义目录、工作区 .talkcody/tools 或用户目录 ~/.talkcody/tools 加载工具。',
+      tooltipTitle: '自定义工具',
+      tooltipDescription:
+        '自定义工具是扩展 AI 代理能力的用户定义函数。创建、测试和安装工具以增强您的工作流程。',
       locationLabel: '工具目录',
       selectDirectory: '选择目录',
       customDirectoryLabel: '自定义目录',
@@ -878,7 +881,7 @@ const zh: LocaleDefinition = {
     toolsPlayground: '工具测试场',
     toolsPlaygroundTooltip: '测试和开发自定义工具',
     usage: '使用情况',
-    usageTooltip: '查看 Claude 订阅使用情况',
+    usageTooltip: '查看订阅和 Coding Plan 使用情况',
     logs: '日志',
     logsTooltip: '查看应用程序日志',
     settings: '设置',
@@ -1743,6 +1746,14 @@ const zh: LocaleDefinition = {
 
     plan: {
       title: '编码计划',
+    },
+  },
+
+  CustomTools: {
+    page: {
+      tooltipTitle: '自定义工具',
+      tooltipDescription:
+        '自定义工具是扩展 AI 代理能力的用户定义函数。创建、测试和安装工具以增强您的工作流程。',
     },
   },
 

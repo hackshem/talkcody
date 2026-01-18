@@ -7,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useLocale } from '@/hooks/use-locale';
 import { notificationService } from '@/services/notification-service';
 import { usePlanModeStore } from '@/stores/plan-mode-store';
+import { useTaskStore } from '@/stores/task-store';
+import type { TaskSettings } from '@/types/task';
 
 interface PlanReviewCardProps {
   planContent: string;
@@ -22,9 +24,33 @@ export function PlanReviewCard({ planContent, taskId }: PlanReviewCardProps) {
 
   const { t } = useLocale();
   const { approvePlan, rejectPlan } = usePlanModeStore();
+  const taskSettings = useTaskStore((state) => {
+    if (!taskId) return null;
+    const task = state.getTask(taskId);
+    if (!task?.settings) return null;
+    try {
+      return JSON.parse(task.settings) as TaskSettings;
+    } catch {
+      return null;
+    }
+  });
   const lastNotifiedKeyRef = useRef<string | null>(null);
+  const autoApprovedRef = useRef(false);
 
   useEffect(() => {
+    if (!taskId || autoApprovedRef.current) return;
+    if (taskSettings?.autoApprovePlan !== true) return;
+
+    autoApprovedRef.current = true;
+    approvePlan(taskId);
+    setSubmitted(true);
+  }, [approvePlan, taskId, taskSettings?.autoApprovePlan]);
+
+  useEffect(() => {
+    if (taskSettings?.autoApprovePlan === true) {
+      return;
+    }
+
     const notificationKey = taskId ?? planContent;
 
     if (lastNotifiedKeyRef.current === notificationKey) {
@@ -37,7 +63,13 @@ export function PlanReviewCard({ planContent, taskId }: PlanReviewCardProps) {
       .catch((error) => {
         console.error('[PlanReviewCard] Failed to send notification', error);
       });
-  }, [planContent, taskId, t.PlanReview.notificationBody, t.PlanReview.notificationTitle]);
+  }, [
+    planContent,
+    taskId,
+    t.PlanReview.notificationBody,
+    t.PlanReview.notificationTitle,
+    taskSettings?.autoApprovePlan,
+  ]);
 
   const handleApprove = () => {
     if (!taskId) {

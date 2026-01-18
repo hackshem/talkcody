@@ -1,6 +1,6 @@
 // src/components/chat/chat-input-tools-bar.tsx
 
-import { AutoApproveEditsButton } from './auto-approve-edits-button';
+import { AutoApproveEditsButton } from './auto-approve-button';
 import { CurrentFileButton } from './current-file-button';
 import { McpSelectorButton } from './mcp-selector-button';
 import { ModelSelectorButton } from './model-selector-button';

@@ -27,6 +27,7 @@ import { exitPlanModeTool } from './exit-plan-mode-tool';
 import { githubPRTool } from './github-pr-tool';
 import { globTool } from './glob-tool';
 import { listFiles } from './list-files-tool';
+import { lspTool } from './lsp-tool';
 import { readFile } from './read-file-tool';
 import { testCustomTool } from './test-custom-tool';
 import { todoWriteTool } from './todo-write-tool';
@@ -106,6 +107,17 @@ export const TOOL_DEFINITIONS = {
       canConcurrent: true,
       fileOperation: false,
       renderDoingUI: false,
+    },
+  },
+  lsp: {
+    tool: lspTool,
+    label: 'LSP',
+    metadata: {
+      category: 'read' as ToolCategory,
+      canConcurrent: true,
+      fileOperation: true,
+      getTargetFile: (input) => (input?.filePath as string) || null,
+      renderDoingUI: true,
     },
   },
 

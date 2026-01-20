@@ -5,10 +5,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { logger } from '@/lib/logger';
 import {
+  type CallHierarchyIncomingCall,
+  type CallHierarchyItem,
+  type CallHierarchyOutgoingCall,
   type CompletionItem,
   type CompletionList,
   type Definition,
   type Diagnostic,
+  type DocumentSymbol,
   filePathToUri,
   type Hover,
   type InitializeParams,
@@ -17,8 +21,10 @@ import {
   type JsonRpcRequest,
   type JsonRpcResponse,
   type Location,
+  type LocationLink,
   LSP_METHODS,
   type PublishDiagnosticsParams,
+  type SymbolInformation,
   type TextDocumentContentChangeEvent,
   type TextDocumentItem,
   type TextDocumentPositionParams,
@@ -469,10 +475,14 @@ class LspService {
           definition: {
             linkSupport: true,
           },
+          implementation: {
+            linkSupport: true,
+          },
           references: {},
           documentSymbol: {
             hierarchicalDocumentSymbolSupport: true,
           },
+          callHierarchy: {},
           publishDiagnostics: {
             relatedInformation: true,
             versionSupport: true,
@@ -482,6 +492,7 @@ class LspService {
         },
         workspace: {
           workspaceFolders: true,
+          symbol: {},
         },
       },
       workspaceFolders: [
@@ -674,6 +685,160 @@ class LspService {
       return result;
     } catch (e) {
       logger.debug(`[LSP] References request failed: ${e}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get implementation
+   */
+  async implementation(
+    serverId: string,
+    filePath: string,
+    line: number,
+    character: number
+  ): Promise<Location[] | null> {
+    const params: TextDocumentPositionParams = {
+      textDocument: { uri: filePathToUri(filePath) },
+      position: { line, character },
+    };
+
+    try {
+      const result = await this.sendRequest<Definition | null>(
+        serverId,
+        LSP_METHODS.IMPLEMENTATION,
+        params
+      );
+
+      if (!result) return null;
+
+      if (Array.isArray(result)) {
+        return result.map((item) => {
+          if ('targetUri' in item) {
+            return {
+              uri: item.targetUri,
+              range: item.targetSelectionRange,
+            };
+          }
+          return item as Location;
+        });
+      }
+
+      return [result as Location];
+    } catch (e) {
+      logger.debug(`[LSP] Implementation request failed: ${e}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get document symbols
+   */
+  async documentSymbol(
+    serverId: string,
+    filePath: string
+  ): Promise<Array<Location | LocationLink | DocumentSymbol | SymbolInformation> | null> {
+    const params = {
+      textDocument: { uri: filePathToUri(filePath) },
+    };
+
+    try {
+      const result = await this.sendRequest<Array<
+        Location | LocationLink | DocumentSymbol | SymbolInformation
+      > | null>(serverId, LSP_METHODS.DOCUMENT_SYMBOL, params);
+      return result;
+    } catch (e) {
+      logger.debug(`[LSP] DocumentSymbol request failed: ${e}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get workspace symbols
+   */
+  async workspaceSymbol(serverId: string, query: string): Promise<SymbolInformation[] | null> {
+    const params = { query };
+
+    try {
+      const result = await this.sendRequest<SymbolInformation[] | null>(
+        serverId,
+        LSP_METHODS.WORKSPACE_SYMBOL,
+        params
+      );
+      return result;
+    } catch (e) {
+      logger.debug(`[LSP] WorkspaceSymbol request failed: ${e}`);
+      return null;
+    }
+  }
+
+  /**
+   * Prepare call hierarchy
+   */
+  async prepareCallHierarchy(
+    serverId: string,
+    filePath: string,
+    line: number,
+    character: number
+  ): Promise<CallHierarchyItem[] | null> {
+    const params: TextDocumentPositionParams = {
+      textDocument: { uri: filePathToUri(filePath) },
+      position: { line, character },
+    };
+
+    try {
+      const result = await this.sendRequest<CallHierarchyItem[] | null>(
+        serverId,
+        LSP_METHODS.CALL_HIERARCHY_PREPARE,
+        params
+      );
+      return result;
+    } catch (e) {
+      logger.debug(`[LSP] CallHierarchy prepare request failed: ${e}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get incoming calls for call hierarchy items
+   */
+  async incomingCalls(
+    serverId: string,
+    item: CallHierarchyItem
+  ): Promise<CallHierarchyIncomingCall[] | null> {
+    const params = { item };
+
+    try {
+      const result = await this.sendRequest<CallHierarchyIncomingCall[] | null>(
+        serverId,
+        LSP_METHODS.CALL_HIERARCHY_INCOMING,
+        params
+      );
+      return result;
+    } catch (e) {
+      logger.debug(`[LSP] CallHierarchy incoming request failed: ${e}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get outgoing calls for call hierarchy items
+   */
+  async outgoingCalls(
+    serverId: string,
+    item: CallHierarchyItem
+  ): Promise<CallHierarchyOutgoingCall[] | null> {
+    const params = { item };
+
+    try {
+      const result = await this.sendRequest<CallHierarchyOutgoingCall[] | null>(
+        serverId,
+        LSP_METHODS.CALL_HIERARCHY_OUTGOING,
+        params
+      );
+      return result;
+    } catch (e) {
+      logger.debug(`[LSP] CallHierarchy outgoing request failed: ${e}`);
       return null;
     }
   }

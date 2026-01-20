@@ -76,11 +76,18 @@ export class AgentSkillService {
     const claudeDirs = await ClaudeCodeImporter.getClaudeCodeSkillDirs();
     const extraEntries = await this.listClaudeSkillEntries(claudeDirs);
 
-    const skillEntries = [...entries, ...extraEntries].filter((entry) => entry.isDirectory);
+    const skillEntries = [
+      ...entries
+        .filter((entry) => entry.isDirectory)
+        .map((entry) => ({ name: entry.name, baseDir: skillsDir })),
+      ...extraEntries
+        .filter((entry) => entry.isDirectory)
+        .map((entry) => ({ name: entry.name, baseDir: entry.path })),
+    ];
 
     // ✅ Concurrent loading: Load all skills in parallel
     const loadPromises = skillEntries.map((entry) =>
-      this.loadSkill(entry.name, entry.path).catch((error) => {
+      this.loadSkill(entry.name, entry.baseDir).catch((error) => {
         logger.warn(`Failed to load skill ${entry.name}:`, error);
         return null;
       })

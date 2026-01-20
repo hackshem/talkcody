@@ -1,6 +1,7 @@
 // TalkCody Free Login Dialog
-// Prompts users to sign in with GitHub or use their own API Key
+// Prompts users to sign in with GitHub or Google, or use their own API Key
 
+import { SiGoogle } from '@icons-pack/react-simple-icons';
 import { Github, Settings, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,10 +28,15 @@ export function TalkCodyFreeLoginDialog({ open, onClose }: TalkCodyFreeLoginDial
   const { setActiveView } = useUiNavigation();
   const language = useSettingsStore((state) => state.language);
   const t = getLocale((language || 'en') as SupportedLocale);
-  const { signInWithGitHub } = useAuthStore();
+  const { signInWithGitHub, signInWithGoogle } = useAuthStore();
 
   const handleGitHubSignIn = async () => {
     await signInWithGitHub();
+    onClose();
+  };
+
+  const handleGoogleSignIn = async () => {
+    await signInWithGoogle();
     onClose();
   };
 
@@ -84,6 +90,10 @@ export function TalkCodyFreeLoginDialog({ open, onClose }: TalkCodyFreeLoginDial
           >
             <Github className="size-4" />
             {t.TalkCodyFreeDialog.signInWithGitHub}
+          </Button>
+          <Button variant="outline" className="w-full gap-2" onClick={handleGoogleSignIn}>
+            <SiGoogle size={16} />
+            {t.TalkCodyFreeDialog.signInWithGoogle}
           </Button>
           <Button variant="outline" className="w-full gap-2" onClick={handleUseOwnApiKey}>
             <Settings className="size-4" />

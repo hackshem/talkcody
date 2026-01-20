@@ -244,6 +244,7 @@ export interface LocaleDefinition {
       signOut: string;
       signInDescription: string;
       signInWithGitHub: string;
+      signInWithGoogle: string;
       authRequired: string;
       failedUploadAvatar: string;
       invalidJsonResponse: string;
@@ -1214,6 +1215,7 @@ export interface LocaleDefinition {
     title: string;
     description: string;
     signInWithGitHub: string;
+    signInWithGoogle: string;
     useOwnApiKey: string;
     benefits: {
       preventAbuse: string;
@@ -1794,6 +1796,22 @@ export interface LocaleDefinition {
       showDiagnosticsDesc: string;
       severitySettings: string;
       severitySettingsDesc: string;
+    };
+  };
+
+  ToolMessages: {
+    Lsp: {
+      projectRootNotSet: string;
+      fileNotFound: (path: string) => string;
+      noLspSupport: string;
+      serverNotInstalled: (language: string) => string;
+      serverNotAvailable: (command: string) => string;
+      languageIdMissing: string;
+      operationNotSupported: (operation: string) => string;
+      noResults: (operation: string) => string;
+      success: (operation: string, location: string) => string;
+      failed: (operation: string, message: string) => string;
+      unknownError: string;
     };
   };
 

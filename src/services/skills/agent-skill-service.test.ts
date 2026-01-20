@@ -147,7 +147,6 @@ Content`;
 			expect(skills).toHaveLength(2);
 			expect(skills.map((skill) => skill.name)).toEqual(['local-skill', 'claude-skill']);
 		});
-	});
 
 		it('should skip directories without SKILL.md', async () => {
 			vi.mocked(readDir).mockResolvedValue([
@@ -559,3 +558,4 @@ Content`;
 		});
 	});
 });
+

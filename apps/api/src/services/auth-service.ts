@@ -63,10 +63,11 @@ export class AuthService {
     avatarUrl?: string;
   }): Promise<User> {
     // Check if user exists by provider ID
+    const providerIdColumn = profile.provider === 'github' ? users.githubId : users.googleId;
     const existingUsers = await db
       .select()
       .from(users)
-      .where(eq(users.githubId, profile.providerId))
+      .where(eq(providerIdColumn, profile.providerId))
       .limit(1);
 
     if (existingUsers.length > 0) {

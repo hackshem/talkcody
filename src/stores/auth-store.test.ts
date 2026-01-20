@@ -42,6 +42,7 @@ vi.mock('@/services/auth-service', () => ({
 const mockStoreAuthToken = authService.storeAuthToken as Mock;
 const mockFetchUserProfile = authService.fetchUserProfile as Mock;
 const mockInitiateGitHubOAuth = authService.initiateGitHubOAuth as Mock;
+const mockInitiateGoogleOAuth = authService.initiateGoogleOAuth as Mock;
 const mockIsAuthenticated = authService.isAuthenticated as Mock;
 const mockSignOut = authService.signOut as Mock;
 
@@ -268,24 +269,43 @@ describe('AuthStore - OAuth Deep Link Flow', () => {
 
   describe('Deep Link Integration Test', () => {
     it('should simulate complete deep link OAuth flow', async () => {
-      // Arrange - simulate clicking \"Sign in with GitHub\"
+      // Arrange - simulate clicking "Sign in with GitHub"
       mockInitiateGitHubOAuth.mockResolvedValueOnce(undefined);
 
       const { signInWithGitHub } = useAuthStore.getState();
       await signInWithGitHub();
 
       expect(authService.initiateGitHubOAuth).toHaveBeenCalled();
+    });
+
+    it('should initiate Google OAuth flow', async () => {
+      mockInitiateGoogleOAuth.mockResolvedValueOnce(undefined);
+
+      const { signInWithGoogle } = useAuthStore.getState();
+      await signInWithGoogle();
+
+      expect(authService.initiateGoogleOAuth).toHaveBeenCalled();
+    });
+
+    it('should simulate complete deep link OAuth flow with Google', async () => {
+      // Arrange - simulate clicking "Sign in with Google"
+      mockInitiateGoogleOAuth.mockResolvedValueOnce(undefined);
+
+      const { signInWithGoogle } = useAuthStore.getState();
+      await signInWithGoogle();
+
+      expect(authService.initiateGoogleOAuth).toHaveBeenCalled();
 
       // Simulate OAuth callback from deep link with token
       const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMyJ9.abcdef';
       const mockUser = {
         id: 'user-123',
-        username: 'githubuser',
-        email: 'github@example.com',
-        avatarUrl: 'https://github.com/avatar.jpg',
-        displayName: 'GitHub User',
-        oauthProvider: 'github' as const,
-        oauthId: 'gh-123',
+        username: 'googleuser',
+        email: 'google@example.com',
+        avatarUrl: 'https://google.com/avatar.jpg',
+        displayName: 'Google User',
+        oauthProvider: 'google' as const,
+        oauthId: 'google-123',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

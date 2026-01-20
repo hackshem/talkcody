@@ -251,6 +251,7 @@ const en: LocaleDefinition = {
       signInDescription:
         'Sign in to publish agents to the TalkCody marketplace and manage your published agents.',
       signInWithGitHub: 'Sign in with GitHub',
+      signInWithGoogle: 'Sign in with Google',
       authRequired: 'Authentication required. Please sign in again.',
       failedUploadAvatar: 'Failed to upload avatar',
       invalidJsonResponse: 'Server returned invalid JSON response',
@@ -1266,8 +1267,9 @@ const en: LocaleDefinition = {
   TalkCodyFreeDialog: {
     title: 'TalkCody Free',
     description:
-      'To prevent abuse of our free API, we need to verify your GitHub identity. This helps us:',
+      'To prevent abuse of our free API, we need to verify your GitHub or Google identity. This helps us:',
     signInWithGitHub: 'Sign in with GitHub',
+    signInWithGoogle: 'Sign in with Google',
     useOwnApiKey: 'Use my API Key',
     benefits: {
       preventAbuse: 'Prevent abuse of shared capacity',
@@ -1670,6 +1672,23 @@ const en: LocaleDefinition = {
       showDiagnosticsDesc: 'Display code diagnostics from language servers',
       severitySettings: 'Severity Settings',
       severitySettingsDesc: 'Select which severity levels to display',
+    },
+  },
+
+  ToolMessages: {
+    Lsp: {
+      projectRootNotSet: 'Project root path is not set.',
+      fileNotFound: (path) => `File not found: ${path}`,
+      noLspSupport: 'No LSP support for this file type.',
+      serverNotInstalled: (language) =>
+        `LSP server for ${language} is not installed. Open LSP settings to install it.`,
+      serverNotAvailable: (command) => `LSP server not available. Please install: ${command}`,
+      languageIdMissing: 'Unable to determine LSP language ID for this file.',
+      operationNotSupported: (operation) => `Unsupported LSP operation: ${operation}`,
+      noResults: (operation) => `No results found for ${operation}`,
+      success: (operation, location) => `LSP ${operation} completed for ${location}`,
+      failed: (operation, message) => `Failed to run LSP ${operation}: ${message}`,
+      unknownError: 'Unknown error',
     },
   },
 

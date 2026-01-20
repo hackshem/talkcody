@@ -1,3 +1,4 @@
+import { SiGoogle } from '@icons-pack/react-simple-icons';
 import type { User as UserType } from '@talkcody/shared';
 import { Github, Loader2, LogOut, Pencil, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -16,6 +17,7 @@ export function AccountSettings() {
     isLoading,
     user,
     signInWithGitHub,
+    signInWithGoogle,
     signOut,
     updateUser,
     loadUserIfNeeded,
@@ -139,10 +141,16 @@ export function AccountSettings() {
               <p className="text-sm text-muted-foreground">
                 {t.Settings.account.signInDescription}
               </p>
-              <Button onClick={signInWithGitHub} variant="default" className="w-full">
-                <Github className="mr-2 h-4 w-4" />
-                {t.Settings.account.signInWithGitHub}
-              </Button>
+              <div className="space-y-2">
+                <Button onClick={signInWithGitHub} variant="default" className="w-full">
+                  <Github className="mr-2 h-4 w-4" />
+                  {t.Settings.account.signInWithGitHub}
+                </Button>
+                <Button onClick={signInWithGoogle} variant="outline" className="w-full">
+                  <SiGoogle className="mr-2" size={16} />
+                  {t.Settings.account.signInWithGoogle}
+                </Button>
+              </div>
             </div>
           </>
         )}

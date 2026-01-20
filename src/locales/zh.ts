@@ -244,6 +244,7 @@ const zh: LocaleDefinition = {
       signOut: '退出登录',
       signInDescription: '登录以将 Agent 发布到 TalkCody 市场并管理您发布的 Agent。',
       signInWithGitHub: '使用 GitHub 登录',
+      signInWithGoogle: '使用 Google 登录',
       authRequired: '需要认证。请重新登录。',
       failedUploadAvatar: '上传头像失败',
       invalidJsonResponse: '服务器返回无效的 JSON 响应',
@@ -1228,8 +1229,9 @@ const zh: LocaleDefinition = {
 
   TalkCodyFreeDialog: {
     title: 'TalkCody Free',
-    description: '为防止免费 API 被滥用，我们需要验证您的 GitHub 身份。这有助于我们：',
+    description: '为防止免费 API 被滥用，我们需要验证您的 GitHub 或 Google 身份。这有助于我们：',
     signInWithGitHub: '使用 GitHub 登录',
+    signInWithGoogle: '使用 Google 登录',
     useOwnApiKey: '使用我的 API Key',
     benefits: {
       preventAbuse: '防止单个用户大量消耗资源',
@@ -1624,6 +1626,22 @@ const zh: LocaleDefinition = {
       showDiagnosticsDesc: '显示来自语言服务器的代码诊断信息',
       severitySettings: '严重级别设置',
       severitySettingsDesc: '选择要显示的诊断严重级别',
+    },
+  },
+
+  ToolMessages: {
+    Lsp: {
+      projectRootNotSet: '未设置项目根路径。',
+      fileNotFound: (path) => `文件未找到：${path}`,
+      noLspSupport: '此文件类型不支持 LSP。',
+      serverNotInstalled: (language) => `未安装 ${language} 的 LSP 服务器。请在 LSP 设置中安装。`,
+      serverNotAvailable: (command) => `LSP 服务器不可用。请安装：${command}`,
+      languageIdMissing: '无法确定该文件的 LSP 语言 ID。',
+      operationNotSupported: (operation) => `不支持的 LSP 操作：${operation}`,
+      noResults: (operation) => `未找到 ${operation} 的结果`,
+      success: (operation, location) => `LSP ${operation} 完成：${location}`,
+      failed: (operation, message) => `运行 LSP ${operation} 失败：${message}`,
+      unknownError: '未知错误',
     },
   },
 

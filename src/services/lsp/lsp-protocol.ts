@@ -259,6 +259,31 @@ export interface SymbolInformation {
 }
 
 // ============================================================================
+// LSP Call Hierarchy
+// ============================================================================
+
+export interface CallHierarchyItem {
+  name: string;
+  kind: SymbolKind;
+  tags?: number[];
+  detail?: string;
+  uri: string;
+  range: Range;
+  selectionRange: Range;
+  data?: unknown;
+}
+
+export interface CallHierarchyIncomingCall {
+  from: CallHierarchyItem;
+  fromRanges: Range[];
+}
+
+export interface CallHierarchyOutgoingCall {
+  to: CallHierarchyItem;
+  fromRanges: Range[];
+}
+
+// ============================================================================
 // LSP Initialize
 // ============================================================================
 
@@ -290,6 +315,10 @@ export interface ClientCapabilities {
       dynamicRegistration?: boolean;
       linkSupport?: boolean;
     };
+    implementation?: {
+      dynamicRegistration?: boolean;
+      linkSupport?: boolean;
+    };
     references?: {
       dynamicRegistration?: boolean;
     };
@@ -297,6 +326,9 @@ export interface ClientCapabilities {
       dynamicRegistration?: boolean;
       symbolKind?: { valueSet?: number[] };
       hierarchicalDocumentSymbolSupport?: boolean;
+    };
+    callHierarchy?: {
+      dynamicRegistration?: boolean;
     };
     publishDiagnostics?: {
       relatedInformation?: boolean;
@@ -309,6 +341,9 @@ export interface ClientCapabilities {
   workspace?: {
     workspaceFolders?: boolean;
     configuration?: boolean;
+    symbol?: {
+      dynamicRegistration?: boolean;
+    };
   };
 }
 
@@ -370,8 +405,13 @@ export const LSP_METHODS = {
   HOVER: 'textDocument/hover',
   COMPLETION: 'textDocument/completion',
   DEFINITION: 'textDocument/definition',
+  IMPLEMENTATION: 'textDocument/implementation',
   REFERENCES: 'textDocument/references',
   DOCUMENT_SYMBOL: 'textDocument/documentSymbol',
+  WORKSPACE_SYMBOL: 'workspace/symbol',
+  CALL_HIERARCHY_PREPARE: 'textDocument/prepareCallHierarchy',
+  CALL_HIERARCHY_INCOMING: 'callHierarchy/incomingCalls',
+  CALL_HIERARCHY_OUTGOING: 'callHierarchy/outgoingCalls',
 
   // Diagnostics (Server -> Client)
   PUBLISH_DIAGNOSTICS: 'textDocument/publishDiagnostics',

@@ -105,6 +105,7 @@ Provide a file path and a 1-based line/character position as shown in editors.`,
       .describe('The character offset (1-based, as shown in editors)'),
   }),
   canConcurrent: true,
+  hidden: true,
   execute: async ({ operation, filePath, line, character }, context): Promise<LspToolResult> => {
     let serverId: string | null = null;
     let shouldDecrement = false;

@@ -11,21 +11,32 @@ import type { HonoContext } from '../types/context';
 const auth = new Hono<HonoContext>();
 
 // Helper to get OAuth config from environment (works in both Bun and Cloudflare Workers)
+function normalizeEnvValue(value?: string | null) {
+  if (!value) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 function getOAuthConfig(c: Context<HonoContext>) {
   const env = c.env;
   return {
-    githubClientId:
-      env?.GITHUB_CLIENT_ID || (typeof Bun !== 'undefined' ? Bun.env.GITHUB_CLIENT_ID : '') || '',
-    githubClientSecret:
-      env?.GITHUB_CLIENT_SECRET ||
-      (typeof Bun !== 'undefined' ? Bun.env.GITHUB_CLIENT_SECRET : '') ||
-      '',
-    googleClientId:
-      env?.GOOGLE_CLIENT_ID || (typeof Bun !== 'undefined' ? Bun.env.GOOGLE_CLIENT_ID : '') || '',
-    googleClientSecret:
-      env?.GOOGLE_CLIENT_SECRET ||
-      (typeof Bun !== 'undefined' ? Bun.env.GOOGLE_CLIENT_SECRET : '') ||
-      '',
+    githubClientId: normalizeEnvValue(
+      env?.GITHUB_CLIENT_ID || (typeof Bun !== 'undefined' ? Bun.env.GITHUB_CLIENT_ID : '')
+    ),
+    githubClientSecret: normalizeEnvValue(
+      env?.GITHUB_CLIENT_SECRET || (typeof Bun !== 'undefined' ? Bun.env.GITHUB_CLIENT_SECRET : '')
+    ),
+    googleClientId: normalizeEnvValue(
+      env?.GOOGLE_CLIENT_ID || (typeof Bun !== 'undefined' ? Bun.env.GOOGLE_CLIENT_ID : '')
+    ),
+    googleClientSecret: normalizeEnvValue(
+      env?.GOOGLE_CLIENT_SECRET || (typeof Bun !== 'undefined' ? Bun.env.GOOGLE_CLIENT_SECRET : '')
+    ),
+    googleRedirectUri: normalizeEnvValue(
+      env?.GOOGLE_REDIRECT_URI || (typeof Bun !== 'undefined' ? Bun.env.GOOGLE_REDIRECT_URI : '')
+    ),
   };
 }
 
@@ -123,6 +134,15 @@ function renderSuccessPage(deepLink: string) {
 // Dynamic middleware that gets config from context
 auth.use('/github', async (c, next) => {
   const config = getOAuthConfig(c);
+  if (!config.githubClientId || !config.githubClientSecret) {
+    return c.json(
+      {
+        error: 'GitHub OAuth is not configured',
+        message: 'Missing GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET',
+      },
+      400
+    );
+  }
   const middleware = githubAuth({
     client_id: config.githubClientId,
     client_secret: config.githubClientSecret,
@@ -178,12 +198,26 @@ auth.get('/github', async (c) => {
  * Google OAuth
  */
 // Dynamic middleware that gets config from context
+// Explicit redirect_uri ensures Google console settings match and avoids code exchange errors.
 auth.use('/google', async (c, next) => {
   const config = getOAuthConfig(c);
+  if (!config.googleClientId || !config.googleClientSecret) {
+    return c.json(
+      {
+        error: 'Google OAuth is not configured',
+        message: 'Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET',
+      },
+      400
+    );
+  }
+  const baseRedirectUri = config.googleRedirectUri || c.req.url.split('?')[0];
   const middleware = googleAuth({
     client_id: config.googleClientId,
     client_secret: config.googleClientSecret,
     scope: ['openid', 'email', 'profile'],
+    redirect_uri: baseRedirectUri,
+    access_type: 'offline',
+    prompt: 'consent',
   });
   return middleware(c, next);
 });
@@ -196,12 +230,10 @@ auth.get('/google', async (c) => {
   }
 
   try {
-    const _config = getOAuthConfig(c);
-
     // Find or create user
     const user = await authService.findOrCreateUser({
       provider: 'google',
-      providerId: googleUser.sub ?? '',
+      providerId: googleUser.id ?? googleUser.sub ?? '',
       email: googleUser.email ?? '',
       name: googleUser.name ?? 'Google User',
       avatarUrl: googleUser.picture,

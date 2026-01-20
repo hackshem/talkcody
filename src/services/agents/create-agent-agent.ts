@@ -76,7 +76,7 @@ export class CreateAgentAgent {
       role: 'write',
       dynamicPrompt: {
         enabled: true,
-        providers: ['env', 'agents_md', 'skills'],
+        providers: ['env'],
         variables: {},
         providerSettings: {},
       },

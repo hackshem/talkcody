@@ -44,6 +44,9 @@ GITHUB_CLIENT_ID=your-github-app-id
 GITHUB_CLIENT_SECRET=your-github-app-secret
 GOOGLE_CLIENT_ID=your-google-app-id
 GOOGLE_CLIENT_SECRET=your-google-app-secret
+# Optional: explicit callback URL registered in Google Console
+# Example: https://api.talkcody.com/api/auth/google
+GOOGLE_REDIRECT_URI=
 ```
 
 4. Generate database migrations:

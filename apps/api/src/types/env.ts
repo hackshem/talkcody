@@ -8,6 +8,7 @@ export interface Env {
   GITHUB_CLIENT_SECRET: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  GOOGLE_REDIRECT_URI?: string;
   NODE_ENV?: string;
   RELEASES_BUCKET?: R2Bucket;
   TALKCODY_DAILY_TOKEN_LIMIT?: string;
@@ -82,6 +83,7 @@ declare global {
       GITHUB_CLIENT_SECRET: string;
       GOOGLE_CLIENT_ID: string;
       GOOGLE_CLIENT_SECRET: string;
+      GOOGLE_REDIRECT_URI?: string;
       NODE_ENV?: string;
       TALKCODY_DAILY_TOKEN_LIMIT?: string;
       EXA_API_KEY?: string;

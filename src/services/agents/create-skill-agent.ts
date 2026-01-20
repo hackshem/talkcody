@@ -11,11 +11,11 @@ When a user requests a new skill, you will:
 1. Based on your knowledge or web search, gather sufficient background information to generate an skills definition that best meets the user's requirements.
 2. If there are crucial points that you still cannot confirm, you can use the \`askUserQuestions\` tool to confirm with the user. You should provide the most likely answers for the user to choose from.
 3. Enforce Agent Skills Specification constraints (kebab-case name, length limits, frontmatter + markdown body).
-4. Generate a valid SKILL.md and create a local skill folder under the app data skills directory.
+4. Generate a valid SKILL.md and create a local skill folder under current project skills directory. (./talkcody/skills)
 5. Add optional references/scripts/assets directories if the skills need them.
 6. Provide clear next steps after creation (refresh skills list).
 
-## Skill Definition Requirements (agentskills.io/specification)
+## Skill Definition Requirements
 
 A skill is a directory containing at minimum a SKILL.md file:
 - skill-name/\n  └── SKILL.md
@@ -42,6 +42,7 @@ Guidelines:
 
 ## SKILL.md Template (outline)
 
+\`\`\`
 ---
 name: your-skill-name
 description: English description
@@ -72,11 +73,13 @@ allowed-tools: "Bash(git:*) Read"
 
 ## References
 - references/your-doc.md
+\`\`\`
 
 ## Classic Example (includes scripts/)
 
 Source: https://raw.githubusercontent.com/anthropics/skills/main/skills/webapp-testing/SKILL.md
 
+\`\`\`
 ---
 name: webapp-testing
 description: Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs.
@@ -94,17 +97,13 @@ Always run scripts with --help first to see usage. Do not read script source unl
 
 Example usage:
 - python scripts/with_server.py --server "npm run dev" --port 5173 -- python your_automation.py
-
-## Process
-
-1. Ask for missing details first.
-2. Generate the skill folder and SKILL.md using writeFile.
-3. Create references/scripts/assets files only when requested.
-4. Confirm the skill name and location, and suggest refreshing skills.
+\`\`\`
 
 ## IMPORTANT
 - If the user's request is about a workflow, you must translate and elaborate it into specific commands that can be executed step by step.
 - If the process involves executing scripts, it must be clearly stated when and how the scripts should be executed.
+- You should write the skill into ./talkcody/skills/ directory under the current project directory.
+- if ./talkcody/skills/ don't exist, you must create it.
 
 `;
 
@@ -120,6 +119,8 @@ export class CreateSkillAgent {
       codeSearch: getToolSync('codeSearch'),
       listFiles: getToolSync('listFiles'),
       writeFile: getToolSync('writeFile'),
+      webSearch: getToolSync('webSearch'),
+      webFetch: getToolSync('webFetch'),
       bash: getToolSync('bash'),
       askUserQuestions: getToolSync('askUserQuestions'),
     };
@@ -138,7 +139,7 @@ export class CreateSkillAgent {
       role: 'write',
       dynamicPrompt: {
         enabled: true,
-        providers: ['env', 'agents_md', 'skills'],
+        providers: ['env'],
         variables: {},
         providerSettings: {},
       },

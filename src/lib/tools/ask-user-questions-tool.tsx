@@ -85,8 +85,7 @@ Each question can have:
 - Support for single or multiple selection
 - An automatic "Other" option for custom text input
 
-Use this tool judiciously to maintain a balance between gathering necessary information and avoiding excessive back-and-forth.
-You could only use this tool when plan mode is enabled.`,
+Use this tool judiciously to maintain a balance between gathering necessary information and avoiding excessive back-and-forth.`,
   inputSchema,
   canConcurrent: false,
   hidden: true,

@@ -5,10 +5,13 @@ import { convertToolsForAI } from '@/lib/tool-adapter';
 import { type ToolOverride, useToolOverrideStore } from '@/stores/tool-override-store';
 import type { Agent, CreateAgentData, UpdateAgentData } from '@/types';
 import type { AgentDefinition, AgentToolSet, DynamicPromptConfig } from '@/types/agent';
+import { getModelType } from '@/types/model-types';
 import type { MCPToolPlaceholder, ToolWithUI } from '@/types/tool';
 import { agentDatabaseService } from '../agent-database-service';
 import { agentService } from '../database/agent-service';
 import { filterToolSetForAgent, isToolAllowedForAgent } from './agent-tool-access';
+import { FileAgentImporter } from './file-agent-importer';
+import { resolveAgentTools } from './github-import-agent-service';
 import { getToolByName, restoreToolsFromConfig } from './tool-registry';
 
 class AgentRegistry {
@@ -43,6 +46,9 @@ class AgentRegistry {
 
       // 2. Load user agents from database
       await this.loadPersistentAgents();
+
+      // 3. Load file-based agents from local directories
+      await this.loadFileAgents();
 
       this.loaded = true;
       logger.info(
@@ -131,6 +137,49 @@ class AgentRegistry {
     }
 
     logger.info(`loadPersistentAgents: Loaded ${dbAgents.length} user agents from database`);
+  }
+
+  private async loadFileAgents(): Promise<void> {
+    logger.info('loadFileAgents: Loading agents from local directories...');
+
+    try {
+      const { agents } = await FileAgentImporter.importAgentsFromDirectories();
+
+      for (const agentConfig of agents) {
+        try {
+          if (this.systemAgents.has(agentConfig.id) || this.persistentAgents.has(agentConfig.id)) {
+            continue;
+          }
+
+          const tools = await resolveAgentTools(agentConfig);
+          const agentDef: AgentDefinition = {
+            id: agentConfig.id,
+            name: agentConfig.name,
+            description: agentConfig.description || '',
+            modelType: getModelType(agentConfig.modelType),
+            systemPrompt: agentConfig.systemPrompt,
+            tools,
+            hidden: agentConfig.hidden || false,
+            rules: agentConfig.rules,
+            outputFormat: agentConfig.outputFormat,
+            isDefault: false,
+            dynamicPrompt: agentConfig.dynamicPrompt,
+            defaultSkills: agentConfig.defaultSkills,
+            isBeta: agentConfig.isBeta,
+            role: agentConfig.role,
+            canBeSubagent: agentConfig.canBeSubagent,
+          };
+
+          this.persistentAgents.set(agentDef.id, agentDef);
+        } catch (error) {
+          logger.warn('loadFileAgents: Failed to load local agent:', error);
+        }
+      }
+
+      logger.info(`loadFileAgents: Loaded ${agents.length} local agent(s) from files`);
+    } catch (error) {
+      logger.warn('loadFileAgents: Failed to load local agents from files:', error);
+    }
   }
 
   private async buildPlannerTools(): Promise<AgentToolSet> {

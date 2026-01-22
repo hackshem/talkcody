@@ -36,6 +36,22 @@ const operations = [
   'outgoingCalls',
 ] as const;
 
+type LspOperation = (typeof operations)[number];
+
+const positionRequiredOperations = new Set<LspOperation>([
+  'goToDefinition',
+  'findReferences',
+  'hover',
+  'goToImplementation',
+  'prepareCallHierarchy',
+  'incomingCalls',
+  'outgoingCalls',
+]);
+
+function requiresPosition(operation: LspOperation): boolean {
+  return positionRequiredOperations.has(operation);
+}
+
 interface LspToolResult {
   success: boolean;
   message: string;
@@ -97,16 +113,26 @@ Provide a file path and a 1-based line/character position as shown in editors.`,
   inputSchema: z.object({
     operation: z.enum(operations).describe('The LSP operation to perform'),
     filePath: z.string().describe('The absolute or relative path to the file'),
-    line: z.number().int().min(1).describe('The line number (1-based, as shown in editors)'),
+    line: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe('The line number (1-based, as shown in editors)'),
     character: z
       .number()
       .int()
       .min(1)
+      .optional()
       .describe('The character offset (1-based, as shown in editors)'),
+    query: z.string().optional().describe('Query string for workspace symbols'),
   }),
   canConcurrent: true,
   hidden: true,
-  execute: async ({ operation, filePath, line, character }, context): Promise<LspToolResult> => {
+  execute: async (
+    { operation, filePath, line, character, query },
+    context
+  ): Promise<LspToolResult> => {
     let serverId: string | null = null;
     let shouldDecrement = false;
     let didOpenDocument = false;
@@ -117,6 +143,13 @@ Provide a file path and a 1-based line/character position as shown in editors.`,
     const t = getTranslations();
 
     try {
+      if (requiresPosition(operation) && (line === undefined || character === undefined)) {
+        return {
+          success: false,
+          message: t.positionRequired(operation),
+        };
+      }
+
       const rootPath = await getEffectiveWorkspaceRoot(context.taskId);
       if (!rootPath) {
         return {
@@ -182,8 +215,8 @@ Provide a file path and a 1-based line/character position as shown in editors.`,
         didOpenDocument = true;
       }
 
-      const lspLine = line - 1;
-      const lspCharacter = character - 1;
+      const lspLine = line ? line - 1 : 0;
+      const lspCharacter = character ? character - 1 : 0;
 
       let data: unknown;
       switch (operation) {
@@ -200,7 +233,7 @@ Provide a file path and a 1-based line/character position as shown in editors.`,
           data = await lspService.documentSymbol(serverId, resolvedPath);
           break;
         case 'workspaceSymbol':
-          data = await lspService.workspaceSymbol(serverId, '');
+          data = await lspService.workspaceSymbol(serverId, query ?? '');
           break;
         case 'goToImplementation':
           data = await lspService.implementation(serverId, resolvedPath, lspLine, lspCharacter);
@@ -239,10 +272,13 @@ Provide a file path and a 1-based line/character position as shown in editors.`,
       }
 
       const relativePath = getRelativePath(resolvedPath, rootPath);
-      const locationLabel = `${relativePath}:${line}:${character}`;
+      const locationLabel =
+        line !== undefined && character !== undefined
+          ? `${relativePath}:${line}:${character}`
+          : relativePath;
       if (isEmptyResult(data)) {
         return {
-          success: false,
+          success: true,
           message: t.noResults(operation),
           data,
         };

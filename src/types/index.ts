@@ -36,6 +36,15 @@ export type {
 } from './agent-skills-spec';
 // API keys types
 export type { ApiKeySettings, AvailableModel } from './api-keys';
+// API usage types
+export type {
+  ApiUsageDailyPoint,
+  ApiUsageModelBreakdown,
+  ApiUsageRange,
+  ApiUsageRangeResult,
+  ApiUsageSummary,
+  ApiUsageTokenView,
+} from './api-usage';
 // Command types
 export type {
   Command,

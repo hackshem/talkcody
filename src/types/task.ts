@@ -21,6 +21,7 @@ export interface Task {
   created_at: number;
   updated_at: number;
   message_count: number;
+  request_count: number;
   cost: number;
   input_token: number;
   output_token: number;
@@ -32,6 +33,7 @@ export interface Task {
 export interface TaskSettings {
   autoApproveEdits?: boolean; // When true, skip review dialog for file edits in this task
   autoApprovePlan?: boolean; // When true, auto-approve plan for this task
+  autoCodeReview?: boolean; // When true, auto-run code review for this task
 }
 
 export interface CreateProjectData {

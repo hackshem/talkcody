@@ -18,8 +18,8 @@ export class TaskService {
     logger.info('createTask', taskId, title, projectId, now);
 
     await this.db.execute(
-      'INSERT INTO conversations (id, title, project_id, created_at, updated_at, message_count) VALUES ($1, $2, $3, $4, $5, $6)',
-      [taskId, title, projectId, now, now, 0]
+      'INSERT INTO conversations (id, title, project_id, created_at, updated_at, message_count, request_count) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [taskId, title, projectId, now, now, 0, 0]
     );
 
     return taskId;
@@ -320,19 +320,20 @@ export class TaskService {
     cost: number,
     inputToken: number,
     outputToken: number,
+    requestCount: number,
     contextUsage?: number
   ): Promise<void> {
     if (contextUsage === undefined) {
       await this.db.execute(
-        'UPDATE conversations SET cost = cost + $1, input_token = input_token + $2, output_token = output_token + $3, updated_at = $4 WHERE id = $5',
-        [cost, inputToken, outputToken, Date.now(), taskId]
+        'UPDATE conversations SET cost = cost + $1, input_token = input_token + $2, output_token = output_token + $3, request_count = request_count + $4, updated_at = $5 WHERE id = $6',
+        [cost, inputToken, outputToken, requestCount, Date.now(), taskId]
       );
       return;
     }
 
     await this.db.execute(
-      'UPDATE conversations SET cost = cost + $1, input_token = input_token + $2, output_token = output_token + $3, context_usage = $4, updated_at = $5 WHERE id = $6',
-      [cost, inputToken, outputToken, contextUsage, Date.now(), taskId]
+      'UPDATE conversations SET cost = cost + $1, input_token = input_token + $2, output_token = output_token + $3, request_count = request_count + $4, context_usage = $5, updated_at = $6 WHERE id = $7',
+      [cost, inputToken, outputToken, requestCount, contextUsage, Date.now(), taskId]
     );
   }
 

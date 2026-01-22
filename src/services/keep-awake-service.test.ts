@@ -33,7 +33,6 @@ vi.mock('@/locales', () => ({
   getLocale: () => ({
     KeepAwake: {
       enabled: 'Sleep prevented while tasks are running',
-      disabled: 'Sleep prevention disabled',
       error: 'Failed to prevent system sleep',
       platformNotSupported: 'Sleep prevention not supported on this platform',
     },

@@ -16,7 +16,7 @@ export interface ImportAgentFromGitHubOptions {
   branch?: string; // Optional branch from GitHub URL
 }
 
-type AgentMarkdownFrontmatter = {
+export type AgentMarkdownFrontmatter = {
   name?: string;
   description?: string;
   tools?: string[] | string;
@@ -27,7 +27,7 @@ type AgentMarkdownFrontmatter = {
   category?: string;
 };
 
-type ParsedAgentMarkdown = {
+export type ParsedAgentMarkdown = {
   frontmatter: AgentMarkdownFrontmatter;
   prompt: string;
 };
@@ -104,7 +104,7 @@ function mapModelToType(value?: string): ModelType {
   return ModelType.MAIN;
 }
 
-function parseAgentFrontmatterYaml(yaml: string): AgentMarkdownFrontmatter {
+export function parseAgentFrontmatterYaml(yaml: string): AgentMarkdownFrontmatter {
   const result: Record<string, unknown> = {};
   const lines = yaml.split('\n');
   let currentKey: string | null = null;
@@ -298,13 +298,14 @@ export async function resolveAgentTools(agentConfig: RemoteAgentConfig): Promise
   return resolvedTools as AgentToolSet;
 }
 
-function buildRemoteAgentConfig(params: {
+export function buildRemoteAgentConfig(params: {
   parsed: ParsedAgentMarkdown;
   repository: string;
   githubPath: string;
   fallbackId: string;
+  defaultCategory?: string;
 }): RemoteAgentConfig {
-  const { parsed, repository, githubPath, fallbackId } = params;
+  const { parsed, repository, githubPath, fallbackId, defaultCategory = 'github' } = params;
   const name = parsed.frontmatter.name ? String(parsed.frontmatter.name).trim() : fallbackId;
   const description = parsed.frontmatter.description
     ? String(parsed.frontmatter.description).trim()
@@ -338,7 +339,7 @@ function buildRemoteAgentConfig(params: {
     id: slugify(name) || fallbackId,
     name,
     description,
-    category: parsed.frontmatter.category ? String(parsed.frontmatter.category) : 'github',
+    category: parsed.frontmatter.category ? String(parsed.frontmatter.category) : defaultCategory,
     repository,
     githubPath,
     modelType: mapModelToType(parsed.frontmatter.model) as RemoteAgentConfig['modelType'],

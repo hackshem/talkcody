@@ -21,11 +21,14 @@ export function AutoApproveButton() {
   const currentTaskId = useTaskStore((state) => state.currentTaskId);
   const autoApproveEditsGlobal = useSettingsStore((state) => state.auto_approve_edits_global);
   const autoApprovePlanGlobal = useSettingsStore((state) => state.auto_approve_plan_global);
+  const autoCodeReviewGlobal = useSettingsStore((state) => state.auto_code_review_global);
   const setAutoApproveEditsGlobal = useSettingsStore((state) => state.setAutoApproveEditsGlobal);
   const setAutoApprovePlanGlobal = useSettingsStore((state) => state.setAutoApprovePlanGlobal);
+  const setAutoCodeReviewGlobal = useSettingsStore((state) => state.setAutoCodeReviewGlobal);
 
   const [editsEnabled, setEditsEnabled] = useState(autoApproveEditsGlobal);
   const [planEnabled, setPlanEnabled] = useState(autoApprovePlanGlobal);
+  const [codeReviewEnabled, setCodeReviewEnabled] = useState(autoCodeReviewGlobal);
 
   useEffect(() => {
     setEditsEnabled(autoApproveEditsGlobal);
@@ -35,7 +38,11 @@ export function AutoApproveButton() {
     setPlanEnabled(autoApprovePlanGlobal);
   }, [autoApprovePlanGlobal]);
 
-  const handleToggle = async (kind: 'edits' | 'plan') => {
+  useEffect(() => {
+    setCodeReviewEnabled(autoCodeReviewGlobal);
+  }, [autoCodeReviewGlobal]);
+
+  const handleToggle = async (kind: 'edits' | 'plan' | 'codeReview') => {
     if (isLoading) return;
 
     setIsLoading(true);
@@ -59,32 +66,53 @@ export function AutoApproveButton() {
         return;
       }
 
-      const newEnabled = !planEnabled;
-      await setAutoApprovePlanGlobal(newEnabled);
+      if (kind === 'plan') {
+        const newEnabled = !planEnabled;
+        await setAutoApprovePlanGlobal(newEnabled);
+
+        if (currentTaskId) {
+          const settings: TaskSettings = { autoApprovePlan: newEnabled };
+          await taskService.updateTaskSettings(currentTaskId, settings);
+          logger.info(
+            `Auto-approve plan ${newEnabled ? 'enabled' : 'disabled'} for task ${currentTaskId}`
+          );
+        }
+
+        setPlanEnabled(newEnabled);
+        toast.success(
+          newEnabled ? t.Chat.autoApprovePlan.enabled : t.Chat.autoApprovePlan.disabled
+        );
+        return;
+      }
+
+      const newEnabled = !codeReviewEnabled;
+      await setAutoCodeReviewGlobal(newEnabled);
 
       if (currentTaskId) {
-        const settings: TaskSettings = { autoApprovePlan: newEnabled };
+        const settings: TaskSettings = { autoCodeReview: newEnabled };
         await taskService.updateTaskSettings(currentTaskId, settings);
         logger.info(
-          `Auto-approve plan ${newEnabled ? 'enabled' : 'disabled'} for task ${currentTaskId}`
+          `Auto code review ${newEnabled ? 'enabled' : 'disabled'} for task ${currentTaskId}`
         );
       }
 
-      setPlanEnabled(newEnabled);
-      toast.success(newEnabled ? t.Chat.autoApprovePlan.enabled : t.Chat.autoApprovePlan.disabled);
+      setCodeReviewEnabled(newEnabled);
+      toast.success(newEnabled ? t.Chat.autoCodeReview.enabled : t.Chat.autoCodeReview.disabled);
     } catch (error) {
       logger.error('Failed to update auto-approve setting:', error);
       toast.error(
         kind === 'edits'
           ? t.Chat.autoApproveEdits.toggleFailed
-          : t.Chat.autoApprovePlan.toggleFailed
+          : kind === 'plan'
+            ? t.Chat.autoApprovePlan.toggleFailed
+            : t.Chat.autoCodeReview.toggleFailed
       );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const anyEnabled = editsEnabled || planEnabled;
+  const anyEnabled = editsEnabled || planEnabled || codeReviewEnabled;
 
   return (
     <HoverCard>
@@ -133,6 +161,18 @@ export function AutoApproveButton() {
                 </span>
               </p>
             </div>
+            <div className="space-y-1">
+              <h4 className="font-medium text-sm">{t.Chat.autoCodeReview.title}</h4>
+              <p className="text-xs text-muted-foreground">{t.Chat.autoCodeReview.description}</p>
+              <p className="text-xs">
+                <span className="text-muted-foreground">{t.Chat.autoCodeReview.title}: </span>
+                <span className={codeReviewEnabled ? 'text-green-600 dark:text-green-400' : ''}>
+                  {codeReviewEnabled
+                    ? t.Chat.autoCodeReview.enabled
+                    : t.Chat.autoCodeReview.disabled}
+                </span>
+              </p>
+            </div>
           </div>
         </HoverCardContent>
         <PopoverContent side="top" align="end" className="w-80 p-3">
@@ -178,6 +218,29 @@ export function AutoApproveButton() {
                 {planEnabled
                   ? t.Chat.autoApprovePlan.enabledTooltip
                   : t.Chat.autoApprovePlan.disabledTooltip}
+              </p>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">{t.Chat.autoCodeReview.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t.Chat.autoCodeReview.description}
+                  </p>
+                </div>
+                <Switch
+                  checked={codeReviewEnabled}
+                  onCheckedChange={() => handleToggle('codeReview')}
+                  disabled={isLoading}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {codeReviewEnabled
+                  ? t.Chat.autoCodeReview.enabledTooltip
+                  : t.Chat.autoCodeReview.disabledTooltip}
               </p>
             </div>
           </div>

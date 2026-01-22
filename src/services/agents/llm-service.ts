@@ -19,8 +19,10 @@ import { getLocale, type SupportedLocale } from '@/locales';
 import { getContextLength } from '@/providers/config/model-config';
 import { parseModelIdentifier } from '@/providers/core/provider-utils';
 import { modelTypeService } from '@/providers/models/model-type-service';
+import { databaseService } from '@/services/database-service';
 import { hookService } from '@/services/hooks/hook-service';
 import { hookStateService } from '@/services/hooks/hook-state-service';
+import { messageService } from '@/services/message-service';
 import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useTaskStore } from '@/stores/task-store';
@@ -33,6 +35,50 @@ import type {
   UIMessage,
 } from '../../types/agent';
 import { aiPricingService } from '../ai/ai-pricing-service';
+
+type UsageLike = {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+};
+
+export function normalizeUsageTokens(
+  usage?: UsageLike | null,
+  totalUsage?: UsageLike | null
+): { inputTokens: number; outputTokens: number; totalTokens: number } | null {
+  const primary = usage ?? totalUsage ?? null;
+  const inputTokens =
+    primary?.inputTokens ??
+    primary?.promptTokens ??
+    totalUsage?.inputTokens ??
+    totalUsage?.promptTokens ??
+    0;
+  const outputTokens =
+    primary?.outputTokens ??
+    primary?.completionTokens ??
+    totalUsage?.outputTokens ??
+    totalUsage?.completionTokens ??
+    0;
+  let totalTokens = primary?.totalTokens ?? totalUsage?.totalTokens ?? inputTokens + outputTokens;
+
+  if (totalTokens > 0 && (inputTokens > 0 || outputTokens > 0)) {
+    totalTokens = inputTokens + outputTokens;
+  }
+
+  if (totalTokens > 0 && inputTokens === 0 && outputTokens === 0) {
+    return { inputTokens: totalTokens, outputTokens: 0, totalTokens };
+  }
+
+  if (totalTokens === 0 && (inputTokens > 0 || outputTokens > 0)) {
+    totalTokens = inputTokens + outputTokens;
+  }
+
+  if (totalTokens === 0) return null;
+
+  return { inputTokens, outputTokens, totalTokens };
+}
 
 /**
  * Callbacks for agent loop
@@ -615,27 +661,27 @@ export class LLMService {
                 providerOptions,
                 onFinish: async ({ finishReason, usage, totalUsage }) => {
                   const requestDuration = Date.now() - requestStartTime;
+                  const normalizedUsage = normalizeUsageTokens(usage, totalUsage);
 
-                  if (totalUsage?.totalTokens) {
+                  if (normalizedUsage?.totalTokens) {
                     // Check if token count increased significantly
                     if (loopState.lastRequestTokens > 0) {
-                      const tokenIncrease = totalUsage.totalTokens - loopState.lastRequestTokens;
+                      const tokenIncrease =
+                        normalizedUsage.totalTokens - loopState.lastRequestTokens;
                       if (tokenIncrease > 10000) {
                         logger.warn('Token count increased significantly', {
-                          currentTokens: totalUsage.totalTokens,
+                          currentTokens: normalizedUsage.totalTokens,
                           previousTokens: loopState.lastRequestTokens,
                           increase: tokenIncrease,
                           iteration: loopState.currentIteration,
                         });
                       }
                     }
-                    loopState.lastRequestTokens = totalUsage.totalTokens;
+                    loopState.lastRequestTokens = normalizedUsage.totalTokens;
                   }
 
-                  // Update task usage for UI display
-                  if (usage && this.taskId && !isSubagent) {
-                    const inputTokens = usage.inputTokens || 0;
-                    const outputTokens = usage.outputTokens || 0;
+                  if (normalizedUsage) {
+                    const { inputTokens, outputTokens } = normalizedUsage;
                     const cost = aiPricingService.calculateCost(model, {
                       inputTokens,
                       outputTokens,
@@ -650,12 +696,31 @@ export class LLMService {
                       );
                     }
 
-                    useTaskStore.getState().updateTaskUsage(this.taskId, {
-                      costDelta: cost,
-                      inputTokensDelta: inputTokens,
-                      outputTokensDelta: outputTokens,
-                      contextUsage,
-                    });
+                    if (this.taskId && !isSubagent) {
+                      useTaskStore.getState().updateTaskUsage(this.taskId, {
+                        costDelta: cost,
+                        inputTokensDelta: inputTokens,
+                        outputTokensDelta: outputTokens,
+                        requestCountDelta: 1,
+                        contextUsage,
+                      });
+                    }
+
+                    databaseService
+                      .insertApiUsageEvent({
+                        id: generateId(),
+                        conversationId:
+                          this.taskId && this.taskId !== 'nested' ? this.taskId : null,
+                        model,
+                        providerId: providerId ?? null,
+                        inputTokens,
+                        outputTokens,
+                        cost,
+                        createdAt: Date.now(),
+                      })
+                      .catch((error) => {
+                        logger.warn('[LLMService] Failed to insert usage event', error);
+                      });
                   }
 
                   logger.info('onFinish', {
@@ -864,16 +929,14 @@ export class LLMService {
             continue;
           }
 
-          // loopState.lastFinishReason = await streamResult.finishReason;
-          // const providerMetadata = await streamResult.providerMetadata;
-
-          // logger.info('Finish reason', { finishReason: loopState.lastFinishReason });
-          // logger.info('Provider metadata', { providerMetadata });
-
           if (this.taskId && toolCalls.length === 0) {
             const stopSummary = await hookService.runStop(this.taskId);
             hookService.applyHookSummary(stopSummary);
             if (stopSummary.blocked) {
+              const reason = stopSummary.blockReason || stopSummary.stopReason;
+              if (reason) {
+                await messageService.addUserMessage(this.taskId, reason);
+              }
               hookStateService.setStopHookActive(true);
               continue;
             }

@@ -148,8 +148,6 @@ export class KeepAwakeService {
       this.isPreventing = this.refCount > 0;
 
       if (wasLast) {
-        const t = this.getTranslations().KeepAwake;
-        this.showToast('success', t.disabled);
         logger.info('[KeepAwakeService] Sleep prevention disabled', {
           refCount: this.refCount,
         });

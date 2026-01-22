@@ -14,10 +14,9 @@ import { hookSnapshotService } from '@/services/hooks/hook-snapshot-service';
 import { useSettingsStore } from '@/stores/settings-store';
 import type { HookConfigScope, HooksConfigFile } from '@/types/hooks';
 
-const CONFIG_SCOPES: Array<{ value: HookConfigScope; labelKey: 'user' | 'project' | 'local' }> = [
+const CONFIG_SCOPES: Array<{ value: HookConfigScope; labelKey: 'user' | 'project' }> = [
   { value: 'user', labelKey: 'user' },
   { value: 'project', labelKey: 'project' },
-  { value: 'local', labelKey: 'local' },
 ];
 
 function formatJson(value: HooksConfigFile): string {

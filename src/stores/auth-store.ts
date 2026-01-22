@@ -11,6 +11,37 @@ function getTranslations() {
   return getLocale(language);
 }
 
+function parseOAuthTokenFromInput(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.startsWith('talkcody://')) {
+    try {
+      const parsedUrl = new URL(trimmed);
+      return parsedUrl.searchParams.get('token')?.trim() || null;
+    } catch (error) {
+      logger.error('[Auth Store] Failed to parse deep link input:', error);
+      return null;
+    }
+  }
+
+  if (trimmed.includes('token=')) {
+    try {
+      const parsedUrl = new URL(trimmed);
+      const token = parsedUrl.searchParams.get('token')?.trim();
+      if (token) {
+        return token;
+      }
+    } catch (error) {
+      logger.error('[Auth Store] Failed to parse callback URL input:', error);
+    }
+  }
+
+  return trimmed;
+}
+
 interface AuthState {
   user: User | null;
   isLoading: boolean;
@@ -23,6 +54,7 @@ interface AuthStore extends AuthState {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   handleOAuthCallback: (token: string) => Promise<void>;
+  handleOAuthCallbackFromInput: (input: string) => Promise<boolean>;
   loadUser: () => Promise<void>;
   initAuth: () => Promise<void>;
   initAuthFast: () => Promise<void>;
@@ -30,7 +62,7 @@ interface AuthStore extends AuthState {
   updateUser: (user: User) => void;
 }
 
-export const useAuthStore = create<AuthStore>((set, _get) => ({
+export const useAuthStore = create<AuthStore>((set, get) => ({
   // Initial state
   user: null,
   isLoading: false,
@@ -142,6 +174,23 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
       });
       toast.error(t.Auth.errors.completionFailedWithMessage(errorMessage));
     }
+  },
+
+  /**
+   * Handle OAuth callback from manual input (URL or token)
+   */
+  handleOAuthCallbackFromInput: async (input: string) => {
+    const t = getTranslations();
+    const token = parseOAuthTokenFromInput(input);
+    if (!token) {
+      const errorMessage = t.Auth.errors.invalidCallback;
+      set({ error: errorMessage });
+      toast.error(errorMessage);
+      return false;
+    }
+
+    await get().handleOAuthCallback(token);
+    return true;
   },
 
   /**
@@ -263,7 +312,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
    * Call this when user info is needed (e.g., account settings, share features)
    */
   loadUserIfNeeded: async () => {
-    const { isAuthenticated, user, isLoading } = _get();
+    const { isAuthenticated, user, isLoading } = get();
 
     // Skip if not authenticated, already have user, or currently loading
     if (!isAuthenticated || user || isLoading) {
@@ -271,7 +320,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
     }
 
     logger.info('[Auth Store] Loading user profile (lazy load)...');
-    await _get().loadUser();
+    await get().loadUser();
   },
 
   /**

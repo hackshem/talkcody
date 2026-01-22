@@ -54,6 +54,12 @@ export class TursoDatabaseInit {
       // Migration 6: Add context_usage column to conversations
       await TursoDatabaseInit.migrateConversationsContextUsage(db);
 
+      // Migration 7: Add request_count column to conversations
+      await TursoDatabaseInit.migrateConversationsRequestCount(db);
+
+      // Migration 8: Create api_usage_events table
+      await TursoDatabaseInit.migrateApiUsageEventsTable(db);
+
       logger.info('✅ Database migrations check completed');
     } catch (error) {
       logger.error('❌ Database migration error:', error);
@@ -257,6 +263,76 @@ export class TursoDatabaseInit {
       }
     } catch (error) {
       logger.error('Error migrating conversations table context_usage:', error);
+    }
+  }
+
+  /**
+   * Add request_count field to conversations table
+   */
+  private static async migrateConversationsRequestCount(db: TursoClient): Promise<void> {
+    try {
+      const result = await (db as any).execute(`
+        SELECT COUNT(*) as count
+        FROM pragma_table_info('conversations')
+        WHERE name = 'request_count'
+      `);
+
+      const columnExists = result.rows[0]?.count > 0;
+
+      if (!columnExists) {
+        logger.info('Migrating conversations table to add request_count field...');
+        await (db as any).execute(
+          `ALTER TABLE conversations ADD COLUMN request_count INTEGER DEFAULT 0`
+        );
+        logger.info('✅ Conversations table request_count migration completed');
+      }
+    } catch (error) {
+      logger.error('Error migrating conversations table request_count:', error);
+    }
+  }
+
+  /**
+   * Create api_usage_events table for per-request usage tracking
+   */
+  private static async migrateApiUsageEventsTable(db: TursoClient): Promise<void> {
+    try {
+      const result = await (db as any).execute(`
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='api_usage_events'
+      `);
+
+      const tableExists = result.rows.length > 0;
+
+      if (!tableExists) {
+        logger.info('Creating api_usage_events table...');
+        await (db as any).execute(`
+          CREATE TABLE IF NOT EXISTS api_usage_events (
+            id TEXT PRIMARY KEY,
+            conversation_id TEXT DEFAULT NULL,
+            model TEXT NOT NULL,
+            provider_id TEXT DEFAULT NULL,
+            input_tokens INTEGER NOT NULL DEFAULT 0,
+            output_tokens INTEGER NOT NULL DEFAULT 0,
+            cost REAL NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE SET NULL
+          )
+        `);
+
+        await (db as any).execute(
+          'CREATE INDEX IF NOT EXISTS idx_api_usage_events_created_at ON api_usage_events(created_at)'
+        );
+        await (db as any).execute(
+          'CREATE INDEX IF NOT EXISTS idx_api_usage_events_model ON api_usage_events(model)'
+        );
+        await (db as any).execute(
+          'CREATE INDEX IF NOT EXISTS idx_api_usage_events_conversation ON api_usage_events(conversation_id)'
+        );
+
+        logger.info('✅ api_usage_events table migration completed');
+      }
+    } catch (error) {
+      logger.error('Error creating api_usage_events table:', error);
     }
   }
 }

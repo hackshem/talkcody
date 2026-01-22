@@ -335,6 +335,7 @@ class CustomModelService {
         url: endpoint,
         method: 'GET',
         headers,
+        allow_private_ip: isCustomProvider,
       };
 
       const response = await invoke<ProxyResponse>('proxy_fetch', { request: proxyRequest });

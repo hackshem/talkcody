@@ -46,7 +46,9 @@ vi.mock('@/stores/settings-store', () => ({
     setCurrentTaskId: vi.fn(),
     getCurrentTaskId: vi.fn(),
     getAutoApproveEditsGlobal: vi.fn(() => false),
+    getAutoCodeReviewGlobal: vi.fn(() => false),
     setAutoApproveEditsGlobal: vi.fn(),
+    setAutoCodeReviewGlobal: vi.fn(),
   },
 }));
 
@@ -104,6 +106,7 @@ describe('useTasks', () => {
       updated_at: 1000,
       project_id: 'proj1',
       message_count: 0,
+      request_count: 0,
       cost: 0,
       input_token: 0,
       output_token: 0,
@@ -115,6 +118,7 @@ describe('useTasks', () => {
       updated_at: 2000,
       project_id: 'proj1',
       message_count: 0,
+      request_count: 0,
       cost: 0,
       input_token: 0,
       output_token: 0,
@@ -318,6 +322,7 @@ describe('useTasks', () => {
       created_at: 1000,
       updated_at: 1000,
       message_count: 0,
+      request_count: 0,
       cost: 0,
       input_token: 0,
       output_token: 0,

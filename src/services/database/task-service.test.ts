@@ -263,21 +263,24 @@ describe('TaskService', () => {
     it('should accumulate usage values', async () => {
       await taskService.createTask('Task', 'id-usage');
 
-      await taskService.updateTaskUsage('id-usage', 0.1, 10, 5, 50);
-      await taskService.updateTaskUsage('id-usage', 0.2, 20, 10, 75);
+      await taskService.updateTaskUsage('id-usage', 0.1, 10, 5, 1, 50);
+      await taskService.updateTaskUsage('id-usage', 0.2, 20, 10, 2, 75);
 
       const rows = db.rawQuery<{
         cost: number;
         input_token: number;
         output_token: number;
+        request_count: number;
         context_usage: number | null;
-      }>('SELECT cost, input_token, output_token, context_usage FROM conversations WHERE id = ?', [
-        'id-usage',
-      ]);
+      }>(
+        'SELECT cost, input_token, output_token, request_count, context_usage FROM conversations WHERE id = ?',
+        ['id-usage']
+      );
 
       expect(rows[0]?.cost).toBeCloseTo(0.3);
       expect(rows[0]?.input_token).toBe(30);
       expect(rows[0]?.output_token).toBe(15);
+      expect(rows[0]?.request_count).toBe(3);
       expect(rows[0]?.context_usage).toBe(75);
     });
   });

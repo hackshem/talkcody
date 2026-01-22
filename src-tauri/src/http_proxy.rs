@@ -13,7 +13,7 @@ static REQUEST_COUNTER: AtomicU32 = AtomicU32::new(0);
 /// Validate URL to prevent SSRF attacks
 /// Returns an error if the URL points to a private/internal IP address
 /// Exception: localhost access is allowed for local development and AI services
-fn validate_url(url_str: &str) -> Result<(), String> {
+fn validate_url(url_str: &str, allow_private_ip: bool) -> Result<(), String> {
     let url = Url::parse(url_str).map_err(|e| format!("Invalid URL: {}", e))?;
 
     // Only allow http and https schemes
@@ -46,7 +46,7 @@ fn validate_url(url_str: &str) -> Result<(), String> {
 
     if let Ok(addrs) = socket_addr.to_socket_addrs() {
         for addr in addrs {
-            if is_private_ip(&addr.ip()) {
+            if !allow_private_ip && is_private_ip(&addr.ip()) {
                 return Err(format!(
                     "Access to private/internal IP addresses is not allowed: {}",
                     addr.ip()
@@ -122,6 +122,7 @@ pub struct ProxyRequest {
     pub headers: HashMap<String, String>,
     pub body: Option<String>,
     pub request_id: Option<u32>,
+    pub allow_private_ip: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -155,7 +156,7 @@ pub async fn proxy_fetch(request: ProxyRequest) -> Result<ProxyResponse, String>
     log::info!("Proxy fetch request to: {} {}", request.method, request.url);
 
     // Validate URL to prevent SSRF attacks
-    validate_url(&request.url)?;
+    validate_url(&request.url, request.allow_private_ip.unwrap_or(false))?;
 
     let client = reqwest::Client::new();
 
@@ -257,7 +258,7 @@ pub async fn proxy_fetch_stream(request: ProxyRequest) -> Result<ProxyResponse, 
     );
 
     // Validate URL to prevent SSRF attacks
-    validate_url(&request.url)?;
+    validate_url(&request.url, request.allow_private_ip.unwrap_or(false))?;
 
     let client = reqwest::Client::new();
 
@@ -405,7 +406,7 @@ pub async fn stream_fetch(
     // );
 
     // Validate URL to prevent SSRF attacks
-    validate_url(&request.url)?;
+    validate_url(&request.url, request.allow_private_ip.unwrap_or(false))?;
 
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
@@ -550,47 +551,47 @@ mod tests {
 
     #[test]
     fn test_validate_url_valid_https() {
-        assert!(validate_url("https://example.com").is_ok());
-        assert!(validate_url("https://api.example.com/path").is_ok());
-        assert!(validate_url("https://example.com:443/path?query=1").is_ok());
+        assert!(validate_url("https://example.com", false).is_ok());
+        assert!(validate_url("https://api.example.com/path", false).is_ok());
+        assert!(validate_url("https://example.com:443/path?query=1", false).is_ok());
     }
 
     #[test]
     fn test_validate_url_valid_http() {
-        assert!(validate_url("http://example.com").is_ok());
-        assert!(validate_url("http://api.example.com:8080/path").is_ok());
+        assert!(validate_url("http://example.com", false).is_ok());
+        assert!(validate_url("http://api.example.com:8080/path", false).is_ok());
     }
 
     #[test]
     fn test_validate_url_allows_localhost_all_ports() {
         // All localhost access should now be allowed for development
-        assert!(validate_url("http://localhost").is_ok());
-        assert!(validate_url("https://localhost/api").is_ok());
-        assert!(validate_url("http://LOCALHOST").is_ok()); // case insensitive
-        assert!(validate_url("http://localhost:3000").is_ok());
-        assert!(validate_url("http://127.0.0.1:9999").is_ok());
-        assert!(validate_url("http://[::1]").is_ok());
-        assert!(validate_url("http://[::1]:9999").is_ok());
+        assert!(validate_url("http://localhost", false).is_ok());
+        assert!(validate_url("https://localhost/api", false).is_ok());
+        assert!(validate_url("http://LOCALHOST", false).is_ok()); // case insensitive
+        assert!(validate_url("http://localhost:3000", false).is_ok());
+        assert!(validate_url("http://127.0.0.1:9999", false).is_ok());
+        assert!(validate_url("http://[::1]", false).is_ok());
+        assert!(validate_url("http://[::1]:9999", false).is_ok());
         // Common development ports
-        assert!(validate_url("http://localhost:11434").is_ok()); // Ollama
-        assert!(validate_url("http://localhost:1234").is_ok()); // LM Studio
-        assert!(validate_url("http://localhost:3845").is_ok()); // MCP Server
-        assert!(validate_url("http://127.0.0.1:11434/v1/models").is_ok());
-        assert!(validate_url("http://127.0.0.1:1234/v1/chat/completions").is_ok());
-        assert!(validate_url("http://127.0.0.1:3845/mcp").is_ok());
+        assert!(validate_url("http://localhost:11434", false).is_ok()); // Ollama
+        assert!(validate_url("http://localhost:1234", false).is_ok()); // LM Studio
+        assert!(validate_url("http://localhost:3845", false).is_ok()); // MCP Server
+        assert!(validate_url("http://127.0.0.1:11434/v1/models", false).is_ok());
+        assert!(validate_url("http://127.0.0.1:1234/v1/chat/completions", false).is_ok());
+        assert!(validate_url("http://127.0.0.1:3845/mcp", false).is_ok());
     }
 
     #[test]
     fn test_validate_url_blocks_unsupported_scheme() {
-        assert!(validate_url("ftp://example.com").is_err());
-        assert!(validate_url("file:///etc/passwd").is_err());
-        assert!(validate_url("data:text/html,<h1>Hello</h1>").is_err());
+        assert!(validate_url("ftp://example.com", false).is_err());
+        assert!(validate_url("file:///etc/passwd", false).is_err());
+        assert!(validate_url("data:text/html,<h1>Hello</h1>", false).is_err());
     }
 
     #[test]
     fn test_validate_url_invalid_url() {
-        assert!(validate_url("not-a-url").is_err());
-        assert!(validate_url("://missing-scheme.com").is_err());
+        assert!(validate_url("not-a-url", false).is_err());
+        assert!(validate_url("://missing-scheme.com", false).is_err());
     }
 
     #[test]
@@ -754,6 +755,19 @@ mod tests {
         assert_eq!(request.url, "https://api.example.com/data");
         assert_eq!(request.method, "GET");
         assert!(request.body.is_none());
+    }
+
+    #[test]
+    fn test_validate_url_blocks_private_ip_by_default() {
+        assert!(validate_url("http://10.0.0.1:8080/v1/models", false).is_err());
+        assert!(validate_url("http://192.168.1.10", false).is_err());
+    }
+
+    #[test]
+    fn test_validate_url_allows_private_ip_when_flagged() {
+        assert!(validate_url("http://10.0.0.1:8080/v1/models", true).is_ok());
+        assert!(validate_url("http://192.168.1.10", true).is_ok());
+        assert!(validate_url("http://[fd00::1]:9090/v1/models", true).is_ok());
     }
 
     #[test]

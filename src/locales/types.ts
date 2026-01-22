@@ -186,6 +186,15 @@ export interface LocaleDefinition {
       disabledTooltip: string;
       toggleFailed: string;
     };
+    autoCodeReview: {
+      title: string;
+      description: string;
+      enabled: string;
+      disabled: string;
+      enabledTooltip: string;
+      disabledTooltip: string;
+      toggleFailed: string;
+    };
     reasoningEffort: {
       title: string;
       description: string;
@@ -1009,7 +1018,6 @@ export interface LocaleDefinition {
 
   KeepAwake: {
     enabled: string;
-    disabled: string;
     error: string;
     platformNotSupported: string;
   };
@@ -1208,6 +1216,7 @@ export interface LocaleDefinition {
       signOutFailed: (message: string) => string;
       completionFailed: string;
       completionFailedWithMessage: (message: string) => string;
+      invalidCallback: string;
     };
   };
 
@@ -1220,6 +1229,16 @@ export interface LocaleDefinition {
     benefits: {
       preventAbuse: string;
       stableService: string;
+    };
+    manual: {
+      title: string;
+      description: string;
+      placeholder: string;
+      copyLink: string;
+      copySuccess: string;
+      copyFailed: string;
+      submit: string;
+      note: string;
     };
   };
 
@@ -1776,6 +1795,58 @@ export interface LocaleDefinition {
     };
   };
 
+  apiUsage: {
+    title: string;
+    description: string;
+    tabLabel: string;
+    dashboardTitle: string;
+    dashboardDescription: string;
+    rangeLabel: string;
+    loading: string;
+    noData: string;
+    ranges: {
+      today: string;
+      week: string;
+      month: string;
+    };
+    metrics: {
+      cost: string;
+      totalTokens: string;
+      outputTokens: string;
+      requests: string;
+    };
+    tokens: {
+      title: string;
+      description: string;
+      selectLabel: string;
+      chartLabel: string;
+      options: {
+        total: string;
+        input: string;
+        output: string;
+      };
+      summary: {
+        totalSuffix: string;
+        average: string;
+        perDay: string;
+        peak: string;
+      };
+    };
+    models: {
+      title: string;
+      description: string;
+      summaryLabel: string;
+      columns: {
+        model: string;
+        min: string;
+        max: string;
+        avg: string;
+        sum: string;
+        requests: string;
+      };
+    };
+  };
+
   Lsp: {
     // Severity
     showErrors: string;
@@ -1807,6 +1878,7 @@ export interface LocaleDefinition {
       serverNotInstalled: (language: string) => string;
       serverNotAvailable: (command: string) => string;
       languageIdMissing: string;
+      positionRequired: (operation: string) => string;
       operationNotSupported: (operation: string) => string;
       noResults: (operation: string) => string;
       success: (operation: string, location: string) => string;

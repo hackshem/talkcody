@@ -267,6 +267,139 @@ describe('AuthStore - OAuth Deep Link Flow', () => {
     });
   });
 
+  describe('handleOAuthCallbackFromInput', () => {
+    it('should accept a deep link URL input', async () => {
+      const mockToken = 'valid-jwt-token-123';
+      const mockUser = {
+        id: 'user-123',
+        username: 'testuser',
+        email: 'test@example.com',
+        avatarUrl: 'https://example.com/avatar.jpg',
+        displayName: 'Test User',
+        oauthProvider: 'github' as const,
+        oauthId: 'github-123',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      mockStoreAuthToken.mockResolvedValueOnce(undefined);
+      mockFetchUserProfile.mockResolvedValueOnce(mockUser);
+
+      const { handleOAuthCallbackFromInput } = useAuthStore.getState();
+      const ok = await handleOAuthCallbackFromInput(
+        `talkcody://auth/callback?token=${mockToken}`
+      );
+
+      expect(ok).toBe(true);
+      expect(authService.storeAuthToken).toHaveBeenCalledWith(mockToken);
+      expect(toast.success).toHaveBeenCalledWith('Signed in successfully');
+    });
+
+    it('should accept a raw token input', async () => {
+      const mockToken = 'raw-token-456';
+      const mockUser = {
+        id: 'user-123',
+        username: 'testuser',
+        email: 'test@example.com',
+        avatarUrl: 'https://example.com/avatar.jpg',
+        displayName: 'Test User',
+        oauthProvider: 'github' as const,
+        oauthId: 'github-123',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      mockStoreAuthToken.mockResolvedValueOnce(undefined);
+      mockFetchUserProfile.mockResolvedValueOnce(mockUser);
+
+      const { handleOAuthCallbackFromInput } = useAuthStore.getState();
+      const ok = await handleOAuthCallbackFromInput(mockToken);
+
+      expect(ok).toBe(true);
+      expect(authService.storeAuthToken).toHaveBeenCalledWith(mockToken);
+      expect(toast.success).toHaveBeenCalledWith('Signed in successfully');
+    });
+
+    it('should reject empty input', async () => {
+      const { handleOAuthCallbackFromInput } = useAuthStore.getState();
+      const ok = await handleOAuthCallbackFromInput('   ');
+
+      expect(ok).toBe(false);
+      expect(toast.error).toHaveBeenCalledWith('Please paste a valid TalkCody callback link or token.');
+      expect(authService.storeAuthToken).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('loadUserIfNeeded', () => {
+    it('should load user when authenticated and user is null', async () => {
+      const mockUser = {
+        id: 'user-123',
+        username: 'testuser',
+        email: 'test@example.com',
+        avatarUrl: 'https://example.com/avatar.jpg',
+        displayName: 'Test User',
+        oauthProvider: 'github' as const,
+        oauthId: 'github-123',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      useAuthStore.setState({
+        user: null,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+
+      mockFetchUserProfile.mockResolvedValueOnce(mockUser);
+
+      await useAuthStore.getState().loadUserIfNeeded();
+
+      expect(authService.fetchUserProfile).toHaveBeenCalled();
+      expect(useAuthStore.getState().user).toEqual(mockUser);
+    });
+
+    it('should not load user when not authenticated or already loading', async () => {
+      useAuthStore.setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
+
+      await useAuthStore.getState().loadUserIfNeeded();
+      expect(authService.fetchUserProfile).not.toHaveBeenCalled();
+
+      useAuthStore.setState({
+        user: null,
+        isAuthenticated: true,
+        isLoading: true,
+      });
+
+      await useAuthStore.getState().loadUserIfNeeded();
+      expect(authService.fetchUserProfile).not.toHaveBeenCalled();
+    });
+
+    it('should not load user when user already exists', async () => {
+      useAuthStore.setState({
+        user: {
+          id: 'user-123',
+          username: 'testuser',
+          email: 'test@example.com',
+          avatarUrl: 'https://example.com/avatar.jpg',
+          displayName: 'Test User',
+          oauthProvider: 'github',
+          oauthId: 'github-123',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        isAuthenticated: true,
+        isLoading: false,
+      });
+
+      await useAuthStore.getState().loadUserIfNeeded();
+      expect(authService.fetchUserProfile).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Deep Link Integration Test', () => {
     it('should simulate complete deep link OAuth flow', async () => {
       // Arrange - simulate clicking "Sign in with GitHub"

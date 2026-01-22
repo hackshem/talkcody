@@ -236,6 +236,8 @@ export class HookRunner {
       }
     }
 
+    logger.info('[HookRunner] Hook run summary', { event, summary });
+
     return summary;
   }
 }

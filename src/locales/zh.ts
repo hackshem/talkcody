@@ -190,6 +190,15 @@ const zh: LocaleDefinition = {
       disabledTooltip: '人工审核：AI 将在执行前等待计划批准',
       toggleFailed: '更新自动批准设置失败',
     },
+    autoCodeReview: {
+      title: '自动代码审查',
+      description: '启用后，任务完成后将自动进行代码审查',
+      enabled: '已启用',
+      disabled: '已禁用',
+      enabledTooltip: '自动审查：任务完成后自动运行代码审查',
+      disabledTooltip: '人工审查：需要时手动运行代码审查',
+      toggleFailed: '更新自动代码审查设置失败',
+    },
     reasoningEffort: {
       title: '推理强度',
       description: '控制模型在响应前进行多少推理。较高的强度会使用更多 tokens 进行思考。',
@@ -636,7 +645,7 @@ const zh: LocaleDefinition = {
       disabledToast: 'Hooks 已关闭',
       blockedPrompt: '提示被 Hooks 阻止。',
     },
-    hooksScopeHint: '作用域合并顺序：用户 → 项目 → 本地项目。',
+    hooksScopeHint: '作用域合并顺序：用户 → 项目。',
   },
 
   Agents: {
@@ -1022,7 +1031,6 @@ const zh: LocaleDefinition = {
 
   KeepAwake: {
     enabled: '任务运行期间已阻止系统休眠',
-    disabled: '已禁用休眠预防',
     error: '阻止系统休眠失败',
     platformNotSupported: '此平台不支持休眠预防',
   },
@@ -1224,6 +1232,7 @@ const zh: LocaleDefinition = {
       signOutFailed: (message) => `退出登录失败：${message}`,
       completionFailed: '无法完成登录',
       completionFailedWithMessage: (message) => `无法完成登录：${message}`,
+      invalidCallback: '请粘贴有效的 TalkCody 回调链接或令牌。',
     },
   },
 
@@ -1236,6 +1245,16 @@ const zh: LocaleDefinition = {
     benefits: {
       preventAbuse: '防止单个用户大量消耗资源',
       stableService: '确保所有用户都能享受稳定的服务',
+    },
+    manual: {
+      title: '手动登录（Linux 备用）',
+      description: '如果浏览器提示“认证成功”但应用未打开，请粘贴浏览器页面的链接或令牌。',
+      placeholder: '粘贴 talkcody://auth/callback?token=... 或 token',
+      copyLink: '复制',
+      copySuccess: '已复制到剪贴板',
+      copyFailed: '复制到剪贴板失败',
+      submit: '完成登录',
+      note: '提示：链接会显示在浏览器登录成功页面。',
     },
   },
 
@@ -1637,6 +1656,7 @@ const zh: LocaleDefinition = {
       serverNotInstalled: (language) => `未安装 ${language} 的 LSP 服务器。请在 LSP 设置中安装。`,
       serverNotAvailable: (command) => `LSP 服务器不可用。请安装：${command}`,
       languageIdMissing: '无法确定该文件的 LSP 语言 ID。',
+      positionRequired: (operation) => `LSP ${operation} 需要同时提供行和列。`,
       operationNotSupported: (operation) => `不支持的 LSP 操作：${operation}`,
       noResults: (operation) => `未找到 ${operation} 的结果`,
       success: (operation, location) => `LSP ${operation} 完成：${location}`,
@@ -1848,6 +1868,58 @@ const zh: LocaleDefinition = {
 
     plan: {
       title: '编码计划',
+    },
+  },
+
+  apiUsage: {
+    title: 'API 使用情况',
+    description: '跟踪不同模型的 AI 请求使用情况',
+    tabLabel: 'API 使用情况',
+    dashboardTitle: '使用情况仪表板',
+    dashboardDescription: '监控不同供应商的 AI 订阅使用情况',
+    rangeLabel: '时间范围',
+    loading: '正在加载使用数据...',
+    noData: '该时间范围内没有使用数据。',
+    ranges: {
+      today: '今天',
+      week: '最近 7 天',
+      month: '最近 30 天',
+    },
+    metrics: {
+      cost: '花费',
+      totalTokens: 'Tokens',
+      outputTokens: '输出 Tokens',
+      requests: '请求次数',
+    },
+    tokens: {
+      title: '每日 Tokens',
+      description: '所选时间范围内的每日 tokens 使用情况',
+      selectLabel: 'Token 视图',
+      chartLabel: 'Tokens',
+      options: {
+        total: '总计',
+        input: '输入',
+        output: '输出',
+      },
+      summary: {
+        totalSuffix: '区间总计',
+        average: '平均值',
+        perDay: '每天',
+        peak: '峰值',
+      },
+    },
+    models: {
+      title: '按模型统计 Tokens',
+      description: '按模型分组的使用统计',
+      summaryLabel: '总花费',
+      columns: {
+        model: '模型',
+        min: '最小 (tok)',
+        max: '最大 (tok)',
+        avg: '平均 (tok)',
+        sum: '总计 (tok)',
+        requests: '请求次数',
+      },
     },
   },
 

@@ -1,9 +1,10 @@
 // src/stores/background-task-store.test.ts
 // Tests for background task store - specifically for Bug #9 (getter side effects)
 
+import { invoke } from '@tauri-apps/api/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useBackgroundTaskStore } from './background-task-store';
-import type { BackgroundTask } from '@/types/background-task';
+import type { BackgroundTask, SpawnBackgroundTaskResponse } from '@/types/background-task';
 
 // Mock Tauri invoke
 vi.mock('@tauri-apps/api/core', () => ({
@@ -15,9 +16,9 @@ vi.mock('@tauri-apps/api/core', () => ({
 describe('BackgroundTaskStore', () => {
   // Reset store state before each test
   beforeEach(() => {
-    const store = useBackgroundTaskStore.getState();
     // Clear all tasks
     useBackgroundTaskStore.setState({ tasks: new Map() });
+    vi.clearAllMocks();
   });
 
   // Helper to create a mock task
@@ -234,6 +235,68 @@ describe('BackgroundTaskStore', () => {
       expect(convATasks.length).toBe(2);
       expect(convBTasks.length).toBe(1);
       expect(convCTasks.length).toBe(0);
+    });
+  });
+
+  describe('spawnTask', () => {
+    it('should wrap request payload and add task', async () => {
+      const store = useBackgroundTaskStore.getState();
+      const invokeMock = vi.mocked(invoke);
+
+      const response: SpawnBackgroundTaskResponse = {
+        taskId: 'bg-1',
+        pid: 4321,
+        outputFile: '/tmp/stdout.log',
+        errorFile: '/tmp/stderr.log',
+        success: true,
+      };
+
+      invokeMock.mockResolvedValue(response);
+
+      const taskId = await store.spawnTask('echo hello', 'conv-1', 'tool-1', '/tmp', 1234);
+
+      expect(invokeMock).toHaveBeenCalledWith('spawn_background_task', {
+        request: {
+          command: 'echo hello',
+          cwd: '/tmp',
+          maxTimeoutMs: 1234,
+        },
+      });
+
+      expect(taskId).toBe('bg-1');
+
+      const task = store.getTask('bg-1');
+      expect(task).toBeDefined();
+      expect(task?.pid).toBe(4321);
+      expect(task?.command).toBe('echo hello');
+      expect(task?.status).toBe('running');
+      expect(task?.outputFile).toBe('/tmp/stdout.log');
+      expect(task?.errorFile).toBe('/tmp/stderr.log');
+      expect(task?.conversationTaskId).toBe('conv-1');
+      expect(task?.toolId).toBe('tool-1');
+      expect(task?.maxTimeoutMs).toBe(1234);
+      expect(task?.lastOutput).toEqual({ stdoutBytesRead: 0, stderrBytesRead: 0 });
+    });
+
+    it('should surface errors when spawn fails', async () => {
+      const store = useBackgroundTaskStore.getState();
+      const invokeMock = vi.mocked(invoke);
+
+      const response: SpawnBackgroundTaskResponse = {
+        taskId: 'bg-2',
+        pid: 1,
+        outputFile: '/tmp/stdout.log',
+        errorFile: '/tmp/stderr.log',
+        success: false,
+        error: 'Boom',
+      };
+
+      invokeMock.mockResolvedValue(response);
+
+      await expect(
+        store.spawnTask('echo bad', 'conv-2', 'tool-2')
+      ).rejects.toThrow('Boom');
+      expect(store.getAllTasks().length).toBe(0);
     });
   });
 });

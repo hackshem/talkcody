@@ -268,6 +268,7 @@ class CustomProviderService {
         method,
         headers,
         body,
+        allow_private_ip: true,
       };
 
       const response = await invoke<ProxyResponse>('proxy_fetch', { request: proxyRequest });

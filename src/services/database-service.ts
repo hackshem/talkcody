@@ -3,6 +3,7 @@
 import { logger } from '@/lib/logger';
 import { MCPServerService } from '@/lib/mcp/mcp-server-service';
 import type { MessageAttachment } from '@/types/agent';
+import { ApiUsageService } from './database/api-usage-service';
 import { ProjectService } from './database/project-service';
 import { type RecentFile, RecentFilesService } from './database/recent-files-service';
 import { type RecentProject, RecentProjectsService } from './database/recent-projects-service';
@@ -32,6 +33,7 @@ export class DatabaseService {
 
   private projectService: ProjectService | null = null;
   private taskService: TaskService | null = null;
+  private apiUsageService: ApiUsageService | null = null;
   private mcpServerService: MCPServerService | null = null;
   private recentFilesService: RecentFilesService | null = null;
   private recentProjectsService: RecentProjectsService | null = null;
@@ -50,6 +52,7 @@ export class DatabaseService {
       // Initialize services
       this.projectService = new ProjectService(this.db);
       this.taskService = new TaskService(this.db);
+      this.apiUsageService = new ApiUsageService(this.db);
       this.mcpServerService = new MCPServerService(this.db);
       this.recentFilesService = new RecentFilesService(this.db);
       this.recentProjectsService = new RecentProjectsService(this.db);
@@ -268,11 +271,19 @@ export class DatabaseService {
     cost: number,
     inputToken: number,
     outputToken: number,
+    requestCount: number,
     contextUsage?: number
   ): Promise<void> {
     await this.ensureInitialized();
     if (!this.taskService) throw new Error('Task service not initialized');
-    return this.taskService.updateTaskUsage(taskId, cost, inputToken, outputToken, contextUsage);
+    return this.taskService.updateTaskUsage(
+      taskId,
+      cost,
+      inputToken,
+      outputToken,
+      requestCount,
+      contextUsage
+    );
   }
 
   async updateTaskSettings(taskId: string, settings: string): Promise<void> {
@@ -285,6 +296,46 @@ export class DatabaseService {
     await this.ensureInitialized();
     if (!this.taskService) throw new Error('Task service not initialized');
     return this.taskService.getTaskSettings(taskId);
+  }
+
+  // API usage methods
+  async insertApiUsageEvent(input: {
+    id: string;
+    conversationId?: string | null;
+    model: string;
+    providerId?: string | null;
+    inputTokens: number;
+    outputTokens: number;
+    cost: number;
+    createdAt: number;
+  }): Promise<void> {
+    await this.ensureInitialized();
+    if (!this.apiUsageService) throw new Error('API usage service not initialized');
+    return this.apiUsageService.insertUsageEvent(input);
+  }
+
+  async getApiUsageSummary(startAt: number, endAt: number) {
+    await this.ensureInitialized();
+    if (!this.apiUsageService) throw new Error('API usage service not initialized');
+    return this.apiUsageService.getRangeSummary(startAt, endAt);
+  }
+
+  async getApiUsageModelBreakdown(startAt: number, endAt: number) {
+    await this.ensureInitialized();
+    if (!this.apiUsageService) throw new Error('API usage service not initialized');
+    return this.apiUsageService.getModelBreakdown(startAt, endAt);
+  }
+
+  async getApiUsageDailySeries(startAt: number, endAt: number) {
+    await this.ensureInitialized();
+    if (!this.apiUsageService) throw new Error('API usage service not initialized');
+    return this.apiUsageService.getDailySeries(startAt, endAt);
+  }
+
+  async getApiUsageRangeResult(startAt: number, endAt: number) {
+    await this.ensureInitialized();
+    if (!this.apiUsageService) throw new Error('API usage service not initialized');
+    return this.apiUsageService.getRangeResult(startAt, endAt);
   }
 
   // MCP Server methods

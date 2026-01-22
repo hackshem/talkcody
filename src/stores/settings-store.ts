@@ -37,6 +37,7 @@ interface SettingsState {
   is_worktree_mode_enabled: boolean;
   auto_approve_edits_global: boolean;
   auto_approve_plan_global: boolean;
+  auto_code_review_global: boolean;
   hooks_enabled: boolean;
 
   // Project Settings
@@ -114,9 +115,11 @@ interface SettingsActions {
   setWorktreeModeEnabled: (enabled: boolean) => Promise<void>;
   setAutoApproveEditsGlobal: (enabled: boolean) => Promise<void>;
   setAutoApprovePlanGlobal: (enabled: boolean) => Promise<void>;
+  setAutoCodeReviewGlobal: (enabled: boolean) => Promise<void>;
   setHooksEnabled: (enabled: boolean) => Promise<void>;
   getAutoApproveEditsGlobal: () => boolean;
   getAutoApprovePlanGlobal: () => boolean;
+  getAutoCodeReviewGlobal: () => boolean;
 
   // Project Settings
   setProject: (project: string) => Promise<void>;
@@ -225,6 +228,7 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'loading' | 'error' | 'isInitialized
   is_worktree_mode_enabled: false,
   auto_approve_edits_global: false,
   auto_approve_plan_global: false,
+  auto_code_review_global: false,
   hooks_enabled: false,
   project: DEFAULT_PROJECT,
   current_root_path: '',
@@ -296,6 +300,7 @@ class SettingsDatabase {
       is_plan_mode_enabled: 'false',
       auto_approve_edits_global: 'false',
       auto_approve_plan_global: 'false',
+      auto_code_review_global: 'false',
       hooks_enabled: 'false',
       model_type_main: '',
       model_type_small: '',
@@ -425,6 +430,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         'is_plan_mode_enabled',
         'auto_approve_edits_global',
         'auto_approve_plan_global',
+        'auto_code_review_global',
         'hooks_enabled',
         'reasoning_effort',
         'project',
@@ -504,6 +510,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         is_worktree_mode_enabled: rawSettings.is_worktree_mode_enabled === 'true',
         auto_approve_edits_global: rawSettings.auto_approve_edits_global === 'true',
         auto_approve_plan_global: rawSettings.auto_approve_plan_global === 'true',
+        auto_code_review_global: rawSettings.auto_code_review_global === 'true',
         hooks_enabled: rawSettings.hooks_enabled === 'true',
         project: rawSettings.project || DEFAULT_PROJECT,
         current_root_path: rawSettings.current_root_path || '',
@@ -638,6 +645,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   setAutoApprovePlanGlobal: async (enabled: boolean) => {
     await settingsDb.set('auto_approve_plan_global', enabled.toString());
     set({ auto_approve_plan_global: enabled });
+  },
+
+  setAutoCodeReviewGlobal: async (enabled: boolean) => {
+    await settingsDb.set('auto_code_review_global', enabled.toString());
+    set({ auto_code_review_global: enabled });
   },
 
   setHooksEnabled: async (enabled: boolean) => {
@@ -1033,6 +1045,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     return get().auto_approve_plan_global;
   },
 
+  getAutoCodeReviewGlobal: () => {
+    return get().auto_code_review_global;
+  },
+
   getHooksEnabled: () => {
     return get().hooks_enabled;
   },
@@ -1069,6 +1085,8 @@ export const settingsManager = {
     useSettingsStore.getState().setAutoApproveEditsGlobal(enabled),
   setAutoApprovePlanGlobal: (enabled: boolean) =>
     useSettingsStore.getState().setAutoApprovePlanGlobal(enabled),
+  setAutoCodeReviewGlobal: (enabled: boolean) =>
+    useSettingsStore.getState().setAutoCodeReviewGlobal(enabled),
   setHooksEnabled: (enabled: boolean) => useSettingsStore.getState().setHooksEnabled(enabled),
   setCustomToolsDir: (path: string) => useSettingsStore.getState().setCustomToolsDir(path),
 
@@ -1083,6 +1101,7 @@ export const settingsManager = {
   getWorktreeModeEnabled: () => useSettingsStore.getState().getWorktreeModeEnabled(),
   getAutoApproveEditsGlobal: () => useSettingsStore.getState().getAutoApproveEditsGlobal(),
   getAutoApprovePlanGlobal: () => useSettingsStore.getState().getAutoApprovePlanGlobal(),
+  getAutoCodeReviewGlobal: () => useSettingsStore.getState().getAutoCodeReviewGlobal(),
   getHooksEnabled: () => useSettingsStore.getState().getHooksEnabled(),
 
   // API Keys

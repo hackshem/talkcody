@@ -18,6 +18,8 @@ const NETWORK_ERROR_PATTERNS = [
   'socket hang up',
 ];
 
+const PRIVATE_IP_HEADER = 'x-talkcody-allow-private-ip';
+
 /**
  * Check if an error is a network-related error that should trigger retry
  */
@@ -46,6 +48,7 @@ export interface ProxyRequest {
   headers: Record<string, string>;
   body?: string;
   request_id?: number;
+  allow_private_ip?: boolean;
 }
 
 export interface ProxyResponse {
@@ -114,6 +117,22 @@ function extractRequestParams(input: RequestInfo | URL, init?: RequestInit) {
   return { url, method, headers, body };
 }
 
+function popAllowPrivateIp(headers: Record<string, string>): boolean {
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase() === PRIVATE_IP_HEADER) {
+      const value = headers[key];
+      delete headers[key];
+      if (!value) {
+        return false;
+      }
+      const normalized = value.toLowerCase();
+      return normalized === 'true' || value === '1' || normalized === 'yes';
+    }
+  }
+
+  return false;
+}
+
 /**
  * Check if the body is a type that cannot be serialized to string (FormData, Blob, ArrayBuffer, etc.)
  * These types require native fetch to handle properly (multipart/form-data encoding)
@@ -150,12 +169,14 @@ export async function simpleFetch(input: RequestInfo | URL, init?: RequestInit):
   }
 
   const { url, method, headers, body } = extractRequestParams(input, init);
+  const allowPrivateIp = popAllowPrivateIp(headers);
 
   const proxyRequest: ProxyRequest = {
     url,
     method,
     headers,
     body,
+    allow_private_ip: allowPrivateIp,
   };
 
   let lastError: Error | undefined;
@@ -202,6 +223,7 @@ export async function simpleFetch(input: RequestInfo | URL, init?: RequestInit):
 function createStreamFetch(): TauriFetchFunction {
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const { url, method, headers, body } = extractRequestParams(input, init);
+    const allowPrivateIp = popAllowPrivateIp(headers);
     const signal = init?.signal;
 
     let lastError: Error | undefined;
@@ -218,6 +240,7 @@ function createStreamFetch(): TauriFetchFunction {
         headers,
         body,
         request_id: requestId,
+        allow_private_ip: allowPrivateIp,
       };
 
       // Setup streaming infrastructure (fresh for each attempt)

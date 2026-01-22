@@ -195,6 +195,15 @@ const en: LocaleDefinition = {
       disabledTooltip: 'Manual review: AI will wait for plan approval before acting',
       toggleFailed: 'Failed to update auto-approve setting',
     },
+    autoCodeReview: {
+      title: 'Auto code review',
+      description: 'When enabled, code review will run automatically after a task completes',
+      enabled: 'Enabled',
+      disabled: 'Disabled',
+      enabledTooltip: 'Auto-review: AI will run code review when the task finishes',
+      disabledTooltip: 'Manual review: use the review button when you are ready',
+      toggleFailed: 'Failed to update auto code review setting',
+    },
     reasoningEffort: {
       title: 'Reasoning Effort',
       description:
@@ -659,7 +668,7 @@ const en: LocaleDefinition = {
       disabledToast: 'Hooks disabled',
       blockedPrompt: 'Prompt blocked by hook.',
     },
-    hooksScopeHint: 'Scopes are merged in the order: user -> project -> local project.',
+    hooksScopeHint: 'Scopes are merged in the order: user -> project.',
   },
 
   Agents: {
@@ -1056,7 +1065,6 @@ const en: LocaleDefinition = {
 
   KeepAwake: {
     enabled: 'Sleep prevented while tasks are running',
-    disabled: 'Sleep prevention disabled',
     error: 'Failed to prevent system sleep',
     platformNotSupported: 'Sleep prevention not supported on this platform',
   },
@@ -1261,6 +1269,7 @@ const en: LocaleDefinition = {
       signOutFailed: (message) => `Failed to sign out: ${message}`,
       completionFailed: 'Failed to complete sign in',
       completionFailedWithMessage: (message) => `Failed to complete sign in: ${message}`,
+      invalidCallback: 'Please paste a valid TalkCody callback link or token.',
     },
   },
 
@@ -1274,6 +1283,17 @@ const en: LocaleDefinition = {
     benefits: {
       preventAbuse: 'Prevent abuse of shared capacity',
       stableService: 'Ensure stable and reliable service for all users',
+    },
+    manual: {
+      title: 'Manual sign-in (Linux fallback)',
+      description:
+        'If your browser shows “auth successful” but the app does not open, paste the link from the browser or the token.',
+      placeholder: 'Paste talkcody://auth/callback?token=... or token',
+      copyLink: 'Copy',
+      copySuccess: 'Copied to clipboard',
+      copyFailed: 'Failed to copy to clipboard',
+      submit: 'Complete sign-in',
+      note: 'Tip: The link is shown on the browser success page.',
     },
   },
 
@@ -1684,6 +1704,8 @@ const en: LocaleDefinition = {
         `LSP server for ${language} is not installed. Open LSP settings to install it.`,
       serverNotAvailable: (command) => `LSP server not available. Please install: ${command}`,
       languageIdMissing: 'Unable to determine LSP language ID for this file.',
+      positionRequired: (operation) =>
+        `LSP ${operation} requires both line and character to be provided.`,
       operationNotSupported: (operation) => `Unsupported LSP operation: ${operation}`,
       noResults: (operation) => `No results found for ${operation}`,
       success: (operation, location) => `LSP ${operation} completed for ${location}`,
@@ -1896,6 +1918,58 @@ const en: LocaleDefinition = {
 
     plan: {
       title: 'Coding Plan',
+    },
+  },
+
+  apiUsage: {
+    title: 'API Usage',
+    description: 'Track your AI request usage across models',
+    tabLabel: 'API Usage',
+    dashboardTitle: 'Usage Dashboard',
+    dashboardDescription: 'Monitor your AI subscription usage across providers',
+    rangeLabel: 'Range',
+    loading: 'Loading usage data...',
+    noData: 'No usage data available for this range.',
+    ranges: {
+      today: 'Today',
+      week: '7 Days',
+      month: '30 Days',
+    },
+    metrics: {
+      cost: 'Spend',
+      totalTokens: 'Tokens',
+      outputTokens: 'Output Tokens',
+      requests: 'Requests',
+    },
+    tokens: {
+      title: 'Tokens by Day',
+      description: 'Daily token usage for the selected range',
+      selectLabel: 'Token View',
+      chartLabel: 'Tokens',
+      options: {
+        total: 'Total',
+        input: 'Input',
+        output: 'Output',
+      },
+      summary: {
+        totalSuffix: 'range total',
+        average: 'Average',
+        perDay: 'per day',
+        peak: 'Peak',
+      },
+    },
+    models: {
+      title: 'Tokens by Model',
+      description: 'Usage breakdown grouped by model',
+      summaryLabel: 'Total spend',
+      columns: {
+        model: 'Model',
+        min: 'Min (tok)',
+        max: 'Max (tok)',
+        avg: 'Avg (tok)',
+        sum: 'Sum (tok)',
+        requests: 'Requests',
+      },
     },
   },
 

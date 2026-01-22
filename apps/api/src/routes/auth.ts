@@ -105,6 +105,45 @@ function renderSuccessPage(deepLink: string) {
           transition: opacity 0.2s ease;
         }
         .link:hover { opacity: 0.7; }
+        .actions {
+          margin-top: 18px;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 10px;
+        }
+        .button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 10px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          background: rgba(255, 255, 255, 0.06);
+          color: #ffffff;
+          text-decoration: none;
+          font-size: 13px;
+          transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        .button:hover { opacity: 0.85; transform: translateY(-1px); }
+        .code {
+          margin-top: 16px;
+          padding: 12px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.06);
+          font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+          font-size: 12px;
+          word-break: break-all;
+          color: #d8d8df;
+        }
+        .copy {
+          border: none;
+          background: none;
+          color: #ffffff;
+          text-decoration: underline;
+          cursor: pointer;
+          font-size: 12px;
+        }
       </style>
     </head>
     <body>
@@ -117,10 +156,39 @@ function renderSuccessPage(deepLink: string) {
           <p class="hint">
             If the app doesn't open automatically, <a class="link" href="${deepLink}" id="manual-link">click to continue</a> or return to the app to finish.
           </p>
+          <div class="actions">
+            <a class="button" href="${deepLink}">Open TalkCody</a>
+            <button class="button" type="button" id="copy-link">Copy sign-in link</button>
+          </div>
+          <div class="code" id="link-preview">${deepLink}</div>
+          <button class="copy" type="button" id="copy-token">Copy token only</button>
         </div>
       </div>
       <script>
-        setTimeout(() => { window.location.href = '${deepLink}'; }, 900);
+        const deepLink = '${deepLink}';
+        const token = new URL(deepLink).searchParams.get('token') || '';
+
+        const copyLinkButton = document.getElementById('copy-link');
+        const copyTokenButton = document.getElementById('copy-token');
+
+        const copyText = async (value) => {
+          if (!value) return;
+          try {
+            await navigator.clipboard.writeText(value);
+          } catch (error) {
+            const textArea = document.createElement('textarea');
+            textArea.value = value;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+          }
+        };
+
+        copyLinkButton?.addEventListener('click', () => copyText(deepLink));
+        copyTokenButton?.addEventListener('click', () => copyText(token));
+
+        setTimeout(() => { window.location.href = deepLink; }, 900);
         setTimeout(() => { window.close(); }, 9000);
       </script>
     </body>

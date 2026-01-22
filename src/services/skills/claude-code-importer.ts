@@ -8,7 +8,7 @@
  */
 
 import { homeDir, join, normalize } from '@tauri-apps/api/path';
-import { exists, readDir, readTextFile } from '@tauri-apps/plugin-fs';
+import { exists } from '@tauri-apps/plugin-fs';
 import { logger } from '@/lib/logger';
 import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
 

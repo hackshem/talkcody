@@ -57,6 +57,7 @@ describe('tauri-fetch', () => {
         request: expect.objectContaining({
           url: 'https://api.example.com/data',
           method: 'GET',
+          allow_private_ip: false,
         }),
       });
 
@@ -87,6 +88,7 @@ describe('tauri-fetch', () => {
           url: 'https://api.example.com/data',
           method: 'POST',
           body: '{"name":"test"}',
+          allow_private_ip: false,
         }),
       });
 
@@ -157,6 +159,7 @@ describe('tauri-fetch', () => {
           headers: expect.objectContaining({
             Accept: 'application/json, text/plain, */*',
           }),
+          allow_private_ip: false,
         }),
       });
     });
@@ -176,6 +179,7 @@ describe('tauri-fetch', () => {
         headers: {
           Authorization: 'Bearer token123',
           'X-Custom-Header': 'custom-value',
+          'X-TalkCody-Allow-Private-IP': 'true',
         },
       });
 
@@ -187,8 +191,35 @@ describe('tauri-fetch', () => {
             'x-custom-header': 'custom-value',
             Accept: 'application/json, text/plain, */*',
           }),
+          allow_private_ip: true,
         }),
       });
+    });
+
+    it('should treat empty allow-private-ip header as false', async () => {
+      const mockResponse: ProxyResponse = {
+        status: 200,
+        headers: {},
+        body: '',
+      };
+
+      mockInvoke.mockResolvedValue(mockResponse);
+
+      const { simpleFetch } = await import('./tauri-fetch');
+
+      await simpleFetch('https://api.example.com/data', {
+        headers: {
+          'X-TalkCody-Allow-Private-IP': '',
+        },
+      });
+
+      const request = mockInvoke.mock.calls[0]?.[1]?.request as {
+        allow_private_ip: boolean;
+        headers: Record<string, string>;
+      };
+
+      expect(request.allow_private_ip).toBe(false);
+      expect(request.headers).not.toHaveProperty('x-talkcody-allow-private-ip');
     });
 
     it('should handle error responses (4xx)', async () => {
@@ -252,6 +283,7 @@ describe('tauri-fetch', () => {
       expect(mockInvoke).toHaveBeenCalledWith('proxy_fetch', {
         request: expect.objectContaining({
           url: 'https://api.example.com/data',
+          allow_private_ip: false,
         }),
       });
     });
@@ -467,6 +499,7 @@ describe('tauri-fetch', () => {
         request: expect.objectContaining({
           url: 'https://api.example.com/stream',
           method: 'POST',
+          allow_private_ip: false,
         }),
       });
 
@@ -551,6 +584,7 @@ describe('tauri-fetch', () => {
       expect(mockInvoke).toHaveBeenCalledWith('proxy_fetch', {
         request: expect.objectContaining({
           url: 'https://api.example.com/data',
+          allow_private_ip: false,
         }),
       });
     });
@@ -571,6 +605,7 @@ describe('tauri-fetch', () => {
       expect(mockInvoke).toHaveBeenCalledWith('proxy_fetch', {
         request: expect.objectContaining({
           method: 'GET',
+          allow_private_ip: false,
         }),
       });
     });
@@ -597,6 +632,7 @@ describe('tauri-fetch', () => {
       expect(mockInvoke).toHaveBeenCalledWith('proxy_fetch', {
         request: expect.objectContaining({
           body: JSON.stringify(bodyObject),
+          allow_private_ip: false,
         }),
       });
     });

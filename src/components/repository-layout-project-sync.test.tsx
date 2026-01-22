@@ -213,6 +213,15 @@ const mockTranslations = {
       disabledTooltip: 'Manual review: AI will ask for approval before applying plans',
       toggleFailed: 'Failed to update auto-approve setting',
     },
+    autoCodeReview: {
+      title: 'Auto code review',
+      description: 'When enabled, code review will run automatically after a task completes',
+      enabled: 'Enabled',
+      disabled: 'Disabled',
+      enabledTooltip: 'Auto-review: AI will run code review when the task finishes',
+      disabledTooltip: 'Manual review: use the review button when you are ready',
+      toggleFailed: 'Failed to update auto code review setting',
+    },
     reasoningEffort: {
       title: 'Reasoning Effort',
       description: 'Control how much reasoning the model performs before responding. Higher effort uses more tokens for thinking.',

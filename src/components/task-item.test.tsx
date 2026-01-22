@@ -19,6 +19,7 @@ describe('TaskItem - No Nested Buttons Regression Test', () => {
     updated_at: '2024-01-01T00:00:00.000Z',
     created_at: '2024-01-01T00:00:00.000Z',
     message_count: 5,
+    request_count: 0,
     cost: 0.05,
     system_prompt: '',
     agent_type: 'general',

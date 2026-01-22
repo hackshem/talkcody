@@ -26,8 +26,10 @@ const mockSettingsManager = {
   getProject: vi.fn(),
   getAutoApproveEditsGlobal: vi.fn(),
   getAutoApprovePlanGlobal: vi.fn(),
+  getAutoCodeReviewGlobal: vi.fn(),
   setAutoApproveEditsGlobal: vi.fn(),
   setAutoApprovePlanGlobal: vi.fn(),
+  setAutoCodeReviewGlobal: vi.fn(),
 };
 
 const mockDatabaseService = {
@@ -61,8 +63,10 @@ vi.mock('@/stores/settings-store', () => ({
     getState: vi.fn(() => ({
       getAutoApproveEditsGlobal: vi.fn(() => false),
       getAutoApprovePlanGlobal: vi.fn(() => false),
+      getAutoCodeReviewGlobal: vi.fn(() => false),
       setAutoApproveEditsGlobal: vi.fn(),
       setAutoApprovePlanGlobal: vi.fn(),
+      setAutoCodeReviewGlobal: vi.fn(),
     })),
   },
 }));
@@ -108,11 +112,13 @@ describe('TaskService.createTask', () => {
     mockSettingsManager.getProject.mockResolvedValue('default');
     mockSettingsManager.getAutoApproveEditsGlobal.mockResolvedValue(false);
     mockSettingsManager.getAutoApprovePlanGlobal.mockResolvedValue(false);
+    mockSettingsManager.getAutoCodeReviewGlobal.mockResolvedValue(false);
     mockDatabaseService.createTask.mockResolvedValue('task-123');
   });
 
   it('applies auto-approve settings when global setting is enabled', async () => {
     mockSettingsManager.getAutoApproveEditsGlobal.mockResolvedValue(true);
+    mockSettingsManager.getAutoCodeReviewGlobal.mockResolvedValue(false);
 
     const updateSpy = vi
       .spyOn(taskService, 'updateTaskSettings')
@@ -125,6 +131,7 @@ describe('TaskService.createTask', () => {
     expect(mockDatabaseService.createTask).toHaveBeenCalledWith('Test Title', 'task-123', 'default');
 
     const createdTask = mockAddTask.mock.calls[0]?.[0] as Task;
+    expect(createdTask.request_count).toBe(0);
     expect(createdTask.settings).toBe(JSON.stringify({ autoApproveEdits: true }));
     expect(updateSpy).toHaveBeenCalledWith('task-123', { autoApproveEdits: true });
     expect(titleSpy).toHaveBeenCalledWith('task-123', 'Hello world');
@@ -133,6 +140,7 @@ describe('TaskService.createTask', () => {
   it('does not apply auto-approve settings when global setting is disabled', async () => {
     mockSettingsManager.getAutoApproveEditsGlobal.mockResolvedValue(false);
     mockSettingsManager.getAutoApprovePlanGlobal.mockResolvedValue(false);
+    mockSettingsManager.getAutoCodeReviewGlobal.mockResolvedValue(false);
 
     const updateSpy = vi
       .spyOn(taskService, 'updateTaskSettings')
@@ -145,6 +153,7 @@ describe('TaskService.createTask', () => {
     expect(mockDatabaseService.createTask).toHaveBeenCalledWith('Test Title', 'task-123', 'default');
 
     const createdTask = mockAddTask.mock.calls[0]?.[0] as Task;
+    expect(createdTask.request_count).toBe(0);
     expect(createdTask.settings).toBeUndefined();
     expect(updateSpy).not.toHaveBeenCalled();
     expect(titleSpy).toHaveBeenCalledWith('task-123', 'Hello world');
@@ -153,6 +162,7 @@ describe('TaskService.createTask', () => {
   it('applies auto-approve plan when global setting is enabled', async () => {
     mockSettingsManager.getAutoApproveEditsGlobal.mockResolvedValue(false);
     mockSettingsManager.getAutoApprovePlanGlobal.mockResolvedValue(true);
+    mockSettingsManager.getAutoCodeReviewGlobal.mockResolvedValue(false);
 
     const updateSpy = vi
       .spyOn(taskService, 'updateTaskSettings')
@@ -165,6 +175,7 @@ describe('TaskService.createTask', () => {
     expect(mockDatabaseService.createTask).toHaveBeenCalledWith('Test Title', 'task-123', 'default');
 
     const createdTask = mockAddTask.mock.calls[0]?.[0] as Task;
+    expect(createdTask.request_count).toBe(0);
     expect(createdTask.settings).toBe(JSON.stringify({ autoApprovePlan: true }));
     expect(updateSpy).toHaveBeenCalledWith('task-123', { autoApprovePlan: true });
     expect(titleSpy).toHaveBeenCalledWith('task-123', 'Hello world');

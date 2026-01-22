@@ -237,6 +237,7 @@ export class TestDatabaseAdapter {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         message_count INTEGER DEFAULT 0,
+        request_count INTEGER DEFAULT 0,
         cost REAL DEFAULT 0,
         input_token INTEGER DEFAULT 0,
         output_token INTEGER DEFAULT 0,
@@ -268,6 +269,19 @@ export class TestDatabaseAdapter {
         size INTEGER NOT NULL,
         created_at INTEGER NOT NULL,
         FOREIGN KEY (message_id) REFERENCES messages (id) ON DELETE CASCADE
+      )`,
+
+      // API usage events table
+      `CREATE TABLE IF NOT EXISTS api_usage_events (
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT DEFAULT NULL,
+        model TEXT NOT NULL,
+        provider_id TEXT DEFAULT NULL,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        cost REAL NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE SET NULL
       )`,
 
       // MCP servers table
@@ -428,6 +442,9 @@ export class TestDatabaseAdapter {
       'CREATE INDEX IF NOT EXISTS idx_conversation_skills_conversation ON conversation_skills(conversation_id)',
       'CREATE INDEX IF NOT EXISTS idx_recent_files_repository ON recent_files(repository_path, opened_at DESC)',
       'CREATE INDEX IF NOT EXISTS idx_recent_projects_opened_at ON recent_projects(opened_at DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_api_usage_events_created_at ON api_usage_events(created_at)',
+      'CREATE INDEX IF NOT EXISTS idx_api_usage_events_model ON api_usage_events(model)',
+      'CREATE INDEX IF NOT EXISTS idx_api_usage_events_conversation ON api_usage_events(conversation_id)',
     ];
   }
 

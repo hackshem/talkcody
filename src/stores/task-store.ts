@@ -105,12 +105,12 @@ function mergeTaskUsage(
 
   const derivedTask: Task = {
     ...task,
+    request_count: task.request_count + runningUsage.requestCountDelta,
     cost: task.cost + runningUsage.costDelta,
     input_token: task.input_token + runningUsage.inputTokensDelta,
     output_token: task.output_token + runningUsage.outputTokensDelta,
     context_usage: runningUsage.contextUsage ?? task.context_usage,
   };
-
   taskUsageCache.set(taskId, {
     baseTask: task,
     runningUsage,
@@ -180,6 +180,7 @@ interface TaskUsageUpdate {
   costDelta?: number;
   inputTokensDelta?: number;
   outputTokensDelta?: number;
+  requestCountDelta?: number;
   contextUsage?: number;
 }
 
@@ -187,6 +188,7 @@ interface RunningTaskUsage {
   costDelta: number;
   inputTokensDelta: number;
   outputTokensDelta: number;
+  requestCountDelta: number;
   contextUsage?: number;
 }
 
@@ -438,12 +440,14 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
         costDelta: 0,
         inputTokensDelta: 0,
         outputTokensDelta: 0,
+        requestCountDelta: 0,
       };
 
       const nextUsage: RunningTaskUsage = {
         costDelta: existing.costDelta + (usage.costDelta ?? 0),
         inputTokensDelta: existing.inputTokensDelta + (usage.inputTokensDelta ?? 0),
         outputTokensDelta: existing.outputTokensDelta + (usage.outputTokensDelta ?? 0),
+        requestCountDelta: existing.requestCountDelta + (usage.requestCountDelta ?? 0),
         contextUsage: usage.contextUsage ?? existing.contextUsage,
       };
 
@@ -464,6 +468,7 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
       const task = nextTasks[index]!;
       nextTasks[index] = {
         ...task,
+        request_count: task.request_count + delta.requestCountDelta,
         cost: task.cost + delta.costDelta,
         input_token: task.input_token + delta.inputTokensDelta,
         output_token: task.output_token + delta.outputTokensDelta,

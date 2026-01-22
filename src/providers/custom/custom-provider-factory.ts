@@ -5,6 +5,8 @@ import { logger } from '@/lib/logger';
 import { streamFetch } from '@/lib/tauri-fetch';
 import type { CustomProviderConfig } from '@/types/custom-provider';
 
+const CUSTOM_PROVIDER_STREAM_HEADER = 'x-talkcody-allow-private-ip';
+
 /**
  * Factory function to create custom providers
  */
@@ -34,6 +36,7 @@ export function createCustomProvider(
       fetch: streamFetch as typeof fetch,
       headers: {
         Authorization: `Bearer ${apiKey}`,
+        [CUSTOM_PROVIDER_STREAM_HEADER]: 'true',
       },
     });
   } else {
@@ -42,6 +45,9 @@ export function createCustomProvider(
       name: config.name,
       baseURL: finalBaseUrl,
       fetch: streamFetch as typeof fetch,
+      headers: {
+        [CUSTOM_PROVIDER_STREAM_HEADER]: 'true',
+      },
     });
   }
 }

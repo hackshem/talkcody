@@ -80,6 +80,8 @@ scripts/*
 !scripts/release.sh
 !scripts/lib/
 !scripts/lib/common.sh
+!scripts/hooks/
+!scripts/hooks/**
 # Design documents (ignore most, keep specific files)
 design/*
 !design/multi-agent-parallel-execution.md

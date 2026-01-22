@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import {
   buildNotificationInput,
   buildPostToolUseInput,
@@ -73,6 +74,7 @@ export class HookService {
   }
 
   async runStop(taskId: string): Promise<HookRunSummary> {
+    logger.info(`[HookService] Running Stop hooks for task ${taskId}`);
     if (!hookStateService.shouldRunHooks('Stop')) {
       return emptyHookSummary();
     }

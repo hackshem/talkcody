@@ -115,9 +115,11 @@ export const useBackgroundTaskStore = create<BackgroundTaskState>((set, get) => 
 
     try {
       const result = await invoke<SpawnBackgroundTaskResponse>('spawn_background_task', {
-        command,
-        cwd,
-        maxTimeoutMs,
+        request: {
+          command,
+          cwd,
+          maxTimeoutMs,
+        },
       });
 
       if (!result.success) {

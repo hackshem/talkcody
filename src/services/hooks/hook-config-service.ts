@@ -6,7 +6,6 @@ import { getValidatedWorkspaceRoot } from '@/services/workspace-root-service';
 import type { HookConfigScope, HookEventName, HookRule, HooksConfigFile } from '@/types/hooks';
 
 const HOOKS_SETTINGS_FILE = 'settings.json';
-const HOOKS_SETTINGS_LOCAL_FILE = 'settings.local.json';
 const TALKCODY_DIR = '.talkcody';
 
 export interface ResolvedHooksConfig {
@@ -77,7 +76,7 @@ export class HookConfigService {
       await join(workspaceRoot, TALKCODY_DIR, HOOKS_SETTINGS_FILE)
     );
     const localPath = await normalizePath(
-      await join(workspaceRoot, TALKCODY_DIR, HOOKS_SETTINGS_LOCAL_FILE)
+      await join(workspaceRoot, TALKCODY_DIR, 'settings.local.json')
     );
 
     const configs = await Promise.all([
@@ -115,13 +114,9 @@ export class HookConfigService {
     let targetPath: string;
     if (scope === 'user') {
       targetPath = await normalizePath(await join(fallbackHome, TALKCODY_DIR, HOOKS_SETTINGS_FILE));
-    } else if (scope === 'project') {
-      targetPath = await normalizePath(
-        await join(workspaceRoot, TALKCODY_DIR, HOOKS_SETTINGS_FILE)
-      );
     } else {
       targetPath = await normalizePath(
-        await join(workspaceRoot, TALKCODY_DIR, HOOKS_SETTINGS_LOCAL_FILE)
+        await join(workspaceRoot, TALKCODY_DIR, HOOKS_SETTINGS_FILE)
       );
     }
 
@@ -141,16 +136,10 @@ export class HookConfigService {
       );
       return readConfig(userPath, 'user');
     }
-    if (scope === 'project') {
-      const projectPath = await normalizePath(
-        await join(workspaceRoot, TALKCODY_DIR, HOOKS_SETTINGS_FILE)
-      );
-      return readConfig(projectPath, 'project');
-    }
-    const localPath = await normalizePath(
-      await join(workspaceRoot, TALKCODY_DIR, HOOKS_SETTINGS_LOCAL_FILE)
+    const projectPath = await normalizePath(
+      await join(workspaceRoot, TALKCODY_DIR, HOOKS_SETTINGS_FILE)
     );
-    return readConfig(localPath, 'local');
+    return readConfig(projectPath, 'project');
   }
 
   mergeRulesForEvent(rules: HookRule[]): HookRule[] {

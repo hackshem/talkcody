@@ -2,7 +2,10 @@
 // Prompts users to sign in with GitHub or Google, or use their own API Key
 
 import { SiGoogle } from '@icons-pack/react-simple-icons';
-import { Github, Settings, Sparkles } from 'lucide-react';
+import { platform } from '@tauri-apps/plugin-os';
+import { Copy, Github, Settings, Sparkles } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -12,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { useUiNavigation } from '@/contexts/ui-navigation';
 import type { SupportedLocale } from '@/locales';
 import { getLocale } from '@/locales';
@@ -28,7 +32,18 @@ export function TalkCodyFreeLoginDialog({ open, onClose }: TalkCodyFreeLoginDial
   const { setActiveView } = useUiNavigation();
   const language = useSettingsStore((state) => state.language);
   const t = getLocale((language || 'en') as SupportedLocale);
-  const { signInWithGitHub, signInWithGoogle } = useAuthStore();
+  const { signInWithGitHub, signInWithGoogle, handleOAuthCallbackFromInput } = useAuthStore();
+  const [manualInput, setManualInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLinux, setIsLinux] = useState(false);
+
+  useEffect(() => {
+    try {
+      setIsLinux(platform() === 'linux');
+    } catch {
+      setIsLinux(false);
+    }
+  }, []);
 
   const handleGitHubSignIn = async () => {
     await signInWithGitHub();
@@ -45,6 +60,36 @@ export function TalkCodyFreeLoginDialog({ open, onClose }: TalkCodyFreeLoginDial
     setActiveView(NavigationView.SETTINGS);
     // Dispatch event to switch to providers tab
     window.dispatchEvent(new CustomEvent('openModelSettingsTab'));
+  };
+
+  const handleCopyManualLink = async () => {
+    const textToCopy = manualInput.trim();
+    if (!textToCopy) {
+      toast.error(t.Auth.errors.invalidCallback);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      toast.success(t.TalkCodyFreeDialog.manual.copySuccess);
+    } catch {
+      toast.error(t.TalkCodyFreeDialog.manual.copyFailed);
+    }
+  };
+
+  const handleSubmitManual = async () => {
+    if (!manualInput.trim()) {
+      toast.error(t.Auth.errors.invalidCallback);
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const ok = await handleOAuthCallbackFromInput(manualInput);
+      if (ok) {
+        onClose();
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -99,6 +144,42 @@ export function TalkCodyFreeLoginDialog({ open, onClose }: TalkCodyFreeLoginDial
             <Settings className="size-4" />
             {t.TalkCodyFreeDialog.useOwnApiKey}
           </Button>
+
+          {isLinux ? (
+            <div className="w-full rounded-lg border border-dashed border-border/70 bg-muted/40 p-3 text-left text-sm">
+              <p className="mb-2 font-medium text-foreground">
+                {t.TalkCodyFreeDialog.manual.title}
+              </p>
+              <p className="mb-3 text-xs text-muted-foreground">
+                {t.TalkCodyFreeDialog.manual.description}
+              </p>
+              <div className="flex flex-col gap-2">
+                <Input
+                  value={manualInput}
+                  onChange={(event) => setManualInput(event.target.value)}
+                  placeholder={t.TalkCodyFreeDialog.manual.placeholder}
+                  className="font-mono text-xs"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={handleCopyManualLink}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    {t.TalkCodyFreeDialog.manual.copyLink}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSubmitManual}
+                    disabled={isSubmitting}
+                  >
+                    {t.TalkCodyFreeDialog.manual.submit}
+                  </Button>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                {t.TalkCodyFreeDialog.manual.note}
+              </p>
+            </div>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>

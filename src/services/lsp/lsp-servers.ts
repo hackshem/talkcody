@@ -5,6 +5,7 @@
 // When adding a new language, only modify LSP_SERVERS - all other
 // mappings are generated automatically.
 
+import { dirname, normalize } from '@tauri-apps/api/path';
 import { exists } from '@tauri-apps/plugin-fs';
 
 /**
@@ -330,17 +331,39 @@ export async function findWorkspaceRoot(
     return repoRoot;
   }
 
+  const normalizedFilePath = await normalize(filePath);
+  const normalizedRepoRoot = await normalize(repoRoot);
+
+  const normalizeForCompare = (value: string): string =>
+    value.replace(/\\/g, '/').replace(/\/$/, '');
+
+  const toOriginalSeparators = (value: string, template: string): string => {
+    if (template.includes('\\')) {
+      return value.replace(/\//g, '\\');
+    }
+    return value;
+  };
+
+  const repoRootComparable = normalizeForCompare(normalizedRepoRoot);
+
   // Start from the file's directory
-  let currentDir = filePath.substring(0, filePath.lastIndexOf('/'));
+  let currentDir = await dirname(normalizedFilePath);
 
   // Walk up until we find a rootPattern or reach repoRoot
-  while (currentDir.startsWith(repoRoot) && currentDir.length >= repoRoot.length) {
+  while (
+    normalizeForCompare(currentDir).startsWith(repoRootComparable) &&
+    normalizeForCompare(currentDir).length >= repoRootComparable.length
+  ) {
     // Check if any rootPattern file exists in this directory
     for (const pattern of config.rootPatterns) {
       const checkPath = `${currentDir}/${pattern}`;
+      const altCheckPath = checkPath.replace(/\//g, '\\');
       try {
         if (await exists(checkPath)) {
-          return currentDir;
+          return toOriginalSeparators(currentDir, normalizedFilePath);
+        }
+        if (altCheckPath !== checkPath && (await exists(altCheckPath))) {
+          return toOriginalSeparators(currentDir, normalizedFilePath);
         }
       } catch {
         // File check failed, continue to next pattern
@@ -348,13 +371,16 @@ export async function findWorkspaceRoot(
     }
 
     // Move up one directory
-    const parentDir = currentDir.substring(0, currentDir.lastIndexOf('/'));
-    if (parentDir === currentDir || parentDir.length < repoRoot.length) {
+    const parentDir = await dirname(currentDir);
+    if (
+      parentDir === currentDir ||
+      normalizeForCompare(parentDir).length < repoRootComparable.length
+    ) {
       break;
     }
     currentDir = parentDir;
   }
 
   // Fall back to repo root if no rootPattern found
-  return repoRoot;
+  return toOriginalSeparators(repoRoot, normalizedFilePath);
 }

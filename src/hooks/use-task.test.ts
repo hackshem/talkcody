@@ -14,6 +14,7 @@ const createTask = (id: string, title: string): Task => ({
   created_at: 1,
   updated_at: 1,
   message_count: 0,
+  request_count: 0,
   cost: 0,
   input_token: 0,
   output_token: 0,

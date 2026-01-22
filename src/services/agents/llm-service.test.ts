@@ -7,6 +7,7 @@ import type { AssistantModelMessage, ToolModelMessage } from 'ai';
 import { describe, expect, it } from 'vitest';
 
 import type { ToolCallInfo } from './tool-executor';
+import { normalizeUsageTokens } from './llm-service';
 
 describe('LLMService - empty tool calls bug fix', () => {
   /**
@@ -390,6 +391,38 @@ describe('LLMService - parallel tool calls message structure', () => {
     // This is correct - 1 assistant message with all tool calls
     expect(newMessages.filter((m) => m.role === 'assistant')).toHaveLength(1);
     expect((newMessages[0].content as Array<unknown>)).toHaveLength(2);
+  });
+});
+
+describe('LLMService - usage normalization', () => {
+  it('prefers usage input/output tokens when available', () => {
+    const normalized = normalizeUsageTokens(
+      { inputTokens: 10, outputTokens: 20, totalTokens: 30 },
+      { inputTokens: 100, outputTokens: 200, totalTokens: 300 }
+    );
+
+    expect(normalized).toEqual({ inputTokens: 10, outputTokens: 20, totalTokens: 30 });
+  });
+
+  it('falls back to totalUsage when usage is missing', () => {
+    const normalized = normalizeUsageTokens(undefined, { inputTokens: 5, outputTokens: 7 });
+
+    expect(normalized).toEqual({ inputTokens: 5, outputTokens: 7, totalTokens: 12 });
+  });
+
+  it('handles providers that only return totalTokens', () => {
+    const normalized = normalizeUsageTokens(null, { totalTokens: 42 });
+
+    expect(normalized).toEqual({ inputTokens: 42, outputTokens: 0, totalTokens: 42 });
+  });
+
+  it('supports prompt/completion token fields', () => {
+    const normalized = normalizeUsageTokens(
+      { promptTokens: 11, completionTokens: 13 },
+      { totalTokens: 30 }
+    );
+
+    expect(normalized).toEqual({ inputTokens: 11, outputTokens: 13, totalTokens: 24 });
   });
 });
 

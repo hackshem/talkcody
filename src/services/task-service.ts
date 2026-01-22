@@ -42,11 +42,13 @@ class TaskService {
 
     const autoApproveEditsGlobal = await settingsManager.getAutoApproveEditsGlobal();
     const autoApprovePlanGlobal = await settingsManager.getAutoApprovePlanGlobal();
+    const autoCodeReviewGlobal = await settingsManager.getAutoCodeReviewGlobal();
     const initialTaskSettings: TaskSettings | undefined =
-      autoApproveEditsGlobal || autoApprovePlanGlobal
+      autoApproveEditsGlobal || autoApprovePlanGlobal || autoCodeReviewGlobal
         ? {
             ...(autoApproveEditsGlobal ? { autoApproveEdits: true } : {}),
             ...(autoApprovePlanGlobal ? { autoApprovePlan: true } : {}),
+            ...(autoCodeReviewGlobal ? { autoCodeReview: true } : {}),
           }
         : undefined;
     const task: Task = {
@@ -56,6 +58,7 @@ class TaskService {
       created_at: Date.now(),
       updated_at: Date.now(),
       message_count: 0,
+      request_count: 0,
       cost: 0,
       input_token: 0,
       output_token: 0,
@@ -299,6 +302,7 @@ class TaskService {
     cost: number,
     inputTokens: number,
     outputTokens: number,
+    requestCount: number,
     contextUsage?: number
   ): Promise<void> {
     // 1. Update store (accumulate)
@@ -306,17 +310,26 @@ class TaskService {
       costDelta: cost,
       inputTokensDelta: inputTokens,
       outputTokensDelta: outputTokens,
+      requestCountDelta: requestCount,
       contextUsage,
     });
 
     // 2. Persist to database
     try {
-      await databaseService.updateTaskUsage(taskId, cost, inputTokens, outputTokens, contextUsage);
+      await databaseService.updateTaskUsage(
+        taskId,
+        cost,
+        inputTokens,
+        outputTokens,
+        requestCount,
+        contextUsage
+      );
       logger.info('[TaskService] Task usage updated', {
         taskId,
         cost,
         inputTokens,
         outputTokens,
+        requestCount,
         contextUsage,
       });
     } catch (error) {

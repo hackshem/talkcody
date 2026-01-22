@@ -29,7 +29,9 @@ vi.mock('@/stores/settings-store', () => ({
     get: vi.fn(),
     getApiKeys: vi.fn().mockResolvedValue({}),
     getAutoApproveEditsGlobal: vi.fn(() => false),
+    getAutoCodeReviewGlobal: vi.fn(() => false),
     setAutoApproveEditsGlobal: vi.fn(),
+    setAutoCodeReviewGlobal: vi.fn(),
   },
 }));
 

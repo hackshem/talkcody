@@ -42,6 +42,38 @@ describe('CustomModelService - fetchProviderModels with custom base URL', () => 
     vi.clearAllMocks();
   });
 
+  it('should allow private IPs for custom providers', async () => {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const { customProviderService } = await import('@/providers/custom/custom-provider-service');
+    const { customModelService } = await import('@/providers/custom/custom-model-service');
+
+    vi.mocked(customProviderService.getEnabledCustomProviders).mockResolvedValue([
+      {
+        id: 'custom-private',
+        name: 'Private Provider',
+        type: 'openai-compatible',
+        baseUrl: 'http://10.108.10.104:9090',
+        apiKey: 'test-key',
+        enabled: true,
+        description: 'Private IP provider',
+      },
+    ]);
+
+    vi.mocked(invoke).mockResolvedValue({
+      status: 200,
+      body: JSON.stringify({ data: [{ id: 'model-1', name: 'Model 1' }] }),
+    });
+
+    await customModelService.fetchProviderModels('custom-private');
+
+    expect(invoke).toHaveBeenCalledWith('proxy_fetch', {
+      request: expect.objectContaining({
+        url: 'http://10.108.10.104:9090/v1/models',
+        allow_private_ip: true,
+      }),
+    });
+  });
+
   it('should use custom base URL when configured for anthropic', async () => {
     const { invoke } = await import('@tauri-apps/api/core');
     const { settingsManager } = await import('@/stores/settings-store');
@@ -62,6 +94,7 @@ describe('CustomModelService - fetchProviderModels with custom base URL', () => 
       request: expect.objectContaining({
         url: 'https://custom-proxy.com/v1/models',
         method: 'GET',
+        allow_private_ip: false,
       }),
     });
   });
@@ -85,6 +118,7 @@ describe('CustomModelService - fetchProviderModels with custom base URL', () => 
       request: expect.objectContaining({
         url: 'https://my-openai-proxy.com/v1/models',
         method: 'GET',
+        allow_private_ip: false,
       }),
     });
   });
@@ -108,6 +142,7 @@ describe('CustomModelService - fetchProviderModels with custom base URL', () => 
       request: expect.objectContaining({
         url: 'https://api.anthropic.com/v1/models',
         method: 'GET',
+        allow_private_ip: false,
       }),
     });
   });
@@ -129,6 +164,7 @@ describe('CustomModelService - fetchProviderModels with custom base URL', () => 
     expect(invoke).toHaveBeenCalledWith('proxy_fetch', {
       request: expect.objectContaining({
         url: 'https://proxy.com/v1/models',
+        allow_private_ip: false,
       }),
     });
   });
@@ -153,6 +189,7 @@ describe('CustomModelService - fetchProviderModels with custom base URL', () => 
           'x-api-key': 'my-api-key',
           'anthropic-version': '2023-06-01',
         }),
+        allow_private_ip: false,
       }),
     });
   });

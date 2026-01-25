@@ -60,4 +60,29 @@ describe('ApiUsageStore', () => {
 
     expect(fetchApiUsageRange).toHaveBeenCalledTimes(1);
   });
+
+  it('initialize refreshes even when data exists', async () => {
+    const payload: ApiUsageRangeResult = {
+      summary: {
+        totalCost: 1.2,
+        totalTokens: 2400,
+        inputTokens: 1200,
+        outputTokens: 1200,
+        requestCount: 12,
+      },
+      daily: [],
+      models: [],
+    };
+
+    useApiUsageStore.setState({
+      data: payload,
+      lastFetchedAt: null,
+    });
+
+    (fetchApiUsageRange as Mock).mockResolvedValue(payload);
+
+    await useApiUsageStore.getState().initialize();
+
+    expect(fetchApiUsageRange).toHaveBeenCalledTimes(1);
+  });
 });

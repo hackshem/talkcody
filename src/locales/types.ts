@@ -203,9 +203,11 @@ export interface LocaleDefinition {
       markdown: string;
       mermaid: string;
       web: string;
+      ppt: string;
       markdownDescription: string;
       mermaidDescription: string;
       webDescription: string;
+      pptDescription: string;
       viewSource: string;
       viewRendered: string;
     };

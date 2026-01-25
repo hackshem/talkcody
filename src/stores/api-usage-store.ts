@@ -43,8 +43,6 @@ export const useApiUsageStore = create<ApiUsageStore>((set, get) => ({
   autoRefreshEnabled: false,
 
   initialize: async () => {
-    const { data } = get();
-    if (data) return;
     await get().fetchUsage();
   },
 

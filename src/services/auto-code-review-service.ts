@@ -12,8 +12,7 @@ import { useTaskStore } from '@/stores/task-store';
 import type { UIMessage } from '@/types/agent';
 import type { TaskSettings } from '@/types/task';
 
-const inFlightTasks = new Set<string>();
-const lastReviewedChangeTimestamp = new Map<string, number>();
+export const lastReviewedChangeTimestamp = new Map<string, number>();
 
 const BASE_REVIEW_PROMPT = [
   'Review the current working tree changes for this task.',
@@ -69,13 +68,6 @@ export class AutoCodeReviewService {
     const latestChange = getLatestChangeTimestamp(taskId);
     const lastReviewed = lastReviewedChangeTimestamp.get(taskId) || 0;
     if (latestChange <= lastReviewed) return null;
-
-    if (inFlightTasks.has(taskId)) {
-      logger.debug('[AutoCodeReview] Review already running', { taskId });
-      return null;
-    }
-
-    inFlightTasks.add(taskId);
 
     try {
       const agent = await agentRegistry.getWithResolvedTools('code-review');
@@ -165,8 +157,6 @@ export class AutoCodeReviewService {
     } catch (error) {
       logger.error('[AutoCodeReview] Unexpected error', { taskId, error });
       return null;
-    } finally {
-      inFlightTasks.delete(taskId);
     }
   }
 }

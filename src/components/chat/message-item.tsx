@@ -3,6 +3,7 @@
 import { Check, CopyIcon, RefreshCcwIcon, Trash2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { FilePreview } from '@/components/chat/file-preview';
+import { PptViewer } from '@/components/ppt-viewer';
 import { ToolErrorBoundary } from '@/components/tools/tool-error-boundary';
 import { ToolErrorFallback } from '@/components/tools/tool-error-fallback';
 import { UnifiedToolResult } from '@/components/tools/unified-tool-result';
@@ -13,6 +14,7 @@ import type { ToolMessageContent, UIMessage } from '@/types/agent';
 import type { OutputFormatType } from '@/types/output-format';
 import { Action, Actions } from '../ai-elements/actions';
 import MyMarkdown from './my-markdown';
+import { parsePptContent } from './ppt-content-parser';
 import { WebContentRenderer } from './web-content-renderer';
 
 /**
@@ -280,19 +282,22 @@ function MessageItemComponent({
 
   const outputFormat = (message.outputFormat || 'markdown') as OutputFormatType;
   const assistantContentClass =
-    outputFormat === 'web'
+    outputFormat === 'web' || outputFormat === 'ppt'
       ? 'w-full max-w-none'
       : 'prose prose-neutral dark:prose-invert w-full max-w-none';
   const assistantText = typeof message.content === 'string' ? message.content : '';
   const mermaidContent = assistantText.trim().startsWith('```mermaid')
     ? assistantText
     : `\n\n\`\`\`mermaid\n${assistantText}\n\`\`\`\n\n`;
+  const pptSlides = useMemo(() => parsePptContent(assistantText), [assistantText]);
 
   const assistantContent =
     outputFormat === 'web' ? (
       <WebContentRenderer content={assistantText} />
     ) : outputFormat === 'mermaid' ? (
       <MyMarkdown content={mermaidContent} />
+    ) : outputFormat === 'ppt' ? (
+      <PptViewer slides={pptSlides} />
     ) : (
       <MyMarkdown content={assistantText} />
     );

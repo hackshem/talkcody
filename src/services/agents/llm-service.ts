@@ -24,7 +24,10 @@ import { getLocale, type SupportedLocale } from '@/locales';
 import { getContextLength } from '@/providers/config/model-config';
 import { parseModelIdentifier } from '@/providers/core/provider-utils';
 import { modelTypeService } from '@/providers/models/model-type-service';
-import { autoCodeReviewService } from '@/services/auto-code-review-service';
+import {
+  autoCodeReviewService,
+  lastReviewedChangeTimestamp,
+} from '@/services/auto-code-review-service';
 import { databaseService } from '@/services/database-service';
 import { hookService } from '@/services/hooks/hook-service';
 import { hookStateService } from '@/services/hooks/hook-state-service';
@@ -1153,6 +1156,9 @@ export class LLMService {
         });
         const fullText = streamProcessor.getFullText();
         onComplete?.(fullText);
+        if (this.taskId && this.taskId !== 'nested') {
+          lastReviewedChangeTimestamp.delete(this.taskId);
+        }
         resolve();
       } catch (error) {
         // Log the raw error object before processing
@@ -1205,6 +1211,10 @@ export class LLMService {
         }
 
         const loopError = this.errorHandler.handleMainLoopError(error, options.model, onError);
+
+        if (this.taskId && this.taskId !== 'nested') {
+          lastReviewedChangeTimestamp.delete(this.taskId);
+        }
 
         logger.error('Agent loop error', error, {
           phase: 'main-loop',

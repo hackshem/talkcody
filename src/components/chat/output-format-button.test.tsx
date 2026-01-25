@@ -28,9 +28,11 @@ vi.mock('@/hooks/use-locale', () => ({
           markdown: 'Markdown',
           mermaid: 'Mermaid',
           web: 'Web',
+          ppt: 'PPT',
           markdownDescription: 'Standard markdown rendering with code blocks and tables.',
           mermaidDescription: 'Render diagrams using Mermaid syntax.',
           webDescription: 'Render as HTML/web content.',
+          pptDescription: 'Render as slide-based presentation.',
           viewSource: 'View Source',
           viewRendered: 'View Rendered',
         },
@@ -58,6 +60,7 @@ describe('OutputFormatButton', () => {
     expect(screen.getAllByText('Markdown').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Mermaid').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Web').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('PPT').length).toBeGreaterThan(0);
   });
 
   it('updates output format on selection', () => {

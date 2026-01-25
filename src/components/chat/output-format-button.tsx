@@ -1,6 +1,6 @@
 // src/components/chat/output-format-button.tsx
 
-import { FileText, GitBranch, Globe } from 'lucide-react';
+import { FileText, GitBranch, Globe, Presentation } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ const FORMAT_ICON_MAP: Record<OutputFormatType, typeof FileText> = {
   markdown: FileText,
   mermaid: GitBranch,
   web: Globe,
+  ppt: Presentation,
 };
 
 export function OutputFormatButton() {
@@ -29,8 +30,14 @@ export function OutputFormatButton() {
       markdown: t.Chat.outputFormat.markdown,
       mermaid: t.Chat.outputFormat.mermaid,
       web: t.Chat.outputFormat.web,
+      ppt: t.Chat.outputFormat.ppt,
     }),
-    [t.Chat.outputFormat.markdown, t.Chat.outputFormat.mermaid, t.Chat.outputFormat.web]
+    [
+      t.Chat.outputFormat.markdown,
+      t.Chat.outputFormat.mermaid,
+      t.Chat.outputFormat.web,
+      t.Chat.outputFormat.ppt,
+    ]
   );
 
   const formatDescriptions = useMemo<Record<OutputFormatType, string>>(
@@ -38,11 +45,13 @@ export function OutputFormatButton() {
       markdown: t.Chat.outputFormat.markdownDescription,
       mermaid: t.Chat.outputFormat.mermaidDescription,
       web: t.Chat.outputFormat.webDescription,
+      ppt: t.Chat.outputFormat.pptDescription,
     }),
     [
       t.Chat.outputFormat.markdownDescription,
       t.Chat.outputFormat.mermaidDescription,
       t.Chat.outputFormat.webDescription,
+      t.Chat.outputFormat.pptDescription,
     ]
   );
 

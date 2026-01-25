@@ -19,6 +19,9 @@ function resolveOutputFormat(content: string): OutputFormatType | undefined {
   ) {
     return 'web';
   }
+  if (/^#\s+\S+/m.test(trimmed) && /^---\s*$/m.test(trimmed)) {
+    return 'ppt';
+  }
   return 'markdown';
 }
 

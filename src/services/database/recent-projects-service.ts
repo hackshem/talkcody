@@ -3,29 +3,6 @@
 import { logger } from '@/lib/logger';
 import type { TursoClient } from './turso-client';
 
-/**
- * Check if an error is a UNIQUE constraint violation
- * Handles different error formats from various SQLite drivers
- */
-function isUniqueConstraintError(error: unknown): boolean {
-  if (!error) return false;
-
-  // Check error code (some drivers use this)
-  if (typeof error === 'object') {
-    const err = error as { code?: string; errno?: number; message?: string };
-    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') return true;
-    if (err.errno === 2067) return true;
-    // Check error message (libsql uses this format)
-    if (err.message?.includes('UNIQUE constraint failed')) return true;
-  }
-
-  // Check if error is a string or has toString
-  const errorStr = String(error);
-  if (errorStr.includes('UNIQUE constraint failed')) return true;
-
-  return false;
-}
-
 export interface RecentProject {
   id: number;
   project_id: string;
@@ -51,39 +28,19 @@ export class RecentProjectsService {
     try {
       const now = Date.now();
 
-      // Use a two-step approach to handle concurrency:
-      // 1. Try to update existing entry
-      const updateResult = await this.db.execute(
-        'UPDATE recent_projects SET opened_at = ?, project_name = ? WHERE project_id = ?',
-        [now, projectName, projectId]
+      await this.db.execute(
+        `INSERT INTO recent_projects (project_id, project_name, root_path, opened_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(project_id) DO UPDATE SET
+           opened_at = excluded.opened_at,
+           project_name = excluded.project_name,
+           root_path = excluded.root_path`,
+        [projectId, projectName, rootPath, now]
       );
 
-      // 2. If no rows were updated, insert new entry
-      const updated = updateResult.rowsAffected && updateResult.rowsAffected > 0;
-
-      if (!updated) {
-        try {
-          await this.db.execute(
-            'INSERT INTO recent_projects (project_id, project_name, root_path, opened_at) VALUES (?, ?, ?, ?)',
-            [projectId, projectName, rootPath, now]
-          );
-        } catch (insertError: unknown) {
-          // If insert fails due to UNIQUE constraint (concurrent insert), try update again
-          if (isUniqueConstraintError(insertError)) {
-            await this.db.execute(
-              'UPDATE recent_projects SET opened_at = ?, project_name = ? WHERE project_id = ?',
-              [now, projectName, projectId]
-            );
-          } else {
-            throw insertError;
-          }
-        }
-
-        // Only cleanup after a new insert when we're at or near the limit
-        const count = await this.getProjectsCount();
-        if (count > this.MAX_RECENT_PROJECTS) {
-          await this.cleanupOldEntries();
-        }
+      const count = await this.getProjectsCount();
+      if (count > this.MAX_RECENT_PROJECTS) {
+        await this.cleanupOldEntries();
       }
 
       logger.info(`Tracked project opened: ${projectName} (${projectId})`);

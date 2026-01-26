@@ -101,6 +101,25 @@ describe('RecentProjectsService', () => {
       expect(projects[0]?.project_name).toBe('New Name');
     });
 
+    it('should update root path when reopened', async () => {
+      await recentProjectsService.trackProjectOpened(
+        PROJECT_1.id,
+        PROJECT_1.name,
+        '/old/path'
+      );
+
+      await recentProjectsService.trackProjectOpened(
+        PROJECT_1.id,
+        PROJECT_1.name,
+        '/new/path'
+      );
+
+      const projects = await recentProjectsService.getRecentProjects();
+
+      expect(projects).toHaveLength(1);
+      expect(projects[0]?.root_path).toBe('/new/path');
+    });
+
     it('should move reopened project to the top of the list', async () => {
       // Open projects in sequence: project1, project2, project3
       await recentProjectsService.trackProjectOpened(

@@ -1,4 +1,5 @@
 import { getVersion } from '@tauri-apps/api/app';
+import { platform } from '@tauri-apps/plugin-os';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { ExternalLink, Sparkles } from 'lucide-react';
 import { type MouseEvent, useEffect, useState } from 'react';
@@ -30,6 +31,7 @@ interface WhatsNewDialogProps {
 }
 
 const DOCS_BASE_URL = 'https://www.talkcody.com';
+const ALLOWED_MARKDOWN_HOSTS = new Set(['talkcody.com', 'www.talkcody.com']);
 
 type MarkdownSegment =
   | { type: 'text'; value: string; start: number }
@@ -83,7 +85,12 @@ const resolveMarkdownHref = (href: string): string | null => {
   const trimmed = href.trim();
 
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    return trimmed;
+    try {
+      const url = new URL(trimmed);
+      return ALLOWED_MARKDOWN_HOSTS.has(url.host) ? url.toString() : null;
+    } catch {
+      return null;
+    }
   }
 
   if (trimmed.startsWith('/')) {
@@ -173,29 +180,34 @@ const renderFeatureCards = (
   items: NormalizedChangelogItem[],
   videoLabel: string,
   captionsLabel: string,
-  captionsLang: string
+  captionsLang: string,
+  supportsVideoPreview: boolean
 ) => (
   <div className="space-y-3">
-    {items.map((item, index) => (
-      <div
-        key={`${item.title}-${item.videoUrl ?? 'text'}-${index}`}
-        className="rounded-2xl border border-border/70 bg-gradient-to-br from-background via-background to-muted/40 p-4 shadow-sm sm:p-5"
-      >
-        <div className={item.videoUrl ? 'flex flex-col gap-4' : 'space-y-2'}>
-          <div className="space-y-2">
-            <h5 className="text-base font-semibold text-foreground">
-              {renderItemText(item.title)}
-            </h5>
-            {item.description && (
-              <p className="text-sm text-muted-foreground">{renderItemText(item.description)}</p>
-            )}
+    {items.map((item, index) => {
+      const shouldShowVideo = Boolean(item.videoUrl && supportsVideoPreview);
+
+      return (
+        <div
+          key={`${item.title}-${item.videoUrl ?? 'text'}-${index}`}
+          className="rounded-2xl border border-border/70 bg-gradient-to-br from-background via-background to-muted/40 p-4 shadow-sm sm:p-5"
+        >
+          <div className={shouldShowVideo ? 'flex flex-col gap-4' : 'space-y-2'}>
+            <div className="space-y-2">
+              <h5 className="text-base font-semibold text-foreground">
+                {renderItemText(item.title)}
+              </h5>
+              {item.description && (
+                <p className="text-sm text-muted-foreground">{renderItemText(item.description)}</p>
+              )}
+            </div>
+            {shouldShowVideo
+              ? renderVideoPreview(item.videoUrl as string, videoLabel, captionsLabel, captionsLang)
+              : null}
           </div>
-          {item.videoUrl
-            ? renderVideoPreview(item.videoUrl, videoLabel, captionsLabel, captionsLang)
-            : null}
         </div>
-      </div>
-    ))}
+      );
+    })}
   </div>
 );
 
@@ -220,7 +232,8 @@ const renderSection = (
   labelClassName: string,
   videoLabel: string,
   captionsLabel: string,
-  captionsLang: string
+  captionsLang: string,
+  supportsVideoPreview: boolean
 ) => {
   if (!items || items.length === 0) {
     return null;
@@ -233,7 +246,13 @@ const renderSection = (
     <div className="space-y-3">
       <h4 className={`text-xs font-semibold uppercase tracking-wide ${labelClassName}`}>{label}</h4>
       {hasVideo
-        ? renderFeatureCards(normalized, videoLabel, captionsLabel, captionsLang)
+        ? renderFeatureCards(
+            normalized,
+            videoLabel,
+            captionsLabel,
+            captionsLang,
+            supportsVideoPreview
+          )
         : renderBulletList(normalized)}
     </div>
   );
@@ -244,10 +263,25 @@ export function WhatsNewDialog({ forceOpen, onForceOpenChange }: WhatsNewDialogP
   const [open, setOpen] = useState(false);
   const [changelog, setChangelog] = useState<ChangelogEntry | null>(null);
   const [currentVersion, setCurrentVersion] = useState<string>('');
+  const [supportsVideoPreview, setSupportsVideoPreview] = useState(false);
 
   const lastSeenVersion = useSettingsStore((state) => state.last_seen_version);
   const setLastSeenVersion = useSettingsStore((state) => state.setLastSeenVersion);
   const isInitialized = useSettingsStore((state) => state.isInitialized);
+
+  useEffect(() => {
+    const detectPlatform = async () => {
+      try {
+        const osPlatform = await platform();
+        setSupportsVideoPreview(osPlatform !== 'linux');
+      } catch (error) {
+        logger.warn('[WhatsNewDialog] Failed to detect platform for video preview', error);
+        setSupportsVideoPreview(false);
+      }
+    };
+
+    void detectPlatform();
+  }, []);
 
   // Check if we need to show the dialog
   useEffect(() => {
@@ -264,21 +298,24 @@ export function WhatsNewDialog({ forceOpen, onForceOpenChange }: WhatsNewDialogP
 
         // TODO: Remove this line after testing - forces dialog to show
         // setOpen(true); // Uncomment for testing
-
-        // If current version differs from last seen version, show dialog
-        if (lastSeenVersion !== version && entry) {
-          logger.info(
-            `Showing What's New dialog for version ${version} (last seen: ${lastSeenVersion})`
-          );
-          setOpen(true);
-        }
       } catch (error) {
         logger.error("Failed to check version for What's New:", error);
       }
     };
 
     checkVersion();
-  }, [isInitialized, lastSeenVersion]);
+  }, [isInitialized]);
+
+  useEffect(() => {
+    if (!isInitialized || !currentVersion || !changelog) return;
+
+    if (lastSeenVersion !== currentVersion) {
+      logger.info(
+        `Showing What's New dialog for version ${currentVersion} (last seen: ${lastSeenVersion})`
+      );
+      setOpen(true);
+    }
+  }, [changelog, currentVersion, isInitialized, lastSeenVersion]);
 
   // Handle force open (from settings page)
   useEffect(() => {
@@ -309,8 +346,11 @@ export function WhatsNewDialog({ forceOpen, onForceOpenChange }: WhatsNewDialogP
   };
 
   const handleViewFullChangelog = async () => {
-    // Open docs website changelog page using Tauri shell
-    await shellOpen('https://talkcody.com/docs/changelog');
+    try {
+      await shellOpen('https://talkcody.com/docs/changelog');
+    } catch (error) {
+      logger.error('Failed to open full changelog:', error);
+    }
   };
 
   if (!changelog) {
@@ -343,7 +383,8 @@ export function WhatsNewDialog({ forceOpen, onForceOpenChange }: WhatsNewDialogP
             'text-emerald-600 dark:text-emerald-400',
             t.WhatsNew.videoPreview,
             t.WhatsNew.videoCaptionsLabel,
-            locale
+            locale,
+            supportsVideoPreview
           )}
           {renderSection(
             t.WhatsNew.changed,
@@ -351,7 +392,8 @@ export function WhatsNewDialog({ forceOpen, onForceOpenChange }: WhatsNewDialogP
             'text-sky-600 dark:text-sky-400',
             t.WhatsNew.videoPreview,
             t.WhatsNew.videoCaptionsLabel,
-            locale
+            locale,
+            supportsVideoPreview
           )}
           {renderSection(
             t.WhatsNew.fixed,
@@ -359,7 +401,8 @@ export function WhatsNewDialog({ forceOpen, onForceOpenChange }: WhatsNewDialogP
             'text-orange-600 dark:text-orange-400',
             t.WhatsNew.videoPreview,
             t.WhatsNew.videoCaptionsLabel,
-            locale
+            locale,
+            supportsVideoPreview
           )}
           {renderSection(
             t.WhatsNew.removed,
@@ -367,7 +410,8 @@ export function WhatsNewDialog({ forceOpen, onForceOpenChange }: WhatsNewDialogP
             'text-rose-600 dark:text-rose-400',
             t.WhatsNew.videoPreview,
             t.WhatsNew.videoCaptionsLabel,
-            locale
+            locale,
+            supportsVideoPreview
           )}
         </div>
 

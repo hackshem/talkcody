@@ -309,4 +309,92 @@ describe('Agent Registry - Auto-load Behavior', () => {
     expect(results[1]?.id).toBe('general');
     expect(results[2]?.id).toBe('planner');
   });
+
+  it('should refresh file-based agents when file content changes', async () => {
+    const { FileAgentImporter } = await import('./file-agent-importer');
+    const { agentService } = await import('../database/agent-service');
+
+    // First load: agent with initial system prompt
+    vi.spyOn(FileAgentImporter, 'importAgentsFromDirectories')
+      .mockResolvedValueOnce({
+        agents: [
+          {
+            id: 'byoc-debug',
+            name: 'BYOC Debug',
+            description: 'Debug agent',
+            modelType: 'main_model',
+            systemPrompt: 'Initial prompt',
+            tools: {},
+            repository: 'local-project',
+            githubPath: '/mock/.talkcody/agents/Byoc-debug.md',
+            category: 'local',
+          },
+        ],
+        errors: [],
+      })
+      // Second load: agent with updated system prompt (simulating file edit)
+      .mockResolvedValueOnce({
+        agents: [
+          {
+            id: 'byoc-debug',
+            name: 'BYOC Debug',
+            description: 'Debug agent - updated',
+            modelType: 'main_model',
+            systemPrompt: 'Updated prompt after file edit',
+            tools: {},
+            repository: 'local-project',
+            githubPath: '/mock/.talkcody/agents/Byoc-debug.md',
+            category: 'local',
+          },
+        ],
+        errors: [],
+      });
+
+    // First load - agent does not exist in DB yet
+    vi.mocked(agentService.agentExists).mockResolvedValue(false);
+
+    agentRegistry.reset();
+    await agentRegistry.loadAllAgents();
+
+    const firstAgent = await agentRegistry.get('byoc-debug');
+    expect(firstAgent).toBeDefined();
+    expect(firstAgent?.systemPrompt).toBe('Initial prompt');
+    expect(firstAgent?.description).toBe('Debug agent');
+
+    // Simulate refresh (user clicks refresh button)
+    // After first load, the agent is saved to DB with old content
+    // This simulates the real scenario where file agent content was persisted to DB
+    vi.mocked(agentService.listAgents).mockResolvedValue([
+      {
+        id: 'byoc-debug',
+        name: 'BYOC Debug',
+        description: 'Debug agent',
+        model_type: 'main_model',
+        system_prompt: 'Initial prompt', // Old content from DB
+        tools_config: '{}',
+        rules: '',
+        output_format: '',
+        is_hidden: false,
+        is_default: false,
+        is_enabled: true,
+        source_type: 'local',
+        is_shared: false,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+        created_by: 'system',
+        usage_count: 0,
+        categories: '[]',
+        tags: '[]',
+      },
+    ]);
+
+    agentRegistry.reset();
+    await agentRegistry.loadAllAgents();
+
+    // After refresh, agent should have updated content from file, not from DB
+    const refreshedAgent = await agentRegistry.get('byoc-debug');
+    expect(refreshedAgent).toBeDefined();
+    expect(refreshedAgent?.systemPrompt).toBe('Updated prompt after file edit');
+    expect(refreshedAgent?.description).toBe('Debug agent - updated');
+  });
 });

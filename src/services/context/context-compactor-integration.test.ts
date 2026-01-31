@@ -3,8 +3,20 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock dependencies FIRST
+// Mock dependencies FIRST - these must be defined before any imports that use them
 const mockCompactContext = vi.hoisted(() => vi.fn());
+
+// Mock database service FIRST before importing LLMService
+vi.mock('@/services/database-service', () => ({
+  databaseService: {
+    initialize: vi.fn().mockResolvedValue(undefined),
+    insertApiUsageEvent: vi.fn().mockResolvedValue(undefined),
+    db: {
+      select: vi.fn().mockResolvedValue([]),
+      execute: vi.fn().mockResolvedValue({ rowsAffected: 0 }),
+    },
+  },
+}));
 
 // Mock AI Context Compaction Service
 vi.mock('@/services/ai/ai-context-compaction', () => ({
@@ -13,11 +25,11 @@ vi.mock('@/services/ai/ai-context-compaction', () => ({
   },
 }));
 
-import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
-import type { ModelMessage } from 'ai';
-import * as aiModule from 'ai';
+import type { Message as ModelMessage } from '@/services/llm/types';
 import { LLMService } from '../agents/llm-service';
 import { ContextCompactor } from './context-compactor';
+import { llmClient } from '@/services/llm/llm-client';
+import { createStreamTextMock } from '@/test-utils/stream-text-mock';
 import type { CompressionConfig, UIMessage } from '../../types/agent';
 
 // ============================================
@@ -61,6 +73,12 @@ vi.mock('@/services/ai-pricing-service', () => ({
   },
 }));
 
+vi.mock('@/services/llm/llm-client', () => ({
+  llmClient: {
+    streamText: vi.fn(),
+  },
+}));
+
 vi.mock('@/services/conversation-manager', () => ({
   ConversationManager: {
     updateConversationUsage: vi.fn().mockResolvedValue(undefined),
@@ -99,87 +117,12 @@ vi.mock('@/stores/file-changes-store', () => ({
   },
 }));
 
-// Mock the 'ai' module's streamText for direct control over streaming
-vi.mock('ai', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('ai')>();
-  return {
-    ...actual,
-    streamText: vi.fn(),
-    stepCountIs: vi.fn((count) => ({ type: 'step-count', count })),
-  };
-});
-
 // Mock AI Context Compaction Service already defined at top
 // ============================================
 
 // HELPER FUNCTIONS
 // ============================================
 
-// Helper to create mock stream for streamText (fullStream format)
-function createStreamTextMock(options: {
-  textChunks?: string[];
-  finishReason?: 'stop' | 'tool-calls' | 'error';
-  inputTokens?: number;
-  outputTokens?: number;
-}) {
-  const {
-    textChunks = ['Hello, world!'],
-    finishReason = 'stop',
-    inputTokens = 10,
-    outputTokens = 20,
-  } = options;
-
-  const fullStream = (async function* () {
-    yield { type: 'text-start' };
-    for (const text of textChunks) {
-      yield { type: 'text-delta', text };
-    }
-    yield {
-      type: 'step-finish',
-      finishReason,
-      usage: { inputTokens, outputTokens },
-    };
-  })();
-
-  return {
-    fullStream,
-    finishReason: Promise.resolve(finishReason),
-    response: Promise.resolve(null),
-    providerMetadata: Promise.resolve(null),
-  };
-}
-
-// Helper for MockLanguageModelV2 doStream format
-function createMockStreamResponse(options: {
-  textChunks?: string[];
-  finishReason?: 'stop' | 'tool-calls' | 'error';
-  inputTokens?: number;
-  outputTokens?: number;
-}) {
-  const {
-    textChunks = ['Hello, world!'],
-    finishReason = 'stop',
-    inputTokens = 10,
-    outputTokens = 20,
-  } = options;
-
-  const chunks: any[] = [{ type: 'text-delta', textDelta: '' }];
-
-  for (const text of textChunks) {
-    chunks.push({ type: 'text-delta', textDelta: text });
-  }
-
-  chunks.push({
-    type: 'finish',
-    finishReason,
-    usage: { promptTokens: inputTokens, completionTokens: outputTokens },
-  });
-
-  return {
-    stream: simulateReadableStream({ chunks }),
-    rawCall: { rawPrompt: null, rawSettings: {} },
-  };
-}
 
 function createCompressionSummaryResponse(summary?: string) {
   const defaultSummary = `<analysis>
@@ -204,7 +147,7 @@ This is an analysis of the conversation history.
     chunks.push(words.slice(i, i + 5).join(' ') + ' ');
   }
 
-  return createMockStreamResponse({
+  return createStreamTextMock({
     textChunks: chunks,
     finishReason: 'stop',
     inputTokens: 500,
@@ -281,30 +224,18 @@ function createMockCompressionModel(config?: {
   errorMessage?: string;
   inputTokens?: number;
   outputTokens?: number;
-}) {
+}): ReturnType<typeof createStreamTextMock> {
   const { summary, shouldError, errorMessage, inputTokens = 500, outputTokens = 200 } = config || {};
 
   if (shouldError) {
-    return new MockLanguageModelV3({
-      doGenerate: async () => {
-        throw new Error(errorMessage || 'Model error');
-      },
-      doStream: async () => {
-        throw new Error(errorMessage || 'Streaming error');
-      },
-    });
+    throw new Error(errorMessage || 'Model error');
   }
 
-  const response = createCompressionSummaryResponse(summary);
-
-  return new MockLanguageModelV3({
-    doStream: async () => response,
-    doGenerate: async () => ({
-      rawCall: { rawPrompt: null, rawSettings: {} },
-      finishReason: 'stop' as const,
-      usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens },
-      text: summary || 'Default compression summary',
-    }),
+  return createStreamTextMock({
+    textChunks: summary ? summary.split(' ') : ['Default', 'compression', 'summary'],
+    finishReason: 'stop',
+    inputTokens,
+    outputTokens,
   });
 }
 
@@ -331,14 +262,19 @@ describe('MessageCompactor Integration Tests with MockLanguageModelV2', () => {
       isFirst ? `\n<thinking>\n${text}` : text
     );
 
+    const { databaseService } = await import('@/services/database-service');
+    vi.mocked(databaseService.initialize).mockResolvedValue(undefined);
+    vi.mocked(databaseService.insertApiUsageEvent).mockResolvedValue(undefined);
+
     // Set up streamText mock with default compression summary response
-    mockStreamText = vi.mocked(aiModule.streamText);
-    mockStreamText.mockReturnValue(createStreamTextMock({
-      textChunks: ['<analysis>', 'Test analysis', '</analysis>', '\n1. Primary Request: test'],
-      finishReason: 'stop',
-      inputTokens: 100,
-      outputTokens: 50,
-    }));
+    mockStreamText = vi.mocked(llmClient.streamText).mockReturnValue(
+      createStreamTextMock({
+        textChunks: ['<analysis>', 'Test analysis', '</analysis>', '\n1. Primary Request: test'],
+        finishReason: 'stop',
+        inputTokens: 100,
+        outputTokens: 50,
+      })
+    );
 
     llmService = new LLMService();
   });
@@ -493,12 +429,14 @@ describe('MessageCompactor Integration Tests with MockLanguageModelV2', () => {
   describe('Token usage tracking', () => {
     it('should track token usage from streamText response', async () => {
       // Set up mock with specific token usage
-      mockStreamText.mockReturnValue(createStreamTextMock({
-        textChunks: ['Response text'],
-        finishReason: 'stop',
-        inputTokens: 1500,
-        outputTokens: 500,
-      }));
+      mockStreamText.mockReturnValue(
+        createStreamTextMock({
+          textChunks: ['Response text'],
+          finishReason: 'stop',
+          inputTokens: 1500,
+          outputTokens: 500,
+        })
+      );
 
       const callbacks = {
         onChunk: vi.fn(),
@@ -575,13 +513,20 @@ describe('MessageCompactor Integration Tests with MockLanguageModelV2', () => {
 
     it('should handle stream errors during compression', async () => {
       // Mock streamText to return a stream that yields an error
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          yield { type: 'text-delta', text: 'Partial ' };
-          yield { type: 'error', error: new Error('Stream interrupted') };
-        })(),
-        finishReason: Promise.resolve('error'),
-      });
+      mockStreamText.mockReturnValue(
+        createStreamTextMock({
+          textChunks: ['Partial '],
+          finishReason: 'error',
+          inputTokens: 0,
+          outputTokens: 0,
+          extraEvents: [
+            {
+              type: 'error',
+              message: 'Stream interrupted',
+            },
+          ],
+        })
+      );
 
       const callbacks = {
         onChunk: vi.fn(),
@@ -606,16 +551,14 @@ describe('MessageCompactor Integration Tests with MockLanguageModelV2', () => {
 
     it('should handle empty response from model', async () => {
       // Mock streamText to return empty response
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          yield {
-            type: 'step-finish',
-            finishReason: 'stop',
-            usage: { inputTokens: 10, outputTokens: 0 },
-          };
-        })(),
-        finishReason: Promise.resolve('stop'),
-      });
+      mockStreamText.mockReturnValue(
+        createStreamTextMock({
+          textChunks: [],
+          finishReason: 'stop',
+          inputTokens: 10,
+          outputTokens: 0,
+        })
+      );
 
       const callbacks = {
         onChunk: vi.fn(),
@@ -916,12 +859,14 @@ The user engaged in a conversation about testing the MessageCompactor.
 7. Pending Tasks: None
 8. Current Work: Running integration tests`;
 
-      mockStreamText.mockReturnValue(createStreamTextMock({
-        textChunks: summary.split('\n'),
-        finishReason: 'stop',
-        inputTokens: 2000,
-        outputTokens: 500,
-      }));
+      mockStreamText.mockReturnValue(
+        createStreamTextMock({
+          textChunks: summary.split('\n'),
+          finishReason: 'stop',
+          inputTokens: 2000,
+          outputTokens: 500,
+        })
+      );
 
       const receivedChunks: string[] = [];
       const callbacks = {

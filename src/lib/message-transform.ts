@@ -1,5 +1,4 @@
-import type { ReasoningPart, TextPart } from '@ai-sdk/provider-utils';
-import type { ModelMessage } from 'ai';
+import type { ContentPart, Message as ModelMessage } from '@/services/llm/types';
 
 export namespace MessageTransform {
   function shouldApplyCaching(providerId: string, modelId: string): boolean {
@@ -38,24 +37,11 @@ export namespace MessageTransform {
     }
   }
 
-  /**
-   * Unified transformation function for messages.
-   *
-   * Handles:
-   * - Prompt caching for Anthropic/Claude providers
-   * - DeepSeek reasoning content extraction (when assistantContent provided)
-   *
-   * @param msgs - The messages array to transform
-   * @param modelId - The model identifier
-   * @param providerId - The provider identifier
-   * @param assistantContent - Optional: assistant content to transform (for DeepSeek)
-   * @returns Transformed messages and optional transformed content
-   */
-  function extractReasoning(content: Array<TextPart | ReasoningPart>): {
-    content: Array<TextPart | ReasoningPart>;
+  function extractReasoning(content: ContentPart[]): {
+    content: ContentPart[];
     reasoningText: string;
   } {
-    const reasoningParts = content.filter((part) => part.type === 'reasoning') as ReasoningPart[];
+    const reasoningParts = content.filter((part) => part.type === 'reasoning');
     const reasoningText = reasoningParts.map((part) => part.text).join('');
     const filteredContent = content.filter((part) => part.type !== 'reasoning');
 
@@ -66,11 +52,11 @@ export namespace MessageTransform {
     msgs: ModelMessage[],
     modelId: string,
     providerId?: string,
-    assistantContent?: Array<TextPart | ReasoningPart>
+    assistantContent?: ContentPart[]
   ): {
     messages: ModelMessage[];
     transformedContent?: {
-      content: Array<TextPart | ReasoningPart>;
+      content: ContentPart[];
       providerOptions?: { openaiCompatible: { reasoning_content: string } };
     };
   } {
@@ -79,12 +65,19 @@ export namespace MessageTransform {
       applyCaching(msgs, providerId);
     }
 
-    // Transform assistant content for Moonshot thinking
-    if (assistantContent && providerId === 'moonshot') {
+    const normalizedProviderId = providerId?.toLowerCase();
+
+    // Transform assistant content for providers that require reasoning_content
+    if (
+      assistantContent &&
+      (normalizedProviderId === 'moonshot' || normalizedProviderId === 'deepseek')
+    ) {
       const extracted = extractReasoning(assistantContent);
+      const shouldIncludeReasoningContent =
+        normalizedProviderId === 'deepseek' || extracted.reasoningText.length > 0;
       const transformedContent = {
         content: extracted.content,
-        providerOptions: extracted.reasoningText
+        providerOptions: shouldIncludeReasoningContent
           ? {
               openaiCompatible: {
                 reasoning_content: extracted.reasoningText,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { ToolSet } from 'ai';
+import type { AgentToolSet } from '@/types/agent';
 import { AgentDependencyAnalyzer, MAX_PARALLEL_SUBAGENTS } from './agent-dependency-analyzer';
 import type { ToolCallInfo } from './tool-executor';
 
@@ -67,7 +67,7 @@ vi.mock('@/lib/tools', () => ({
     canConcurrent: toolName !== 'non-concurrent' && toolName !== 'callAgent',
     fileOperation: false,
     renderDoingUI: true,
-    getTargetFile: (input: any) => {
+    getTargetFile: (input: { targets?: unknown }) => {
       const targets = input?.targets;
       if (Array.isArray(targets)) return targets;
       if (typeof targets === 'string') return targets;
@@ -78,7 +78,7 @@ vi.mock('@/lib/tools', () => ({
 
 describe('AgentDependencyAnalyzer', () => {
   let analyzer: AgentDependencyAnalyzer;
-  const mockTools: ToolSet = {
+  const mockTools: AgentToolSet = {
     callAgent: {
       execute: vi.fn(),
       inputSchema: { type: 'object' as const, properties: {} },

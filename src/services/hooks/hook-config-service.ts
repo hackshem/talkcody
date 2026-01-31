@@ -75,14 +75,10 @@ export class HookConfigService {
     const projectPath = await normalizePath(
       await join(workspaceRoot, TALKCODY_DIR, HOOKS_SETTINGS_FILE)
     );
-    const localPath = await normalizePath(
-      await join(workspaceRoot, TALKCODY_DIR, 'settings.local.json')
-    );
 
     const configs = await Promise.all([
       readConfig(userPath, 'user'),
       readConfig(projectPath, 'project'),
-      readConfig(localPath, 'local'),
     ]);
 
     const mergedHooks = configs.reduce<HooksConfigFile['hooks']>((acc, cfg) => {

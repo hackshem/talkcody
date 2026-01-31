@@ -5,6 +5,7 @@ import { getToolMetadata } from '@/lib/tools';
 import type { Tracer } from '@/lib/tracer';
 import { decodeObjectHtmlEntities } from '@/lib/utils';
 import { hookService } from '@/services/hooks/hook-service';
+import { InvalidToolInputError, NoSuchToolError } from '@/services/llm/errors';
 import type { AgentLoopState, AgentToolSet, UIMessage } from '@/types/agent';
 import type { ToolExecuteContext, ToolInput, ToolOutput, ToolWithUI } from '@/types/tool';
 import type { AgentExecutionGroup, AgentExecutionStage } from './agent-dependency-analyzer';

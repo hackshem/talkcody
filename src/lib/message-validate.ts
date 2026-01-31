@@ -1,8 +1,8 @@
 // src/lib/message-validate.ts
 // Message validation functions for Anthropic API compliance
 
-import type { ModelMessage, TextPart, ToolCallPart, ToolResultPart } from 'ai';
 import { logger } from '@/lib/logger';
+import type { ContentPart, Message as ModelMessage } from '@/services/llm/types';
 
 /**
  * Validation issue codes for Anthropic message format compliance
@@ -36,7 +36,7 @@ export interface ValidationResult {
 /**
  * Type guard for assistant content parts
  */
-type AssistantContentPart = TextPart | ToolCallPart;
+type AssistantContentPart = Extract<ContentPart, { type: 'text' | 'tool-call' }>;
 
 /**
  * Validates that system messages are only at the beginning of the message array.
@@ -128,7 +128,7 @@ export function validateToolPairing(messages: ModelMessage[]): ValidationResult 
   // Collect all tool-result IDs
   for (const msg of messages) {
     if (msg.role === 'tool' && Array.isArray(msg.content)) {
-      for (const part of msg.content as ToolResultPart[]) {
+      for (const part of msg.content as ContentPart[]) {
         if (part.type === 'tool-result' && part.toolCallId) {
           toolResultIds.add(part.toolCallId);
         }

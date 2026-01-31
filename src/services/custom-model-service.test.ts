@@ -27,6 +27,7 @@ vi.mock('@/stores/settings-store', () => ({
     getProviderBaseUrl: vi.fn(),
     getAutoApproveEditsGlobal: vi.fn(() => false),
     setAutoApproveEditsGlobal: vi.fn(),
+    getProviderUseInternational: vi.fn().mockResolvedValue(false),
   },
 }));
 
@@ -35,6 +36,7 @@ vi.mock('@/providers/config/provider-config', () => ({
     anthropic: { name: 'Anthropic' },
     openai: { name: 'OpenAI' },
   },
+  PROVIDERS_WITH_INTERNATIONAL: [],
 }));
 
 describe('CustomModelService - fetchProviderModels with custom base URL', () => {

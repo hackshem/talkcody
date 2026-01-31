@@ -1,10 +1,10 @@
 // src/services/agents/stream-processor.ts
 
-import type { ReasoningPart, TextPart } from '@ai-sdk/provider-utils';
 import { formatReasoningText } from '@/lib/llm-utils';
 import { logger } from '@/lib/logger';
 import { decodeObjectHtmlEntities } from '@/lib/utils';
 import { getLocale, type SupportedLocale } from '@/locales';
+import type { ContentPart, ProviderOptions } from '@/services/llm/types';
 import { useSettingsStore } from '@/stores/settings-store';
 import type { ToolCallInfo } from './tool-executor';
 
@@ -26,7 +26,7 @@ export interface StreamProcessorContext {
 export interface ReasoningBlock {
   id: string;
   text: string;
-  providerMetadata?: Record<string, unknown>; // For storing signature/redactedData from Claude API
+  providerMetadata?: ProviderOptions; // For storing signature/redactedData from Claude API
 }
 
 export interface StreamProcessorState {
@@ -169,10 +169,11 @@ export class StreamProcessor {
    * and we need to merge it with existing metadata (e.g., redactedData)
    */
   private deepMergeMetadata(
-    existing: Record<string, unknown> | undefined,
-    incoming: Record<string, unknown>
-  ): Record<string, unknown> {
+    existing: ProviderOptions | undefined,
+    incoming: ProviderOptions
+  ): ProviderOptions {
     if (!existing) return incoming;
+    if (!incoming) return existing;
 
     const result: Record<string, unknown> = { ...existing };
     for (const key of Object.keys(incoming)) {
@@ -189,8 +190,8 @@ export class StreamProcessor {
         !Array.isArray(incomingValue)
       ) {
         result[key] = this.deepMergeMetadata(
-          existingValue as Record<string, unknown>,
-          incomingValue as Record<string, unknown>
+          existingValue as ProviderOptions,
+          incomingValue as ProviderOptions
         );
       } else {
         result[key] = incomingValue;
@@ -265,6 +266,13 @@ export class StreamProcessor {
     //   })(),
     // });
 
+    if (!toolCall.toolName) {
+      logger.warn('Skipping tool call without tool name', {
+        toolCallId: toolCall.toolCallId,
+      });
+      return;
+    }
+
     // Decode HTML entities in tool call input
     let decodedInput = decodeObjectHtmlEntities(toolCall.input);
 
@@ -324,7 +332,7 @@ export class StreamProcessor {
    */
   processReasoningStart(
     id: string,
-    providerMetadata: Record<string, unknown> | undefined,
+    providerMetadata: ProviderOptions | undefined,
     callbacks: StreamProcessorCallbacks
   ): void {
     // logger.info('Processing reasoning start:', { id });
@@ -348,7 +356,7 @@ export class StreamProcessor {
   processReasoningDelta(
     id: string,
     text: string,
-    providerMetadata: Record<string, unknown> | undefined,
+    providerMetadata: ProviderOptions | undefined,
     context: StreamProcessorContext,
     callbacks: StreamProcessorCallbacks
   ): void {
@@ -427,17 +435,16 @@ export class StreamProcessor {
   }
 
   /**
-   * Get structured assistant content as an array of TextPart and ReasoningPart
-   * This builds the proper AssistantContent format for Vercel AI SDK
-   * ReasoningParts include providerOptions with signature for Claude API extended thinking
+   * Get structured assistant content as an array of content parts.
+   * Reasoning parts include providerOptions for Claude API extended thinking.
    *
    * CRITICAL: When thinking mode is enabled, Claude API requires:
    * "a final assistant message must start with a thinking block (preceeding the lastmost set of tool_use and tool_result blocks)"
    * Therefore, we MUST return reasoning parts BEFORE text parts, regardless of arrival order.
    */
-  getAssistantContent(): Array<TextPart | ReasoningPart> {
-    const reasoningParts: ReasoningPart[] = [];
-    const textParts: TextPart[] = [];
+  getAssistantContent(): Array<ContentPart> {
+    const reasoningParts: Array<ContentPart> = [];
+    const textParts: Array<ContentPart> = [];
 
     for (const order of this.state.contentOrder) {
       if (order.type === 'text') {
@@ -448,16 +455,12 @@ export class StreamProcessor {
       } else if (order.type === 'reasoning') {
         const block = this.state.reasoningBlocks[order.index];
         if (block?.text && this.isSignificantText(block.text)) {
-          // Pass providerMetadata as providerOptions for AI SDK to convert reasoning back to thinking
-          // The providerMetadata contains signature required by Claude API
-          const reasoningPart: ReasoningPart = {
+          const reasoningPart: ContentPart = {
             type: 'reasoning',
             text: block.text.trim(),
           };
           if (block.providerMetadata) {
-            // Use type assertion as providerMetadata comes from AI SDK events
-            // biome-ignore lint/suspicious/noExplicitAny: AI SDK type compatibility
-            (reasoningPart as any).providerOptions = block.providerMetadata;
+            reasoningPart.providerOptions = block.providerMetadata;
           }
           reasoningParts.push(reasoningPart);
         }

@@ -1,11 +1,11 @@
 // src/services/agents/message-filter.ts
 
-import type { ModelMessage, TextPart, ToolCallPart, ToolResultPart } from 'ai';
 import { logger } from '@/lib/logger';
 import { timedMethod } from '@/lib/timer';
+import type { ContentPart, Message as ModelMessage } from '@/services/llm/types';
 
 // Type for assistant message content parts
-type AssistantContentPart = TextPart | ToolCallPart;
+type AssistantContentPart = Extract<ContentPart, { type: 'text' | 'tool-call' }>;
 
 /**
  * ContextFilter handles message optimization and filtering
@@ -88,7 +88,7 @@ export class ContextFilter {
               continue;
             }
 
-            const fileReadKey = this.extractFileReadKey(part as ToolCallPart);
+            const fileReadKey = this.extractFileReadKey(part);
             if (fileReadKey && part.toolCallId) {
               const previous = fileReadMap.get(fileReadKey);
               if (previous) {
@@ -198,7 +198,7 @@ export class ContextFilter {
               continue;
             }
 
-            const signature = this.getToolCallSignature(part as ToolCallPart);
+            const signature = this.getToolCallSignature(part);
             if (signature) {
               const previous = toolCallMap.get(signature);
               if (previous) {
@@ -220,7 +220,12 @@ export class ContextFilter {
    * Generate a unique signature for a tool call based on name and parameters
    * Used to identify exact duplicates
    */
-  private getToolCallSignature(toolCall: ToolCallPart): string | null {
+  private getToolCallSignature(toolCall: AssistantContentPart): string | null {
+    // Only process tool-call parts, not text parts
+    if (toolCall.type !== 'tool-call') {
+      return null;
+    }
+
     try {
       const input =
         typeof toolCall.input === 'string' ? JSON.parse(toolCall.input) : toolCall.input;
@@ -291,7 +296,7 @@ export class ContextFilter {
         }
       } else if (message.role === 'tool' && Array.isArray(message.content)) {
         // Filter out tool-result parts that match
-        const filteredContent = (message.content as ToolResultPart[]).filter((part) => {
+        const filteredContent = (message.content as ContentPart[]).filter((part) => {
           if (part.type === 'tool-result' && part.toolCallId) {
             return !toolCallIdsToFilter.has(part.toolCallId);
           }
@@ -335,7 +340,7 @@ export class ContextFilter {
    * Extract file read key from readFile tool call
    * Returns a unique key that includes file path and line range (if specified)
    */
-  private extractFileReadKey(toolCall: ToolCallPart | undefined): string | null {
+  private extractFileReadKey(toolCall: AssistantContentPart | undefined): string | null {
     if (!toolCall || toolCall.type !== 'tool-call') {
       return null;
     }

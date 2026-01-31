@@ -11,15 +11,6 @@ import type { UIMessage } from '@/types/agent';
 
 // Mock dependencies
 
-vi.mock('@/providers/models/model-service', () => ({
-  modelService: { isModelAvailableSync: vi.fn(() => true) },
-}));
-
-vi.mock('@/providers/core/provider-factory', () => ({
-  aiProviderService: {
-    getProviderModel: vi.fn(() => ({ modelId: 'test-model', provider: 'test' })),
-  },
-}));
 
 // Mock provider store
 const mockProviderStore = {
@@ -107,12 +98,21 @@ vi.mock('@/lib/tool-adapter', () => ({
   }),
 }));
 
-vi.mock('ai', () => ({
-  streamText: vi.fn(),
-  stepCountIs: vi.fn((count) => ({ type: 'step-count', count })),
-  smoothStream: vi.fn(() => undefined),
-  NoSuchToolError: { isInstance: vi.fn(() => false) },
-  InvalidToolInputError: { isInstance: vi.fn(() => false) },
+vi.mock('@/services/llm/llm-client', () => ({
+  llmClient: {
+    streamText: vi.fn(),
+  },
+}));
+
+vi.mock('@/services/database-service', () => ({
+  databaseService: {
+    initialize: vi.fn().mockResolvedValue(undefined),
+    insertApiUsageEvent: vi.fn().mockResolvedValue(undefined),
+    db: {
+      select: vi.fn().mockResolvedValue([]),
+      execute: vi.fn().mockResolvedValue({ rowsAffected: 0 }),
+    },
+  },
 }));
 
 describe('ChatService Tool UI Rendering', () => {
@@ -132,8 +132,8 @@ describe('ChatService Tool UI Rendering', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    const aiModule = await import('ai');
-    mockStreamText = vi.mocked(aiModule.streamText);
+    const llmModule = await import('@/services/llm/llm-client');
+    mockStreamText = vi.mocked(llmModule.llmClient.streamText);
 
     const toolAdapterModule = await import('@/lib/tool-adapter');
     _mockGetToolUIRenderers = vi.mocked(toolAdapterModule.getToolUIRenderers);
@@ -149,42 +149,32 @@ describe('ChatService Tool UI Rendering', () => {
       execute: vi.fn(() => Promise.resolve({ success: true, result: 'test result' })),
     };
 
-    // Setup mock stream with tool call (first stream)
-    const mockFirstStream = [
-      {
-        type: 'tool-call',
-        toolCallId: 'call_testTool_abc123',
-        toolName: 'testTool',
-        input: { input: 'test input' },
-      },
-    ];
-
-    // Second stream after tool execution
-    const mockSecondStream = [
-      { type: 'text-delta', text: 'Tool completed' },
-      {
-        type: 'step-finish',
-        finishReason: 'stop',
-        usage: { inputTokens: 10, outputTokens: 5 },
-      },
-    ];
-
     mockStreamText
-      .mockReturnValueOnce({
-        fullStream: (async function* () {
-          for (const delta of mockFirstStream) {
-            yield delta;
-          }
+      .mockResolvedValueOnce({
+        requestId: 1,
+        events: (async function* () {
+          yield {
+            type: 'tool-call',
+            toolCallId: 'call_testTool_abc123',
+            toolName: 'testTool',
+            input: { input: 'test input' },
+          };
+          yield { type: 'done', finish_reason: 'tool-calls' };
         })(),
-        finishReason: Promise.resolve('tool-calls'),
       })
-      .mockReturnValueOnce({
-        fullStream: (async function* () {
-          for (const delta of mockSecondStream) {
-            yield delta;
-          }
+      .mockResolvedValueOnce({
+        requestId: 2,
+        events: (async function* () {
+          yield { type: 'text-start' };
+          yield { type: 'text-delta', text: 'Tool completed' };
+          yield {
+            type: 'usage',
+            input_tokens: 10,
+            output_tokens: 5,
+            total_tokens: 15,
+          };
+          yield { type: 'done', finish_reason: 'stop' };
         })(),
-        finishReason: Promise.resolve('stop'),
       });
 
     const toolMessages: UIMessage[] = [];
@@ -229,42 +219,32 @@ describe('ChatService Tool UI Rendering', () => {
       execute: vi.fn(() => Promise.resolve(mockToolResult)),
     };
 
-    // Setup mock stream with tool call (first stream)
-    const mockFirstStream = [
-      {
-        type: 'tool-call',
-        toolCallId: 'call_testTool_abc123',
-        toolName: 'testTool',
-        input: { input: 'test input' },
-      },
-    ];
-
-    // Second stream after tool execution
-    const mockSecondStream = [
-      { type: 'text-delta', text: 'Tool completed' },
-      {
-        type: 'step-finish',
-        finishReason: 'stop',
-        usage: { inputTokens: 10, outputTokens: 5 },
-      },
-    ];
-
     mockStreamText
-      .mockReturnValueOnce({
-        fullStream: (async function* () {
-          for (const delta of mockFirstStream) {
-            yield delta;
-          }
+      .mockResolvedValueOnce({
+        requestId: 1,
+        events: (async function* () {
+          yield {
+            type: 'tool-call',
+            toolCallId: 'call_testTool_abc123',
+            toolName: 'testTool',
+            input: { input: 'test input' },
+          };
+          yield { type: 'done', finish_reason: 'tool-calls' };
         })(),
-        finishReason: Promise.resolve('tool-calls'),
       })
-      .mockReturnValueOnce({
-        fullStream: (async function* () {
-          for (const delta of mockSecondStream) {
-            yield delta;
-          }
+      .mockResolvedValueOnce({
+        requestId: 2,
+        events: (async function* () {
+          yield { type: 'text-start' };
+          yield { type: 'text-delta', text: 'Tool completed' };
+          yield {
+            type: 'usage',
+            input_tokens: 10,
+            output_tokens: 5,
+            total_tokens: 15,
+          };
+          yield { type: 'done', finish_reason: 'stop' };
         })(),
-        finishReason: Promise.resolve('stop'),
       });
 
     const toolMessages: UIMessage[] = [];
@@ -313,41 +293,32 @@ describe('ChatService Tool UI Rendering', () => {
       execute: vi.fn(() => Promise.resolve({ success: true })),
     };
 
-    // Setup mock stream with tool call
-    const mockFirstStream = [
-      {
-        type: 'tool-call',
-        toolCallId: 'call_testTool_render123',
-        toolName: 'testTool',
-        input: {},
-      },
-    ];
-
-    const mockSecondStream = [
-      { type: 'text-delta', text: 'Done' },
-      {
-        type: 'step-finish',
-        finishReason: 'stop',
-        usage: { inputTokens: 10, outputTokens: 5 },
-      },
-    ];
-
     mockStreamText
-      .mockReturnValueOnce({
-        fullStream: (async function* () {
-          for (const delta of mockFirstStream) {
-            yield delta;
-          }
+      .mockResolvedValueOnce({
+        requestId: 1,
+        events: (async function* () {
+          yield {
+            type: 'tool-call',
+            toolCallId: 'call_testTool_render123',
+            toolName: 'testTool',
+            input: {},
+          };
+          yield { type: 'done', finish_reason: 'tool-calls' };
         })(),
-        finishReason: Promise.resolve('tool-calls'),
       })
-      .mockReturnValueOnce({
-        fullStream: (async function* () {
-          for (const delta of mockSecondStream) {
-            yield delta;
-          }
+      .mockResolvedValueOnce({
+        requestId: 2,
+        events: (async function* () {
+          yield { type: 'text-start' };
+          yield { type: 'text-delta', text: 'Done' };
+          yield {
+            type: 'usage',
+            input_tokens: 10,
+            output_tokens: 5,
+            total_tokens: 15,
+          };
+          yield { type: 'done', finish_reason: 'stop' };
         })(),
-        finishReason: Promise.resolve('stop'),
       });
 
     const toolMessages: UIMessage[] = [];

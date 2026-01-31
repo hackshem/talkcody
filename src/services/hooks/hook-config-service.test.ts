@@ -29,7 +29,7 @@ describe('HookConfigService', () => {
     vi.clearAllMocks();
   });
 
-  it('merges user, project, and local configs in order', async () => {
+  it('merges user and project configs in order', async () => {
     const fs = await import('@tauri-apps/plugin-fs');
     const readTextFile = vi.mocked(fs.readTextFile);
 
@@ -51,20 +51,11 @@ describe('HookConfigService', () => {
             ],
           },
         })
-      )
-      .mockResolvedValueOnce(
-        JSON.stringify({
-          hooks: {
-            PostToolUse: [
-              { matcher: '*', hooks: [{ type: 'command', command: 'echo local' }] },
-            ],
-          },
-        })
       );
 
     const result = await hookConfigService.loadConfigs();
 
     expect(result.hooks?.PreToolUse?.length).toBe(2);
-    expect(result.hooks?.PostToolUse?.length).toBe(1);
+    expect(result.hooks?.PostToolUse).toBeUndefined();
   });
 });

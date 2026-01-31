@@ -1,4 +1,3 @@
-import type { ModelMessage } from 'ai';
 import { logger } from '@/lib/logger';
 import {
   mergeConsecutiveAssistantMessages,
@@ -7,6 +6,7 @@ import {
 import { validateAnthropicMessages } from '@/lib/message-validate';
 import { timedMethod } from '@/lib/timer';
 import { getContextLength } from '@/providers/config/model-config';
+import type { Message as ModelMessage } from '@/services/llm/types';
 import type {
   CompressionConfig,
   CompressionResult,

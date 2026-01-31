@@ -149,6 +149,22 @@ describe('Extended Thinking Signature Handling', () => {
       expect((content[0] as any).providerOptions).toEqual(signatureMetadata);
     });
 
+    it('should allow non-anthropic provider metadata on reasoning parts', () => {
+      const signatureMetadata = {
+        google: { thought_signature: 'test-google-signature' },
+      };
+
+      processor.processReasoningStart('test-id', undefined, callbacks);
+      processor.processReasoningDelta('test-id', 'Reasoning with metadata', undefined, context, callbacks);
+      processor.processReasoningDelta('test-id', '', signatureMetadata, context, callbacks);
+
+      const content = processor.getAssistantContent();
+
+      expect(content).toHaveLength(1);
+      expect(content[0].type).toBe('reasoning');
+      expect((content[0] as any).providerOptions).toEqual(signatureMetadata);
+    });
+
     it('should not include providerOptions when no metadata is present', () => {
       processor.processReasoningStart('test-id', undefined, callbacks);
       processor.processReasoningDelta(

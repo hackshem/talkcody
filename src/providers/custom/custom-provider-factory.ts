@@ -1,53 +1,26 @@
 // src/providers/custom-provider-factory.ts
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { logger } from '@/lib/logger';
-import { streamFetch } from '@/lib/tauri-fetch';
-import type { CustomProviderConfig } from '@/types/custom-provider';
-
-const CUSTOM_PROVIDER_STREAM_HEADER = 'x-talkcody-allow-private-ip';
+export type CustomProviderPlaceholder = {
+  providerId: string;
+  baseUrl?: string;
+  type: 'openai-compatible' | 'anthropic';
+  requiresAuth: boolean;
+};
 
 /**
- * Factory function to create custom providers
+ * Factory placeholder for custom providers.
+ *
+ * Provider creation is now handled by Rust, so we only return metadata
+ * describing the provider. This keeps the frontend free of AI SDK runtime.
  */
-export function createCustomProvider(
-  config: CustomProviderConfig,
-  apiKey: string,
-  baseUrl?: string
-) {
-  let finalBaseUrl = baseUrl || config.baseUrl;
-
-  // For anthropic type, auto-append /v1 if not already present
-  if (config.type === 'anthropic' && finalBaseUrl && !finalBaseUrl.endsWith('/v1')) {
-    finalBaseUrl = `${finalBaseUrl.replace(/\/$/, '')}/v1`;
-  }
-
-  logger.info('Creating custom provider:', {
-    id: config.id,
-    name: config.name,
+export function createCustomProvider(config: {
+  id: string;
+  type: 'openai-compatible' | 'anthropic';
+  baseUrl: string;
+}): CustomProviderPlaceholder {
+  return {
+    providerId: config.id,
+    baseUrl: config.baseUrl,
     type: config.type,
-    baseUrl: finalBaseUrl,
-  });
-
-  if (config.type === 'anthropic') {
-    return createAnthropic({
-      apiKey,
-      baseURL: finalBaseUrl,
-      fetch: streamFetch as typeof fetch,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        [CUSTOM_PROVIDER_STREAM_HEADER]: 'true',
-      },
-    });
-  } else {
-    return createOpenAICompatible({
-      apiKey,
-      name: config.name,
-      baseURL: finalBaseUrl,
-      fetch: streamFetch as typeof fetch,
-      headers: {
-        [CUSTOM_PROVIDER_STREAM_HEADER]: 'true',
-      },
-    });
-  }
+    requiresAuth: true,
+  };
 }

@@ -318,10 +318,16 @@ const en: LocaleDefinition = {
         `${provider} connection test failed. Please check your configuration.`,
       customBaseUrl: 'Custom Base URL (Optional)',
       useCodingPlan: 'Use Coding Plan',
+      useInternational: 'Use International API',
       loadFailed: 'Failed to load API keys settings',
       codingPlanEnabled: (provider) => `${provider} Coding Plan enabled`,
       codingPlanDisabled: (provider) => `${provider} Coding Plan disabled`,
       codingPlanUpdateFailed: (provider) => `Failed to update ${provider} Coding Plan setting`,
+      internationalEnabled: (provider) => `${provider} International API enabled`,
+      internationalDisabled: (provider) => `${provider} International API disabled`,
+      internationalUpdateFailed: (provider) =>
+        `Failed to update ${provider} International API setting`,
+
       tooltipTitle: 'API Keys',
       tooltipDescription:
         'API keys are required to access AI models from different providers. Configure your API keys here to enable model access.',
@@ -1759,6 +1765,10 @@ const en: LocaleDefinition = {
       success: (operation, location) => `LSP ${operation} completed for ${location}`,
       failed: (operation, message) => `Failed to run LSP ${operation}: ${message}`,
       unknownError: 'Unknown error',
+    },
+    Bash: {
+      outputSaved: (path) => `Full stdout saved to: ${path}`,
+      errorSaved: (path) => `Full stderr saved to: ${path}`,
     },
   },
 

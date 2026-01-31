@@ -47,8 +47,8 @@ export const createMockUseSettingsStore = (
     theme: string;
     settings: Record<string, unknown>;
   }> = {}
-) => ({
-  getState: vi.fn(() => ({
+) => {
+  const state = {
     language: overrides.language ?? DEFAULT_LANGUAGE,
     theme: overrides.theme ?? 'dark',
     getReasoningEffort: vi.fn(() => 'medium'),
@@ -56,15 +56,24 @@ export const createMockUseSettingsStore = (
     getAutoApprovePlanGlobal: vi.fn(() => false),
     getAutoCodeReviewGlobal: vi.fn(() => false),
     getRalphLoopEnabled: vi.fn(() => false),
+    setLanguage: vi.fn().mockResolvedValue(undefined),
     setAutoApproveEditsGlobal: vi.fn(),
     setAutoApprovePlanGlobal: vi.fn(),
     setAutoCodeReviewGlobal: vi.fn(),
     setRalphLoopEnabled: vi.fn(),
     ...overrides.settings,
-  })),
-  subscribe: vi.fn(),
-  setState: vi.fn(),
-});
+  };
+
+  const useSettingsStore = ((selector?: (state: typeof state) => unknown) =>
+    selector ? selector(state) : state) as typeof import('zustand').StoreApi<typeof state> &
+    ((selector?: (state: typeof state) => unknown) => unknown);
+
+  useSettingsStore.getState = vi.fn(() => state);
+  useSettingsStore.subscribe = vi.fn();
+  useSettingsStore.setState = vi.fn();
+
+  return useSettingsStore;
+};
 
 // Default instances for common use
 export const mockSettingsManager = createMockSettingsManager();

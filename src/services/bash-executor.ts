@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { isAbsolute, join } from '@tauri-apps/api/path';
 import { logger } from '@/lib/logger';
 import { isPathWithinProjectDirectory } from '@/lib/utils/path-security';
+import { taskFileService } from '@/services/task-file-service';
 import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
 
 // Result from Rust backend execute_user_shell command
@@ -29,6 +30,10 @@ export interface BashResult {
   command: string;
   output?: string;
   error?: string;
+  outputFilePath?: string;
+  errorFilePath?: string;
+  outputTruncated?: boolean;
+  errorTruncated?: boolean;
   exit_code?: number;
   timed_out?: boolean;
   idle_timed_out?: boolean;
@@ -73,6 +78,10 @@ const BUILD_TEST_PATTERNS = [
 
 type OutputStrategy = 'full' | 'minimal' | 'default';
 
+const MAX_OUTPUT_CHARS = 10000;
+const MAX_ERROR_CHARS = 10000;
+const MAX_FAILURE_STDOUT_CHARS = 5000;
+
 /**
  * Determine output strategy based on command type
  */
@@ -98,92 +107,92 @@ function getOutputStrategy(command: string): OutputStrategy {
 // 2. Validates all expanded paths are within workspace
 const DANGEROUS_PATTERNS = [
   // File system destruction - rm patterns that are always dangerous
-  /\brm\b.*\s\.(?:\/)?(?:\s|$)/, // rm . or rm -rf . (current directory)
-  /rmdir\s+.*-.*r/, // rmdir with recursive
+  /\brm\b.*\s\.(?:\/)?(?:\s|$)/i, // rm . or rm -rf . (current directory)
+  /rmdir\s+.*-.*r/i, // rmdir with recursive
 
   // Other file deletion commands
-  /\bunlink\s+/,
-  /\bshred\s+/,
-  /\btruncate\s+.*-s\s*0/, // truncate to zero
+  /\bunlink\s+/i,
+  /\bshred\s+/i,
+  /\btruncate\s+.*-[sS]\s*0/i, // truncate to zero (case-insensitive -s flag)
 
   // find + delete combinations
-  /\bfind\s+.*-delete/,
-  /\bfind\s+.*-exec\s+rm/,
-  /\bfind\s+.*\|\s*xargs\s+rm/,
+  /\bfind\s+.*-[dD][eE][lL][eE][tT][eE]/i,
+  /\bfind\s+.*-[eE][xX][eE][cC]\s+rm/i,
+  /\bfind\s+.*\|\s*xargs\s+rm/i,
 
   // File content clearing
-  /^>\s*\S+/, // > file (clear file)
-  /cat\s+\/dev\/null\s*>/, // cat /dev/null > file
+  /^>\s*\S+/i, // > file (clear file)
+  /cat\s+\/dev\/null\s*>/i, // cat /dev/null > file
 
   // Git dangerous operations
-  /\bgit\s+clean\s+-[fd]/,
-  /\bgit\s+reset\s+--hard/,
+  /\bgit\s+clean\s+-[fdFD]/i,
+  /\bgit\s+reset\s+--hard/i,
 
   // mv to dangerous locations
-  /\bmv\s+.*\/dev\/null/,
+  /\bmv\s+.*\/dev\/null/i,
 
   // Format commands (disk formatting, not code formatters)
-  /mkfs\./,
-  /\bformat\s+[a-zA-Z]:/, // Windows format drive command (format C:, format D:, etc.)
-  /fdisk/,
-  /parted/,
-  /gparted/,
+  /mkfs\./i,
+  /\bformat\s+[a-zA-Z]:/i, // Windows format drive command (format C:, format D:, etc.)
+  /fdisk/i,
+  /parted/i,
+  /gparted/i,
 
   // System control
-  /shutdown/,
-  /reboot/,
-  /halt/,
-  /poweroff/,
-  /init\s+[016]/,
+  /shutdown/i,
+  /reboot/i,
+  /halt/i,
+  /poweroff/i,
+  /init\s+[016]/i,
 
   // Dangerous dd operations
-  /dd\s+.*of=\/dev/,
+  /dd\s+.*of=\/dev/i,
 
   // Permission changes that could be dangerous
-  /chmod\s+.*777\s+\//,
-  /chmod\s+.*-R.*777/,
-  /chown\s+.*-R.*root/,
+  /chmod\s+.*777\s+\//i,
+  /chmod\s+.*-[rR].*777/i,
+  /chown\s+.*-[rR].*root/i,
 
   // Network and system modification
-  /iptables/,
-  /ufw\s+.*disable/,
-  /systemctl\s+.*stop/,
-  /service\s+.*stop/,
+  /iptables/i,
+  /ufw\s+.*disable/i,
+  /systemctl\s+.*stop/i,
+  /service\s+.*stop/i,
 
   // Package managers with dangerous operations
-  /apt\s+.*purge/,
-  /yum\s+.*remove/,
-  /brew\s+.*uninstall.*--force/,
+  /apt\s+.*purge/i,
+  /yum\s+.*remove/i,
+  /brew\s+.*uninstall.*--force/i,
 
   // Disk operations
-  /mount\s+.*\/dev/,
-  /umount\s+.*-f/,
-  /fsck\s+.*-y/,
+  /mount\s+.*\/dev/i,
+  /umount\s+.*-[fF]/i,
+  /fsck\s+.*-[yY]/i,
 
   // Process killing
-  /killall\s+.*-9/,
-  /pkill\s+.*-9.*init/,
+  /killall\s+.*-9/i,
+  /pkill\s+.*-9.*init/i,
 
   // Cron modifications
-  /crontab\s+.*-r/,
+  /crontab\s+.*-[rR]/i,
 
   // History manipulation
-  /history\s+.*-c/,
-  />\s*~\/\.bash_history/,
+  /history\s+.*-[cC]/i,
+  />\s*~\/\.bash_history/i,
 
   // Dangerous redirections
-  />\s*\/dev\/sd[a-z]/,
-  />\s*\/dev\/nvme/,
-  />\s*\/etc\//,
+  />\s*\/dev\/sd[a-z]/i,
+  />\s*\/dev\/nvme/i,
+  />\s*\/etc\//i,
 
   // Kernel and system files
-  /modprobe\s+.*-r/,
-  /insmod/,
-  /rmmod/,
+  /modprobe\s+.*-[rR]/i,
+  /insmod/i,
+  /rmmod/i,
 
   // Dangerous curl/wget operations
-  /curl\s+.*\|\s*(sh|bash|zsh)/,
-  /wget\s+.*-O.*\|\s*(sh|bash|zsh)/,
+  /curl\s+.*\|\s*(sh|bash|zsh)/i,
+  /wget\s+.*-[oO].*\|\s*(sh|bash|zsh)/i,
 ];
 
 // Additional dangerous commands (exact matches)
@@ -215,24 +224,31 @@ export class BashExecutor {
    * Heredoc syntax: << DELIMITER or <<- DELIMITER or << 'DELIMITER' or << "DELIMITER"
    * Content between << DELIMITER and DELIMITER should not be checked as commands
    * But commands AFTER the heredoc delimiter MUST be checked
+   *
+   * For <<- (indented heredoc), the closing delimiter can have leading tabs
    */
   private extractCommandExcludingHeredocContent(command: string): string {
     // Match heredoc start: << or <<- followed by optional quotes and delimiter
-    const heredocMatch = command.match(/<<-?\s*['"]?(\w+)['"]?/);
+    const heredocMatch = command.match(/(<<-?)\s*['"]?(\w+)['"]?/);
     if (!heredocMatch) {
       return command;
     }
 
-    const delimiter = heredocMatch[1];
-    const heredocStartIndex = command.indexOf('<<');
+    const heredocOperator = heredocMatch[1] ?? '';
+    const delimiter = heredocMatch[2] ?? '';
+    const heredocStartIndex = command.indexOf(heredocOperator);
+    const isIndented = heredocOperator === '<<-';
 
     // Get the part before heredoc
     const beforeHeredoc = command.slice(0, heredocStartIndex);
 
     // Find the end of heredoc (delimiter on its own line)
-    // The delimiter must be at the start of a line (after newline) and may have trailing whitespace
+    // For <<- heredocs, the delimiter can have leading tabs
+    // Handle both LF and CRLF line endings
     const afterHeredocStart = command.slice(heredocStartIndex + heredocMatch[0].length);
-    const delimiterPattern = new RegExp(`\\n${delimiter}\\s*(?:\\n|$)`);
+    const delimiterPattern = new RegExp(
+      `\\r?\\n${isIndented ? '\\t*' : ''}${delimiter}\\s*(?:\\r?\\n|$)`
+    );
     const delimiterMatch = afterHeredocStart.match(delimiterPattern);
 
     if (!delimiterMatch || delimiterMatch.index === undefined) {
@@ -259,7 +275,8 @@ export class BashExecutor {
     // Extract command excluding heredoc content - heredoc content should not be checked
     // but commands after heredoc must still be checked
     const commandToCheck = this.extractCommandExcludingHeredocContent(command);
-    const trimmedCommand = commandToCheck.trim().toLowerCase();
+    const lowerCommand = commandToCheck.toLowerCase();
+    const trimmedCommand = lowerCommand.trim();
 
     // Check for exact dangerous commands
     for (const dangerousCmd of DANGEROUS_COMMANDS) {
@@ -271,7 +288,7 @@ export class BashExecutor {
       }
     }
 
-    // Check for dangerous patterns (use commandToCheck to exclude heredoc content)
+    // Check for dangerous patterns (patterns are case-insensitive)
     for (const pattern of DANGEROUS_PATTERNS) {
       if (pattern.test(commandToCheck)) {
         return {
@@ -307,9 +324,9 @@ export class BashExecutor {
    * Returns an array of paths that the rm command targets
    */
   private extractRmPaths(command: string): string[] {
-    // Match rm command with optional flags
+    // Match rm command with optional flags (case-insensitive)
     // rm [-options] path1 [path2 ...]
-    const rmMatch = command.match(/\brm\s+(.+)/);
+    const rmMatch = command.match(/\brm\s+(.+)/i);
     if (!rmMatch) {
       return [];
     }
@@ -339,6 +356,12 @@ export class BashExecutor {
    * Check if a path is within the workspace directory
    */
   private async isPathWithinWorkspace(targetPath: string, workspaceRoot: string): Promise<boolean> {
+    // Block tilde paths to prevent shell expansion escaping workspace
+    // The shell expands ~ to the user's home directory, which is outside workspace
+    if (targetPath.startsWith('~')) {
+      return false;
+    }
+
     // If the path is relative, it's relative to the workspace
     const isAbs = await isAbsolute(targetPath);
     if (!isAbs) {
@@ -361,7 +384,8 @@ export class BashExecutor {
     flags: string[];
     hasWildcards: boolean;
   } {
-    const rmMatch = command.match(/\brm\s+(.+)/);
+    // Match rm command with optional flags (case-insensitive)
+    const rmMatch = command.match(/\brm\s+(.+)/i);
     if (!rmMatch) {
       return { wildcardPaths: [], explicitPaths: [], flags: [], hasWildcards: false };
     }
@@ -424,22 +448,18 @@ export class BashExecutor {
   /**
    * Expand wildcard patterns to actual file paths using Rust backend
    * Returns canonical (resolved) paths to prevent symlink attacks
+   * Throws on error to fail closed (security principle)
    */
   private async expandWildcards(pattern: string, workspaceRoot: string): Promise<string[]> {
-    try {
-      const results = await invoke<GlobResult[]>('search_files_by_glob', {
-        pattern,
-        path: workspaceRoot,
-        maxResults: 10000, // Safety limit
-      });
+    const results = await invoke<GlobResult[]>('search_files_by_glob', {
+      pattern,
+      path: workspaceRoot,
+      maxResults: 10000, // Safety limit
+    });
 
-      // Use canonical_path (resolved symlinks) for security validation
-      // This prevents symlink attacks where a symlink inside workspace points to external files
-      return results.map((r) => r.canonical_path);
-    } catch (error) {
-      this.logger.warn('Failed to expand wildcard pattern:', pattern, error);
-      return [];
-    }
+    // Use canonical_path (resolved symlinks) for security validation
+    // This prevents symlink attacks where a symlink inside workspace points to external files
+    return results.map((r) => r.canonical_path);
   }
 
   /**
@@ -477,9 +497,19 @@ export class BashExecutor {
       // Resolve relative patterns against workspace root
       const isAbs = await isAbsolute(pattern);
       const fullPattern = isAbs ? pattern : await join(workspaceRoot, pattern);
-      const expandedPaths = await this.expandWildcards(fullPattern, workspaceRoot);
 
-      // If pattern matches nothing, let shell handle it (will show error)
+      let expandedPaths: string[];
+      try {
+        expandedPaths = await this.expandWildcards(fullPattern, workspaceRoot);
+      } catch {
+        // Fail closed: if we can't expand the wildcard safely, block the command
+        return {
+          allowed: false,
+          reason: `rm command blocked: failed to expand wildcard "${pattern}" safely`,
+        };
+      }
+
+      // If pattern matches nothing, that's fine - no files to delete
       if (expandedPaths.length === 0) {
         continue;
       }
@@ -521,8 +551,8 @@ export class BashExecutor {
     // Check if command contains rm (excluding heredoc content)
     const commandToCheck = this.extractCommandExcludingHeredocContent(command);
 
-    // Simple check for rm command presence
-    if (!/\brm\b/.test(commandToCheck)) {
+    // Simple check for rm command presence (case-insensitive)
+    if (!/\brm\b/i.test(commandToCheck)) {
       return { allowed: true };
     }
 
@@ -561,7 +591,7 @@ export class BashExecutor {
 
     for (const part of commandParts) {
       const trimmedPart = part.trim();
-      if (!/\brm\b/.test(trimmedPart)) {
+      if (!/\brm\b/i.test(trimmedPart)) {
         continue;
       }
 
@@ -599,7 +629,7 @@ export class BashExecutor {
     return { allowed: true };
   }
 
-  async execute(command: string, taskId: string, toolId: string): Promise<BashResult> {
+  async execute(command: string, taskId?: string, toolId?: string): Promise<BashResult> {
     return this.executeWithTimeout(command, taskId, toolId, 300000, 60000);
   }
 
@@ -608,8 +638,8 @@ export class BashExecutor {
    */
   async executeWithTimeout(
     command: string,
-    taskId: string,
-    _toolId: string,
+    taskId: string | undefined,
+    toolId: string | undefined,
     timeoutMs: number,
     idleTimeoutMs: number
   ): Promise<BashResult> {
@@ -627,7 +657,7 @@ export class BashExecutor {
       }
 
       this.logger.info('Executing bash command:', command);
-      const rootPath = await getEffectiveWorkspaceRoot(taskId);
+      const rootPath = await getEffectiveWorkspaceRoot(taskId ?? '');
 
       // Validate rm command paths
       const rmValidation = await this.validateRmCommand(command, rootPath || null);
@@ -648,7 +678,7 @@ export class BashExecutor {
 
       const result = await this.executeCommand(command, rootPath || null, timeoutMs, idleTimeoutMs);
 
-      return this.formatResult(result, command);
+      return await this.formatResult(result, command, taskId, toolId);
     } catch (error) {
       return this.handleError(error, command);
     }
@@ -676,53 +706,119 @@ export class BashExecutor {
   }
 
   /**
+   * Check if a command is a search/grep command that returns exit code 1 when no matches found
+   * These commands should be considered successful even with exit code 1
+   *
+   * Note: 'find' is NOT included because exit code 1 in find indicates an error
+   * (e.g., permission denied), not just "no matches found".
+   */
+  private isSearchCommand(command: string): boolean {
+    const trimmedCommand = command.trim();
+    // rg, grep, ag, ack - return exit code 1 when no matches found (normal behavior)
+    return /^(rg|grep|ag|ack)\b/.test(trimmedCommand);
+  }
+
+  /**
    * Format execution result based on command type strategy
    */
-  private formatResult(result: TauriShellResult, command: string): BashResult {
-    const isSuccess = result.idle_timed_out || result.timed_out || result.code === 0;
+  private async formatResult(
+    result: TauriShellResult,
+    command: string,
+    taskId: string | undefined,
+    toolId: string | undefined
+  ): Promise<BashResult> {
+    // For search commands, exit code 1 means "no matches found" which is still a successful execution
+    const isSearchCmd = this.isSearchCommand(command);
+    const isSuccess =
+      result.idle_timed_out ||
+      result.timed_out ||
+      result.code === 0 ||
+      (isSearchCmd && result.code === 1);
     const strategy = getOutputStrategy(command);
 
     let message: string;
     let output: string | undefined;
     let error: string | undefined;
+    let outputFilePath: string | undefined;
+    let errorFilePath: string | undefined;
+    let outputTruncated: boolean | undefined;
+    let errorTruncated: boolean | undefined;
+
+    const stdoutResult = async (maxChars: number) =>
+      await this.processOutput(result.stdout, maxChars, taskId, toolId, 'stdout');
+    const stderrResult = async (maxChars: number) =>
+      await this.processOutput(result.stderr, maxChars, taskId, toolId, 'stderr');
 
     if (result.idle_timed_out) {
       message = `Command running in background (idle timeout after 5s). PID: ${result.pid ?? 'unknown'}`;
-      output = this.truncateByChars(result.stdout, 10000);
-      error = result.stderr || undefined;
+      const stdout = await stdoutResult(MAX_OUTPUT_CHARS);
+      const stderr = await stderrResult(MAX_ERROR_CHARS);
+      output = stdout.displayText;
+      error = stderr.displayText;
+      outputFilePath = stdout.filePath;
+      errorFilePath = stderr.filePath;
+      outputTruncated = stdout.truncated;
+      errorTruncated = stderr.truncated;
     } else if (result.timed_out) {
       message = `Command timed out after max timeout. PID: ${result.pid ?? 'unknown'}`;
-      output = this.truncateByChars(result.stdout, 10000);
-      error = result.stderr || undefined;
-    } else if (result.code === 0) {
+      const stdout = await stdoutResult(MAX_OUTPUT_CHARS);
+      const stderr = await stderrResult(MAX_ERROR_CHARS);
+      output = stdout.displayText;
+      error = stderr.displayText;
+      outputFilePath = stdout.filePath;
+      errorFilePath = stderr.filePath;
+      outputTruncated = stdout.truncated;
+      errorTruncated = stderr.truncated;
+    } else if (isSuccess) {
       message = 'Command executed successfully';
 
+      const stderr = await stderrResult(MAX_ERROR_CHARS);
+      error = stderr.displayText;
+      errorFilePath = stderr.filePath;
+      errorTruncated = stderr.truncated;
+
       switch (strategy) {
-        case 'full':
-          // Output IS the result - return up to 10000 chars
-          output = this.truncateByChars(result.stdout, 10000);
+        case 'full': {
+          const stdout = await stdoutResult(MAX_OUTPUT_CHARS);
+          output = stdout.displayText;
+          outputFilePath = stdout.filePath;
+          outputTruncated = stdout.truncated;
           break;
-        case 'minimal':
-          // Build/test success - minimal output
+        }
+        case 'minimal': {
+          const stdout = await stdoutResult(MAX_OUTPUT_CHARS);
           output = result.stdout.trim() ? '(output truncated on success)' : undefined;
+          outputFilePath = stdout.filePath;
+          outputTruncated = stdout.truncated;
           break;
-        default:
-          // Default: return up to 10000 chars
-          output = this.truncateByChars(result.stdout, 10000);
+        }
+        default: {
+          const stdout = await stdoutResult(MAX_OUTPUT_CHARS);
+          output = stdout.displayText;
+          outputFilePath = stdout.filePath;
+          outputTruncated = stdout.truncated;
           break;
+        }
       }
-      error = result.stderr || undefined;
     } else {
       // Failure: always show full error information
       message = `Command failed with exit code ${result.code}`;
       if (result.stderr?.trim()) {
-        error = this.truncateByChars(result.stderr, 10000);
-        // Also include stdout if it contains useful info
+        const stderr = await stderrResult(MAX_ERROR_CHARS);
+        error = stderr.displayText;
+        errorFilePath = stderr.filePath;
+        errorTruncated = stderr.truncated;
         if (result.stdout.trim()) {
-          output = this.truncateByChars(result.stdout, 5000);
+          const stdout = await stdoutResult(MAX_FAILURE_STDOUT_CHARS);
+          output = stdout.displayText;
+          outputFilePath = stdout.filePath;
+          outputTruncated = stdout.truncated;
         }
       } else {
-        output = this.truncateByChars(result.stdout, 10000);
+        const stdout = await stdoutResult(MAX_OUTPUT_CHARS);
+        output = stdout.displayText;
+        outputFilePath = stdout.filePath;
+        outputTruncated = stdout.truncated;
       }
     }
 
@@ -732,6 +828,10 @@ export class BashExecutor {
       message,
       output,
       error,
+      outputFilePath,
+      errorFilePath,
+      outputTruncated,
+      errorTruncated,
       exit_code: result.code,
       timed_out: result.timed_out,
       idle_timed_out: result.idle_timed_out,
@@ -751,6 +851,35 @@ export class BashExecutor {
       return `... (${truncatedCount} chars truncated)\n${text.slice(-maxChars)}`;
     }
     return text;
+  }
+
+  private async processOutput(
+    text: string,
+    maxChars: number,
+    taskId: string | undefined,
+    toolId: string | undefined,
+    suffix: string
+  ): Promise<{ displayText?: string; filePath?: string; truncated: boolean }> {
+    if (!text.trim()) {
+      return { displayText: undefined, filePath: undefined, truncated: false };
+    }
+
+    if (text.length <= maxChars) {
+      return { displayText: text, filePath: undefined, truncated: false };
+    }
+
+    const displayText = this.truncateByChars(text, maxChars);
+    let filePath: string | undefined;
+
+    if (taskId && toolId) {
+      try {
+        filePath = await taskFileService.saveOutput(taskId, toolId, text, suffix);
+      } catch (error) {
+        this.logger.warn('Failed to save bash output file', error);
+      }
+    }
+
+    return { displayText, filePath, truncated: true };
   }
 
   /**

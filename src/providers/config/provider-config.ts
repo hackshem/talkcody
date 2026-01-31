@@ -1,14 +1,5 @@
 // src/providers/config/provider-config.ts
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createDeepSeek } from '@ai-sdk/deepseek';
-import { createGateway } from '@ai-sdk/gateway';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { streamFetch } from '@/lib/tauri-fetch';
 import type { ProviderRegistry } from '@/types';
-import { createTalkCodyProvider } from '../core/talkcody-provider';
 
 export const PROVIDER_CONFIGS: ProviderRegistry = {
   talkcody: {
@@ -17,7 +8,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     apiKeyName: 'TALKCODY_ENABLED', // Not a real API key, just a flag
     required: false,
     type: 'custom',
-    createProvider: () => createTalkCodyProvider(),
   },
   openai: {
     id: 'openai',
@@ -26,20 +16,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     required: false,
     type: 'openai',
     supportsOAuth: true, // Supports OpenAI ChatGPT Plus/Pro OAuth authentication
-    createProvider: (apiKey: string, baseUrl?: string) => {
-      if (baseUrl) {
-        return createOpenAICompatible({
-          apiKey,
-          name: 'openai',
-          baseURL: baseUrl,
-          fetch: streamFetch as typeof fetch,
-        });
-      }
-      return createOpenAI({
-        apiKey,
-        fetch: streamFetch as typeof fetch,
-      });
-    },
   },
 
   github_copilot: {
@@ -50,13 +26,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     required: false,
     type: 'openai-compatible',
     supportsOAuth: true,
-    createProvider: (_apiKey: string, baseUrl?: string) =>
-      createOpenAICompatible({
-        apiKey: 'oauth-placeholder',
-        name: 'github_copilot',
-        baseURL: baseUrl || 'https://api.githubcopilot.com/v1',
-        fetch: streamFetch as typeof fetch,
-      }),
   },
 
   MiniMax: {
@@ -66,12 +35,8 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     required: false,
     type: 'openai-compatible',
     supportsCodingPlan: true,
-    createProvider: (apiKey: string) =>
-      createAnthropic({
-        apiKey,
-        baseURL: 'https://api.minimaxi.com/anthropic/v1',
-        fetch: streamFetch as typeof fetch,
-      }),
+    supportsInternational: true,
+    internationalBaseUrl: 'https://api.minimaxi.chat/anthropic/v1',
   },
 
   zhipu: {
@@ -83,13 +48,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     type: 'openai-compatible',
     supportsCodingPlan: true,
     codingPlanBaseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
-    createProvider: (apiKey: string, baseUrl?: string) =>
-      createOpenAICompatible({
-        apiKey,
-        name: 'zhipu',
-        baseURL: baseUrl || 'https://open.bigmodel.cn/api/paas/v4/',
-        fetch: streamFetch as typeof fetch,
-      }),
   },
 
   zai: {
@@ -100,14 +58,7 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     required: false,
     type: 'openai-compatible',
     supportsCodingPlan: true,
-    codingPlanBaseUrl: ' https://api.z.ai/api/coding/paas/v4',
-    createProvider: (apiKey: string, baseUrl?: string) =>
-      createOpenAICompatible({
-        apiKey,
-        name: 'zai',
-        baseURL: baseUrl || 'https://api.z.ai/api/paas/v4/',
-        fetch: streamFetch as typeof fetch,
-      }),
+    codingPlanBaseUrl: 'https://api.z.ai/api/coding/paas/v4',
   },
 
   openRouter: {
@@ -116,20 +67,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     apiKeyName: 'OPEN_ROUTER_API_KEY',
     required: false,
     type: 'custom',
-    createProvider: (apiKey: string) =>
-      createOpenRouter({
-        apiKey,
-        headers: {
-          'HTTP-Referer': 'https://talkcody.com',
-          'X-Title': 'TalkCody',
-        },
-        extraBody: {
-          reasoning: {
-            enabled: true,
-          },
-        },
-        fetch: streamFetch as typeof fetch,
-      }),
   },
 
   aiGateway: {
@@ -138,15 +75,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     apiKeyName: 'AI_GATEWAY_API_KEY',
     required: false,
     type: 'custom',
-    createProvider: (apiKey: string) =>
-      createGateway({
-        headers: {
-          'http-referer': 'https://talkcody.com',
-          'x-title': 'TalkCody',
-        },
-        apiKey,
-        fetch: streamFetch as typeof fetch,
-      }),
   },
 
   deepseek: {
@@ -156,12 +84,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     baseUrl: 'https://api.deepseek.com',
     required: false,
     type: 'openai-compatible',
-    createProvider: (apiKey: string, baseUrl?: string) =>
-      createDeepSeek({
-        apiKey,
-        baseURL: baseUrl || 'https://api.deepseek.com/v1/',
-        fetch: streamFetch as typeof fetch,
-      }),
   },
 
   google: {
@@ -170,11 +92,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     apiKeyName: 'GOOGLE_API_KEY',
     required: false,
     type: 'custom',
-    createProvider: (apiKey: string) =>
-      createGoogleGenerativeAI({
-        apiKey,
-        fetch: streamFetch as typeof fetch,
-      }),
   },
 
   ollama: {
@@ -184,13 +101,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     baseUrl: 'http://127.0.0.1:11434',
     required: false,
     type: 'openai-compatible',
-    createProvider: () =>
-      createOpenAICompatible({
-        name: 'ollama',
-        baseURL: 'http://127.0.0.1:11434/v1',
-        apiKey: 'ollama', // Ollama doesn't require a real API key
-        fetch: streamFetch as typeof fetch,
-      }),
   },
 
   anthropic: {
@@ -200,21 +110,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     required: false,
     type: 'custom',
     supportsOAuth: false,
-    createProvider: (apiKey: string, baseUrl?: string) =>
-      createAnthropic({
-        apiKey,
-        ...(baseUrl && { baseURL: baseUrl }),
-        // Add Authorization header for third-party APIs that use Bearer token auth
-        // Official Anthropic API uses x-api-key (handled by SDK), third-party APIs often use Bearer
-        ...(baseUrl && {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        }),
-        // Use Tauri fetch to bypass webview CORS restrictions
-        // This works for both official Anthropic API and third-party compatible APIs
-        fetch: streamFetch as typeof fetch,
-      }),
   },
 
   lmstudio: {
@@ -224,13 +119,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     baseUrl: 'http://127.0.0.1:1234',
     required: false,
     type: 'openai-compatible',
-    createProvider: (_apiKey: string, baseUrl?: string) =>
-      createOpenAICompatible({
-        name: 'lmstudio',
-        baseURL: baseUrl ? `${baseUrl}/v1` : 'http://127.0.0.1:1234/v1',
-        apiKey: 'lm-studio', // LM Studio doesn't require a real API key
-        fetch: streamFetch as typeof fetch,
-      }),
   },
 
   moonshot: {
@@ -241,13 +129,8 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     type: 'openai-compatible',
     supportsCodingPlan: true,
     codingPlanBaseUrl: 'https://api.kimi.com/coding/v1',
-    createProvider: (apiKey: string) =>
-      createOpenAICompatible({
-        apiKey,
-        name: 'moonshot',
-        baseURL: 'https://api.moonshot.cn/v1',
-        fetch: streamFetch as typeof fetch,
-      }),
+    supportsInternational: true,
+    internationalBaseUrl: 'https://api.kimi.com/v1',
   },
 
   tavily: {
@@ -257,7 +140,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     baseUrl: 'https://api.tavily.com',
     required: false,
     type: 'custom',
-    createProvider: () => null, // Tavily is not an AI provider, just a search API
   },
 
   serper: {
@@ -267,7 +149,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     baseUrl: 'https://google.serper.dev',
     required: false,
     type: 'custom',
-    createProvider: () => null, // Serper is not an AI provider, just a search API
   },
 
   qwen_code: {
@@ -278,13 +159,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     required: false,
     type: 'openai-compatible',
     supportsOAuth: true, // Supports Qwen Code OAuth authentication
-    createProvider: (apiKey: string, baseUrl?: string) =>
-      createOpenAICompatible({
-        apiKey,
-        name: 'qwen_code',
-        baseURL: baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-        fetch: streamFetch as typeof fetch,
-      }),
   },
 
   elevenlabs: {
@@ -294,7 +168,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     baseUrl: 'https://api.elevenlabs.io',
     required: false,
     type: 'custom',
-    createProvider: () => null,
   },
 } as const;
 
@@ -305,4 +178,9 @@ export const PROVIDER_IDS = Object.keys(PROVIDER_CONFIGS) as ProviderIds[];
 // Providers that support Coding Plan feature
 export const PROVIDERS_WITH_CODING_PLAN = Object.entries(PROVIDER_CONFIGS)
   .filter(([_, config]) => config.supportsCodingPlan)
+  .map(([id]) => id);
+
+// Providers that support International mode
+export const PROVIDERS_WITH_INTERNATIONAL = Object.entries(PROVIDER_CONFIGS)
+  .filter(([_, config]) => config.supportsInternational)
   .map(([id]) => id);

@@ -308,10 +308,14 @@ const zh: LocaleDefinition = {
       testFailed: (provider) => `${provider} 连接测试失败。请检查您的配置。`,
       customBaseUrl: '自定义 Base URL（可选）',
       useCodingPlan: '使用 Coding Plan',
+      useInternational: '使用国际站 API',
       loadFailed: '加载 API 密钥设置失败',
       codingPlanEnabled: (provider) => `${provider} Coding Plan 已启用`,
       codingPlanDisabled: (provider) => `${provider} Coding Plan 已禁用`,
       codingPlanUpdateFailed: (provider) => `更新 ${provider} Coding Plan 设置失败`,
+      internationalEnabled: (provider) => `${provider} 国际站 API 已启用`,
+      internationalDisabled: (provider) => `${provider} 国际站 API 已禁用`,
+      internationalUpdateFailed: (provider) => `更新 ${provider} 国际站 API 设置失败`,
       tooltipTitle: 'API 密钥',
       tooltipDescription:
         '需要 API 密钥才能访问不同供应商的 AI 模型。在此配置您的 API 密钥以启用模型访问。',
@@ -1708,6 +1712,10 @@ const zh: LocaleDefinition = {
       success: (operation, location) => `LSP ${operation} 完成：${location}`,
       failed: (operation, message) => `运行 LSP ${operation} 失败：${message}`,
       unknownError: '未知错误',
+    },
+    Bash: {
+      outputSaved: (path) => `完整 stdout 已保存至：${path}`,
+      errorSaved: (path) => `完整 stderr 已保存至：${path}`,
     },
   },
 

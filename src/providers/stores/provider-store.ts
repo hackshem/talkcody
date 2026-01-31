@@ -4,24 +4,22 @@
 import { create } from 'zustand';
 import { logger } from '@/lib/logger';
 import { ensureModelsInitialized } from '@/providers/config/model-config';
-import { PROVIDER_CONFIGS, PROVIDERS_WITH_CODING_PLAN } from '@/providers/config/provider-config';
 import {
-  buildProviderConfigs,
-  isModelAvailable as checkModelAvailable,
-  computeAvailableModels,
-  createProviders,
-  getBestProvider,
+  PROVIDERS_WITH_CODING_PLAN,
+  PROVIDERS_WITH_INTERNATIONAL,
+} from '@/providers/config/provider-config';
+import {
   type OAuthConfig,
   type ProviderFactory,
   parseModelIdentifier,
-  resolveProviderModelName,
 } from '@/providers/core/provider-utils';
 import { modelSyncService } from '@/providers/models/model-sync-service';
 import { remoteAgentsSyncService } from '@/providers/remote-agents/remote-agents-sync-service';
 import { remoteSkillsSyncService } from '@/providers/remote-skills/remote-skills-sync-service';
+import { llmClient } from '@/services/llm/llm-client';
+import type { ProviderConfig as RustProviderConfig } from '@/services/llm/types';
 import type { ProviderDefinition } from '@/types';
 import type { AvailableModel } from '@/types/api-keys';
-
 import type { CustomProviderConfig } from '@/types/custom-provider';
 import { isValidModelType, type ModelType } from '@/types/model-types';
 import type { ModelConfig } from '@/types/models';
@@ -29,7 +27,7 @@ import type { ModelConfig } from '@/types/models';
 // ===== Types =====
 
 interface ProviderStoreState {
-  // Provider instances (ready to use)
+  // Provider instances (legacy placeholder map)
   providers: Map<string, ProviderFactory>;
 
   // Provider configurations (built-in + custom)
@@ -43,6 +41,9 @@ interface ProviderStoreState {
 
   // Use coding plan settings (for Zhipu)
   useCodingPlanSettings: Map<string, boolean>;
+
+  // Use international settings (for MiniMax, Moonshot)
+  useInternationalSettings: Map<string, boolean>;
 
   // Custom providers from file
   customProviders: CustomProviderConfig[];
@@ -66,7 +67,7 @@ interface ProviderStoreActions {
   // Initialization
   initialize: () => Promise<void>;
 
-  // Synchronous getters (main API for LLM service)
+  // Synchronous getters (legacy placeholders)
   getProviderModel: (modelIdentifier: string) => ReturnType<ProviderFactory>;
   isModelAvailable: (modelIdentifier: string) => boolean;
   getBestProviderForModel: (modelKey: string) => string | null;
@@ -96,21 +97,40 @@ async function loadApiKeys(): Promise<Record<string, string | undefined>> {
   return useSettingsStore.getState().getApiKeys();
 }
 
+function mapRustProviderConfigs(configs: RustProviderConfig[]): Map<string, ProviderDefinition> {
+  const mapped = new Map<string, ProviderDefinition>();
+  for (const cfg of configs) {
+    const providerType = cfg.id === 'talkcody' ? 'custom' : 'openai-compatible';
+    mapped.set(cfg.id, {
+      id: cfg.id,
+      name: cfg.name,
+      apiKeyName: cfg.apiKeyName,
+      baseUrl: cfg.baseUrl,
+      required: false,
+      type: providerType,
+      supportsOAuth: cfg.supportsOAuth,
+      supportsCodingPlan: cfg.supportsCodingPlan,
+      supportsInternational: cfg.supportsInternational,
+      codingPlanBaseUrl: cfg.codingPlanBaseUrl || undefined,
+      internationalBaseUrl: cfg.internationalBaseUrl || undefined,
+    });
+  }
+  return mapped;
+}
+
 async function loadBaseUrls(): Promise<Map<string, string>> {
   const { settingsDb } = await import('@/stores/settings-store');
   await settingsDb.initialize();
 
-  const providerIds = Object.keys(PROVIDER_CONFIGS);
-
-  // Batch query all base URLs in a single database call
-  const keys = providerIds.map((id) => `base_url_${id}`);
-  const values = await settingsDb.getBatch(keys);
+  const providerConfigs = await llmClient.getProviderConfigs();
+  const keys = providerConfigs.map((config) => `base_url_${config.id}`);
+  const rows = await settingsDb.getBatch(keys);
 
   const baseUrls = new Map<string, string>();
-  for (const providerId of providerIds) {
-    const baseUrl = values[`base_url_${providerId}`];
-    if (baseUrl) {
-      baseUrls.set(providerId, baseUrl);
+  for (const [key, value] of Object.entries(rows)) {
+    if (key.startsWith('base_url_') && value) {
+      const providerId = key.replace('base_url_', '');
+      baseUrls.set(providerId, value);
     }
   }
 
@@ -121,13 +141,31 @@ async function loadUseCodingPlanSettings(): Promise<Map<string, boolean>> {
   const { settingsDb } = await import('@/stores/settings-store');
   await settingsDb.initialize();
 
-  // Batch query all coding plan settings in a single database call
   const keys = PROVIDERS_WITH_CODING_PLAN.map((id) => `use_coding_plan_${id}`);
   const values = await settingsDb.getBatch(keys);
 
   const settings = new Map<string, boolean>();
   for (const providerId of PROVIDERS_WITH_CODING_PLAN) {
     const value = values[`use_coding_plan_${providerId}`];
+    if (value !== undefined && value !== '') {
+      settings.set(providerId, value === 'true');
+    }
+  }
+
+  return settings;
+}
+
+async function loadUseInternationalSettings(): Promise<Map<string, boolean>> {
+  const { settingsDb } = await import('@/stores/settings-store');
+  await settingsDb.initialize();
+
+  // Batch query all international settings in a single database call
+  const keys = PROVIDERS_WITH_INTERNATIONAL.map((id) => `use_international_${id}`);
+  const values = await settingsDb.getBatch(keys);
+
+  const settings = new Map<string, boolean>();
+  for (const providerId of PROVIDERS_WITH_INTERNATIONAL) {
+    const value = values[`use_international_${providerId}`];
     if (value !== undefined && value !== '') {
       settings.set(providerId, value === 'true');
     }
@@ -155,37 +193,15 @@ async function loadCustomModels(): Promise<Record<string, ModelConfig>> {
 
 async function loadOAuthConfig(): Promise<OAuthConfig> {
   try {
-    // Load Claude OAuth
-    const { getClaudeOAuthAccessToken } = await import('@/providers/oauth/claude-oauth-store');
-    const anthropicAccessToken = await getClaudeOAuthAccessToken();
-
-    // Load OpenAI OAuth - use helper function like Claude OAuth
-    const { getOpenAIOAuthAccessToken } = await import('@/providers/oauth/openai-oauth-store');
-    const openaiAccessToken = await getOpenAIOAuthAccessToken();
-
-    // Get additional OpenAI OAuth state (accountId) if connected
-    const { useOpenAIOAuthStore } = await import('@/providers/oauth/openai-oauth-store');
-    const openaiStoreState = useOpenAIOAuthStore.getState();
-    const openaiAccountId = openaiStoreState.accountId;
-
-    // Load Qwen Code OAuth
-    const { getQwenCodeOAuthAccessToken } = await import('@/providers/oauth/qwen-code-oauth-store');
-    const qwenAccessToken = await getQwenCodeOAuthAccessToken();
-
-    // Load GitHub Copilot OAuth
-    const { getGitHubCopilotOAuthTokens } = await import(
-      '@/providers/oauth/github-copilot-oauth-store'
-    );
-    const githubCopilotTokens = await getGitHubCopilotOAuthTokens();
-
+    const snapshot = await llmClient.getOAuthStatus();
     return {
-      anthropicAccessToken,
-      openaiAccessToken,
-      openaiAccountId,
-      qwenAccessToken,
-      githubCopilotAccessToken: githubCopilotTokens?.accessToken || null,
-      githubCopilotCopilotToken: githubCopilotTokens?.copilotToken || null,
-      githubCopilotEnterpriseUrl: githubCopilotTokens?.enterpriseUrl || null,
+      anthropicAccessToken: snapshot?.anthropic?.accessToken || null,
+      openaiAccessToken: snapshot?.openai?.accessToken || null,
+      openaiAccountId: snapshot?.openai?.accountId || null,
+      qwenAccessToken: snapshot?.qwen?.accessToken || null,
+      githubCopilotAccessToken: snapshot?.githubCopilot?.accessToken || null,
+      githubCopilotCopilotToken: snapshot?.githubCopilot?.copilotToken || null,
+      githubCopilotEnterpriseUrl: snapshot?.githubCopilot?.enterpriseUrl || null,
     };
   } catch (error) {
     logger.warn('Failed to load OAuth config:', error);
@@ -212,9 +228,10 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   apiKeys: {},
   baseUrls: new Map(),
   useCodingPlanSettings: new Map(),
+  useInternationalSettings: new Map(),
   customProviders: [],
   customModels: {},
-  oauthConfig: {},
+  oauthConfig: {} as OAuthConfig,
   availableModels: [],
   isInitialized: false,
   isLoading: false,
@@ -253,15 +270,23 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
       });
 
       // Load all data in parallel (including OAuth)
-      const [apiKeys, baseUrls, useCodingPlanSettings, customProviders, customModels, oauthConfig] =
-        await Promise.all([
-          loadApiKeys(),
-          loadBaseUrls(),
-          loadUseCodingPlanSettings(),
-          loadCustomProviders(),
-          loadCustomModels(),
-          loadOAuthConfig(),
-        ]);
+      const [
+        apiKeys,
+        baseUrls,
+        useCodingPlanSettings,
+        useInternationalSettings,
+        customProviders,
+        customModels,
+        oauthConfig,
+      ] = await Promise.all([
+        loadApiKeys(),
+        loadBaseUrls(),
+        loadUseCodingPlanSettings(),
+        loadUseInternationalSettings(),
+        loadCustomProviders(),
+        loadCustomModels(),
+        loadOAuthConfig(),
+      ]);
 
       logger.info('[ProviderStore] Data loaded', {
         apiKeyCount: Object.keys(apiKeys).filter((k) => apiKeys[k]).length,
@@ -271,26 +296,17 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
         hasOAuth: !!oauthConfig.anthropicAccessToken,
       });
 
-      // Build provider configs (built-in + custom)
-      const providerConfigs = buildProviderConfigs(customProviders);
+      const providerConfigs = mapRustProviderConfigs(await llmClient.getProviderConfigs());
 
-      // Create provider instances (with OAuth support)
-      const providers = createProviders(
-        apiKeys,
-        providerConfigs,
-        baseUrls,
-        useCodingPlanSettings,
-        oauthConfig
-      );
+      const providers = new Map<string, ProviderFactory>();
+      for (const [providerId, config] of providerConfigs) {
+        providers.set(providerId, (_modelName: string) => ({
+          provider: providerId,
+          config,
+        }));
+      }
 
-      // Compute available models (with OAuth support)
-      const availableModels = computeAvailableModels(
-        apiKeys,
-        providerConfigs,
-        customProviders,
-        customModels,
-        oauthConfig
-      );
+      const availableModels = await llmClient.listAvailableModels();
 
       logger.info('[ProviderStore] Initialization complete', {
         providerCount: providers.size,
@@ -303,6 +319,7 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
         apiKeys,
         baseUrls,
         useCodingPlanSettings,
+        useInternationalSettings,
         customProviders,
         customModels,
         oauthConfig,
@@ -321,48 +338,41 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
     }
   },
 
-  // Get provider model instance (synchronous - main API for LLM service)
+  // Get provider model instance (legacy placeholder)
   getProviderModel: (modelIdentifier: string) => {
     const state = get();
-    const { modelKey, providerId: explicitProviderId } = parseModelIdentifier(modelIdentifier);
-
-    // Use explicit provider if specified, otherwise find best available
-    const providerId =
-      explicitProviderId ||
-      getBestProvider(modelKey, state.apiKeys, state.customProviders, state.oauthConfig);
+    const { providerId: explicitProviderId } = parseModelIdentifier(modelIdentifier);
+    const providerId = explicitProviderId || state.availableModels[0]?.provider;
 
     if (!providerId) {
-      throw new Error(
-        `No available provider for model: ${modelKey}. Please configure API keys in settings.`
-      );
+      throw new Error(`No available provider for model: ${modelIdentifier}`);
     }
 
     const provider = state.providers.get(providerId);
     if (!provider) {
-      throw new Error(`Provider ${providerId} not initialized for model: ${modelKey}`);
+      throw new Error(`Provider ${providerId} not initialized for model: ${modelIdentifier}`);
     }
 
-    // For OpenAI OAuth, we need to ensure the token is valid when making API calls
-    // This is handled by the provider's custom fetch function
-    const providerModelName = resolveProviderModelName(modelKey, providerId);
-    return provider(providerModelName);
+    return provider(modelIdentifier);
   },
 
   // Check if model is available (synchronous)
   isModelAvailable: (modelIdentifier: string) => {
     const state = get();
-    return checkModelAvailable(
-      modelIdentifier,
-      state.apiKeys,
-      state.customProviders,
-      state.oauthConfig
-    );
+    const { modelKey, providerId } = parseModelIdentifier(modelIdentifier);
+
+    if (providerId) {
+      return state.availableModels.some(
+        (model) => model.key === modelKey && model.provider === providerId
+      );
+    }
+    return state.availableModels.some((model) => model.key === modelKey);
   },
 
   // Get best provider for a model (synchronous)
   getBestProviderForModel: (modelKey: string) => {
     const state = get();
-    return getBestProvider(modelKey, state.apiKeys, state.customProviders, state.oauthConfig);
+    return state.availableModels.find((model) => model.key === modelKey)?.provider ?? null;
   },
 
   // Get the lowest cost available model (synchronous)
@@ -389,28 +399,16 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
 
   // Set API key and rebuild providers
   setApiKey: async (providerId: string, apiKey: string) => {
-    // Persist to database
     await saveApiKeyToDb(providerId, apiKey);
 
-    // Update state
     const state = get();
     const newApiKeys = { ...state.apiKeys, [providerId]: apiKey };
 
-    // Rebuild providers and available models
-    const providers = createProviders(
-      newApiKeys,
-      state.providerConfigs,
-      state.baseUrls,
-      state.useCodingPlanSettings,
-      state.oauthConfig
-    );
-    const availableModels = computeAvailableModels(
-      newApiKeys,
-      state.providerConfigs,
-      state.customProviders,
-      state.customModels,
-      state.oauthConfig
-    );
+    const availableModels = await llmClient.listAvailableModels();
+    const providers = new Map<string, ProviderFactory>();
+    for (const [id, config] of state.providerConfigs) {
+      providers.set(id, (_modelName: string) => ({ provider: id, config }));
+    }
 
     logger.info('[ProviderStore] API key updated', {
       providerId,
@@ -428,10 +426,9 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
 
   // Set base URL and rebuild providers
   setBaseUrl: async (providerId: string, baseUrl: string) => {
-    // Persist to database
     await saveBaseUrlToDb(providerId, baseUrl);
+    await llmClient.setSetting(`base_url_${providerId}`, baseUrl);
 
-    // Update state
     const state = get();
     const newBaseUrls = new Map(state.baseUrls);
     if (baseUrl) {
@@ -440,14 +437,10 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
       newBaseUrls.delete(providerId);
     }
 
-    // Rebuild providers
-    const providers = createProviders(
-      state.apiKeys,
-      state.providerConfigs,
-      newBaseUrls,
-      state.useCodingPlanSettings,
-      state.oauthConfig
-    );
+    const providers = new Map<string, ProviderFactory>();
+    for (const [id, config] of state.providerConfigs) {
+      providers.set(id, (_modelName: string) => ({ provider: id, config }));
+    }
 
     logger.info('[ProviderStore] Base URL updated', {
       providerId,
@@ -464,6 +457,15 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   addCustomProvider: async (config: CustomProviderConfig) => {
     const { customProviderService } = await import('@/providers/custom/custom-provider-service');
     await customProviderService.addCustomProvider(config.id, config);
+    await llmClient.registerCustomProvider({
+      id: config.id,
+      name: config.name,
+      type: config.type,
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKey,
+      enabled: config.enabled,
+      description: config.description,
+    });
 
     // Reload and rebuild
     await get().refresh();
@@ -473,6 +475,21 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   updateCustomProvider: async (providerId: string, config: Partial<CustomProviderConfig>) => {
     const { customProviderService } = await import('@/providers/custom/custom-provider-service');
     await customProviderService.updateCustomProvider(providerId, config);
+
+    if (config.baseUrl || config.apiKey || config.name || config.type || config.enabled) {
+      const updated = await customProviderService.getCustomProvider(providerId);
+      if (updated) {
+        await llmClient.registerCustomProvider({
+          id: updated.id,
+          name: updated.name,
+          type: updated.type,
+          baseUrl: updated.baseUrl,
+          apiKey: updated.apiKey,
+          enabled: updated.enabled,
+          description: updated.description,
+        });
+      }
+    }
 
     // Reload and rebuild
     await get().refresh();
@@ -492,33 +509,35 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
     logger.info('[ProviderStore] Refreshing all state...');
 
     try {
-      // Reload all data (including OAuth)
-      const [apiKeys, baseUrls, useCodingPlanSettings, customProviders, customModels, oauthConfig] =
-        await Promise.all([
-          loadApiKeys(),
-          loadBaseUrls(),
-          loadUseCodingPlanSettings(),
-          loadCustomProviders(),
-          loadCustomModels(),
-          loadOAuthConfig(),
-        ]);
-
-      // Rebuild everything
-      const providerConfigs = buildProviderConfigs(customProviders);
-      const providers = createProviders(
+      const [
         apiKeys,
-        providerConfigs,
         baseUrls,
         useCodingPlanSettings,
-        oauthConfig
-      );
-      const availableModels = computeAvailableModels(
-        apiKeys,
-        providerConfigs,
+        useInternationalSettings,
         customProviders,
         customModels,
-        oauthConfig
-      );
+        oauthConfig,
+      ] = await Promise.all([
+        loadApiKeys(),
+        loadBaseUrls(),
+        loadUseCodingPlanSettings(),
+        loadUseInternationalSettings(),
+        loadCustomProviders(),
+        loadCustomModels(),
+        loadOAuthConfig(),
+      ]);
+
+      const providerConfigs = mapRustProviderConfigs(await llmClient.getProviderConfigs());
+
+      const providers = new Map<string, ProviderFactory>();
+      for (const [providerId, config] of providerConfigs) {
+        providers.set(providerId, (_modelName: string) => ({
+          provider: providerId,
+          config,
+        }));
+      }
+
+      const availableModels = await llmClient.listAvailableModels();
 
       logger.info('[ProviderStore] Refresh complete', {
         providerCount: providers.size,
@@ -532,6 +551,7 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
         apiKeys,
         baseUrls,
         useCodingPlanSettings,
+        useInternationalSettings,
         customProviders,
         customModels,
         oauthConfig,
@@ -546,27 +566,20 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   rebuildProviders: () => {
     const state = get();
 
-    const providers = createProviders(
-      state.apiKeys,
-      state.providerConfigs,
-      state.baseUrls,
-      state.useCodingPlanSettings,
-      state.oauthConfig
-    );
-    const availableModels = computeAvailableModels(
-      state.apiKeys,
-      state.providerConfigs,
-      state.customProviders,
-      state.customModels,
-      state.oauthConfig
-    );
+    const providers = new Map<string, ProviderFactory>();
+    for (const [providerId, config] of state.providerConfigs) {
+      providers.set(providerId, (_modelName: string) => ({
+        provider: providerId,
+        config,
+      }));
+    }
 
     logger.info('[ProviderStore] Providers rebuilt', {
       providerCount: providers.size,
-      availableModelCount: availableModels.length,
+      availableModelCount: state.availableModels.length,
     });
 
-    set({ providers, availableModels });
+    set({ providers });
   },
 }));
 

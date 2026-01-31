@@ -1,4 +1,3 @@
-import { tool } from 'ai';
 import type { ToolInput, ToolOutput, ToolWithUI } from '@/types/tool';
 
 // Context passed to tool UI renderers
@@ -27,31 +26,11 @@ export function unregisterToolUIRenderers(keyName: string) {
 }
 
 /**
- * Convert ToolWithUI to ai library compatible tool and register UI renderers
+ * Register ToolWithUI renderers and return a tool definition for LLM usage.
  */
 export function convertToolForAI(toolWithUI: ToolWithUI, keyName: string) {
   registerToolUIRenderers(toolWithUI, keyName);
-
-  // Use vercel ai's tool() for proper schema handling and JSON schema conversion
-  // Don't provide execute - ToolExecutor will use the original execute with context
-  const vercelTool = tool({
-    description: toolWithUI.description,
-    inputSchema: toolWithUI.inputSchema as any,
-  });
-
-  // Preserve ToolWithUI properties so ToolExecutor.isToolWithUI() returns true
-  // and uses the correct execute signature with context
-  const adaptedTool = vercelTool as typeof vercelTool & Partial<ToolWithUI>;
-  (adaptedTool as any).renderToolDoing = toolWithUI.renderToolDoing;
-  (adaptedTool as any).renderToolResult = toolWithUI.renderToolResult;
-  // Add execute with the original that accepts (params, context)
-  (adaptedTool as any).execute = toolWithUI.execute;
-
-  return Object.defineProperty(adaptedTool, 'description', {
-    get: () => toolWithUI.description,
-    enumerable: true,
-    configurable: true,
-  });
+  return toolWithUI;
 }
 
 /**
@@ -62,26 +41,22 @@ export function getToolUIRenderers(toolName: string) {
 }
 
 /**
- * Convert a set of tools (mixed ToolWithUI and legacy) to ai library format
+ * Register tool UI renderers and return the original tool definitions.
  */
 export function convertToolsForAI(tools: Record<string, unknown>) {
-  const aiTools: Record<string, any> = {};
+  const adaptedTools: Record<string, unknown> = {};
 
   for (const [key, toolObj] of Object.entries(tools)) {
     if (toolObj && typeof toolObj === 'object') {
       // Check if it's a ToolWithUI
       if ('renderToolDoing' in toolObj && 'renderToolResult' in toolObj) {
-        // logger.info('[ToolAdapter] Tool has UI renderers, registering:', key);
-        aiTools[key] = convertToolForAI(toolObj as ToolWithUI, key);
+        adaptedTools[key] = convertToolForAI(toolObj as ToolWithUI, key);
       } else {
-        // // It's already an adapted tool (e.g., MCP tool or previously converted tool)
-        // logger.info('[ToolAdapter] Tool looks like a pre-adapted tool, using directly:', key);
-
-        // Just use directly without re-wrapping
-        aiTools[key] = toolObj as any;
+        // Use directly without re-wrapping
+        adaptedTools[key] = toolObj;
       }
     }
   }
 
-  return aiTools;
+  return adaptedTools;
 }

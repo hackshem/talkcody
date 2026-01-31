@@ -1,8 +1,11 @@
 import { Clock, Play, Terminal } from 'lucide-react';
+import { useTranslation } from '@/hooks/use-locale';
 
 interface BashToolResultProps {
   output?: string;
   error?: string;
+  outputFilePath?: string;
+  errorFilePath?: string;
   success: boolean;
   exitCode?: number;
   idleTimedOut?: boolean;
@@ -15,6 +18,8 @@ interface BashToolResultProps {
 export function BashToolResult({
   output,
   error,
+  outputFilePath,
+  errorFilePath,
   success,
   exitCode,
   idleTimedOut,
@@ -23,6 +28,7 @@ export function BashToolResult({
   taskId,
   isBackground,
 }: BashToolResultProps) {
+  const t = useTranslation();
   const isSuccess = success || exitCode === 0;
   const isRunningInBackground = idleTimedOut || timedOut;
   const isExplicitBackground = isBackground && !isRunningInBackground;
@@ -61,6 +67,13 @@ export function BashToolResult({
               <span>Command timed out{pid ? ` (PID: ${pid})` : ''}</span>
             </>
           )}
+        </div>
+      )}
+
+      {(outputFilePath || errorFilePath) && (
+        <div className="flex flex-col gap-1 text-xs text-gray-600 dark:text-gray-400">
+          {outputFilePath && <div>{t.ToolMessages.Bash.outputSaved(outputFilePath)}</div>}
+          {errorFilePath && <div>{t.ToolMessages.Bash.errorSaved(errorFilePath)}</div>}
         </div>
       )}
 

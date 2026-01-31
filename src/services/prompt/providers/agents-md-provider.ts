@@ -33,8 +33,27 @@ function getParentDirectory(path: string): string | null {
     return null; // Already at root
   }
 
+  const drivePrefixMatch = normalized.match(/^[A-Za-z]:/);
+  const prefix = normalized.startsWith('//')
+    ? '//'
+    : normalized.startsWith('/')
+      ? '/'
+      : drivePrefixMatch
+        ? drivePrefixMatch[0]
+        : '';
+
+  if (drivePrefixMatch && parts[0] === drivePrefixMatch[0]) {
+    parts.shift();
+  }
+
   parts.pop();
-  return `/${parts.join('/')}`;
+
+  if (parts.length === 0) {
+    return prefix || null;
+  }
+
+  const separator = prefix && !prefix.endsWith('/') ? '/' : '';
+  return `${prefix}${separator}${parts.join('/')}`;
 }
 
 /**
@@ -73,100 +92,77 @@ async function findHierarchicalMarkdownFiles(
   const results: Array<{ path: string; relativePath: string; fileType: MarkdownFileType }> = [];
   const workspaceRoot = normalizePath(ctx.workspaceRoot);
   const maxDepth = settings?.maxDepth;
+  const added = new Set<string>();
 
-  // Try each markdown file type in order
-  for (const fileType of MARKDOWN_FILES) {
-    // Always try to read from root first
-    const rootRelativePath = fileType;
-    let rootFound = false;
+  const shouldIncludePath = (dirPath: string) => {
+    if (maxDepth === undefined) return true;
+    const depth = getPathDepth(workspaceRoot, dirPath);
+    return depth !== -1 && depth <= maxDepth;
+  };
 
-    try {
-      await ctx.readFile(workspaceRoot, rootRelativePath);
-      results.push({ path: workspaceRoot, relativePath: rootRelativePath, fileType });
-      rootFound = true;
-    } catch {
-      // Root file doesn't exist, continue
+  const tryAddMarkdownFile = async (dirPath: string) => {
+    const relativeDir =
+      dirPath === workspaceRoot ? '' : dirPath.substring(workspaceRoot.length + 1);
+
+    for (const fileType of MARKDOWN_FILES) {
+      const markdownRelativePath = relativeDir ? `${relativeDir}/${fileType}` : fileType;
+      if (added.has(markdownRelativePath)) {
+        return;
+      }
+
+      try {
+        await ctx.readFile(workspaceRoot, markdownRelativePath);
+        results.push({ path: dirPath, relativePath: markdownRelativePath, fileType });
+        added.add(markdownRelativePath);
+        return; // Stop after first match per directory (AGENTS → CLAUDE → GEMINI)
+      } catch {
+        // File doesn't exist at this level, continue trying other file types
+      }
     }
+  };
 
-    // If we found the root file, we can stop searching for this file type
-    // and move to the next file type in the preference list
-    if (rootFound) {
-      break;
+  if (shouldIncludePath(workspaceRoot)) {
+    await tryAddMarkdownFile(workspaceRoot);
+  }
+
+  const startingPoints: string[] = [];
+
+  if (ctx.currentWorkingDirectory) {
+    startingPoints.push(normalizePath(ctx.currentWorkingDirectory));
+  }
+
+  if (ctx.recentFilePaths && ctx.recentFilePaths.length > 0) {
+    for (const filePath of ctx.recentFilePaths) {
+      const normalized = normalizePath(filePath);
+      const dir = getParentDirectory(normalized);
+      if (dir && !startingPoints.includes(dir)) {
+        startingPoints.push(dir);
+      }
     }
   }
 
-  // If no root file was found, collect all starting points for hierarchical search
-  if (results.length === 0) {
-    const startingPoints: string[] = [];
-
-    if (ctx.currentWorkingDirectory) {
-      startingPoints.push(normalizePath(ctx.currentWorkingDirectory));
+  // For each starting point, walk up to workspace root
+  for (const startPath of startingPoints) {
+    if (!isSubdirectory(workspaceRoot, startPath)) {
+      continue; // Skip if not within workspace
     }
 
-    if (ctx.recentFilePaths && ctx.recentFilePaths.length > 0) {
-      for (const filePath of ctx.recentFilePaths) {
-        const normalized = normalizePath(filePath);
-        // Get the directory containing the file
-        const dir = getParentDirectory(normalized);
-        if (dir && !startingPoints.includes(dir)) {
-          startingPoints.push(dir);
-        }
-      }
-    }
+    let currentPath = startPath;
 
-    // For each starting point, walk up to workspace root
-    for (const startPath of startingPoints) {
-      if (!isSubdirectory(workspaceRoot, startPath)) {
-        continue; // Skip if not within workspace
+    while (currentPath) {
+      if (shouldIncludePath(currentPath)) {
+        await tryAddMarkdownFile(currentPath);
       }
 
-      let currentPath = startPath;
-      let foundInHierarchy = false;
-
-      while (currentPath && currentPath !== workspaceRoot && !foundInHierarchy) {
-        // Check depth constraint
-        if (maxDepth !== undefined) {
-          const depth = getPathDepth(workspaceRoot, currentPath);
-          if (depth > maxDepth) {
-            const parentPath = getParentDirectory(currentPath);
-            if (!parentPath) break;
-            currentPath = parentPath;
-            continue;
-          }
-        }
-
-        // Try each markdown file type in order
-        for (const fileType of MARKDOWN_FILES) {
-          // Calculate relative path from workspace root
-          const relativePath = currentPath.substring(workspaceRoot.length + 1);
-          const markdownRelativePath = relativePath ? `${relativePath}/${fileType}` : fileType;
-
-          // Skip if already added
-          const alreadyAdded = results.some((r) => r.relativePath === markdownRelativePath);
-          if (!alreadyAdded) {
-            try {
-              await ctx.readFile(workspaceRoot, markdownRelativePath);
-              results.push({ path: currentPath, relativePath: markdownRelativePath, fileType });
-              foundInHierarchy = true;
-              break; // Found a file, stop trying other file types for this directory
-            } catch {
-              // File doesn't exist at this level, continue trying other file types
-            }
-          }
-        }
-
-        // Move up one directory
-        const parentPath = getParentDirectory(currentPath);
-        if (!parentPath || parentPath === currentPath) {
-          break;
-        }
-        currentPath = parentPath;
-      }
-
-      // If we found any file in this starting point's hierarchy, we can stop
-      if (foundInHierarchy) {
+      if (currentPath === workspaceRoot) {
         break;
       }
+
+      const parentPath = getParentDirectory(currentPath);
+      if (!parentPath || parentPath === currentPath) {
+        break;
+      }
+      currentPath = parentPath;
     }
   }
 
@@ -276,7 +272,7 @@ export const AgentsMdProvider = (settings?: AgentsMdSettings): PromptContextProv
   id: 'agents_md',
   label: 'Markdown Context (AGENTS.md/CLAUDE.md/GEMINI.md)',
   description:
-    'Injects the content of AGENTS.md, CLAUDE.md, or GEMINI.md from the opened repository root with fallback support. Updates when workspace changes.',
+    'Injects the content of AGENTS.md, CLAUDE.md, or GEMINI.md with hierarchical lookup and fallback support. Updates when workspace changes.',
   badges: ['Auto', 'Files', 'Local'],
 
   providedTokens() {
@@ -288,7 +284,7 @@ export const AgentsMdProvider = (settings?: AgentsMdSettings): PromptContextProv
   },
 
   async resolve(_token: string, ctx: ResolveContext): Promise<string | undefined> {
-    const strategy = settings?.searchStrategy ?? 'root-only';
+    const strategy = settings?.searchStrategy ?? 'hierarchical';
     const maxChars = settings?.maxChars ?? 8000;
 
     // Handle different search strategies

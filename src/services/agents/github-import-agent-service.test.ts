@@ -300,7 +300,7 @@ You are a test agent.`;
     expect(agent.dynamicPrompt?.providerSettings).toEqual({
       agents_md: {
         maxChars: 8000,
-        searchStrategy: 'root-only',
+        searchStrategy: 'hierarchical',
       },
     });
   });

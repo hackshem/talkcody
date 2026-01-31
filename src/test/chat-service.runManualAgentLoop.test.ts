@@ -6,6 +6,7 @@ import { hookStateService } from '../services/hooks/hook-state-service';
 import { messageService } from '../services/message-service';
 import { createLLMService, LLMService } from '../services/agents/llm-service';
 import type { AgentLoopOptions, UIMessage } from '../types/agent';
+import { createLlmEventStream, createTextOnlyEvents } from './utils/llm-client-mock';
 
 vi.mock('@/providers/stores/provider-store', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/providers/stores/provider-store')>();
@@ -14,10 +15,8 @@ vi.mock('@/providers/stores/provider-store', async (importOriginal) => {
     useProviderStore: {
       getState: vi.fn(() => ({
         getProviderModel: vi.fn(() => ({
-          languageModel: { provider: 'test', modelId: 'test-model' },
-          modelConfig: { name: 'Test Model', context_length: 128000 },
-          providerId: 'test-provider',
-          modelKey: 'test-model',
+          provider: 'test-provider',
+          config: { id: 'test-provider' },
         })),
         isModelAvailable: vi.fn(() => true),
         availableModels: [],
@@ -167,15 +166,9 @@ vi.mock('../lib/llm-utils', () => ({
     .mockImplementation((text, isFirst) => (isFirst ? `\n<thinking>\n${text}` : text)),
 }));
 
-vi.mock('ai', () => ({
-  streamText: vi.fn(),
-  stepCountIs: vi.fn((count) => ({ type: 'step-count', count })),
-  smoothStream: vi.fn(() => undefined),
-  NoSuchToolError: {
-    isInstance: vi.fn().mockReturnValue(false),
-  },
-  InvalidToolInputError: {
-    isInstance: vi.fn().mockReturnValue(false),
+vi.mock('@/services/llm/llm-client', () => ({
+  llmClient: {
+    streamText: vi.fn(),
   },
 }));
 
@@ -201,16 +194,8 @@ describe('ChatService.runManualAgentLoop', () => {
     const { useProviderStore } = await import('@/providers/stores/provider-store');
     vi.mocked(useProviderStore.getState).mockReturnValue({
       getProviderModel: vi.fn().mockReturnValue({
-        languageModel: {
-          provider: 'test',
-          modelId: 'test-model',
-        },
-        modelConfig: {
-          name: 'Test Model',
-          context_length: 128000,
-        },
-        providerId: 'test-provider',
-        modelKey: 'test-model',
+        provider: 'test-provider',
+        config: { id: 'test-provider' },
       }),
       isModelAvailable: vi.fn(() => true),
       availableModels: [],
@@ -246,8 +231,8 @@ describe('ChatService.runManualAgentLoop', () => {
       additionalContext: [],
     });
 
-    const aiModule = await import('ai');
-    mockStreamText = vi.mocked(aiModule.streamText);
+    const llmModule = await import('@/services/llm/llm-client');
+    mockStreamText = vi.mocked(llmModule.llmClient.streamText);
 
     chatService = new LLMService('test-task-id');
     mockCallbacks = {
@@ -284,26 +269,9 @@ describe('ChatService.runManualAgentLoop', () => {
 
   describe('Basic functionality', () => {
     it('should complete successfully with text response', async () => {
-      // Mock successful text stream
-      const mockFullStream = [
-        { type: 'text-start' },
-        { type: 'text-delta', text: 'Hello!' },
-        { type: 'text-delta', text: ' How can I help?' },
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 10, outputTokens: 5 },
-        },
-      ];
-
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          for (const delta of mockFullStream) {
-            yield delta;
-          }
-        })(),
-        finishReason: Promise.resolve('stop'),
-      });
+      mockStreamText.mockReturnValue(
+        createLlmEventStream(createTextOnlyEvents(['Hello!', ' How can I help?']))
+      );
 
       const options = createBasicOptions();
 
@@ -316,28 +284,14 @@ describe('ChatService.runManualAgentLoop', () => {
     });
 
     it('should handle reasoning output when isThink is true', async () => {
-      const mockFullStream = [
-        { type: 'reasoning-delta', text: 'Let me think about this...' },
-        { type: 'text-start' },
-        {
-          type: 'text-delta',
-          text: 'Based on my reasoning, here is the answer.',
-        },
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 15, outputTokens: 8, reasoningTokens: 12 },
-        },
-      ];
-
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          for (const delta of mockFullStream) {
-            yield delta;
-          }
-        })(),
-        finishReason: Promise.resolve('stop'),
-      });
+      mockStreamText.mockReturnValue(
+        createLlmEventStream([
+          { type: 'reasoning-delta', id: 'default', text: 'Let me think about this...' },
+          { type: 'text-start' },
+          { type: 'text-delta', text: 'Based on my reasoning, here is the answer.' },
+          { type: 'done', finish_reason: 'stop' },
+        ])
+      );
 
       const options = createBasicOptions({ isThink: true });
 
@@ -353,24 +307,13 @@ describe('ChatService.runManualAgentLoop', () => {
     });
 
     it('should suppress reasoning when suppressReasoning is true', async () => {
-      const mockFullStream = [
-        { type: 'reasoning-delta', text: 'This should be suppressed' },
-        { type: 'text-delta', text: 'Visible text' },
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 10, outputTokens: 5 },
-        },
-      ];
-
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          for (const delta of mockFullStream) {
-            yield delta;
-          }
-        })(),
-        finishReason: Promise.resolve('stop'),
-      });
+      mockStreamText.mockReturnValue(
+        createLlmEventStream([
+          { type: 'reasoning-delta', id: 'default', text: 'This should be suppressed' },
+          { type: 'text-delta', text: 'Visible text' },
+          { type: 'done', finish_reason: 'stop' },
+        ])
+      );
 
       const options = createBasicOptions({ suppressReasoning: true });
 
@@ -382,23 +325,17 @@ describe('ChatService.runManualAgentLoop', () => {
 
     it('should respect maxIterations limit', async () => {
       // Mock stream that would normally continue indefinitely
-      const mockFullStream = [
-        {
-          type: 'tool-call',
-          toolName: 'nonExistentTool',
-          toolCallId: 'call-1',
-          args: {},
-        },
-      ];
-
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          for (const delta of mockFullStream) {
-            yield delta;
-          }
-        })(),
-        finishReason: Promise.resolve('tool-calls'),
-      });
+      mockStreamText.mockReturnValue(
+        createLlmEventStream([
+          {
+            type: 'tool-call',
+            toolName: 'nonExistentTool',
+            toolCallId: 'call-1',
+            input: {},
+          },
+          { type: 'done', finish_reason: 'tool-calls' },
+        ])
+      );
 
       const options = createBasicOptions({
         maxIterations: 2,
@@ -423,42 +360,24 @@ describe('ChatService.runManualAgentLoop', () => {
       };
 
 
-      const mockFullStream = [
-        {
-          type: 'tool-call',
-          toolName: 'testTool',
-          toolCallId: 'call-1',
-          input: { input: 'test' },
-        },
-      ];
-
-      // Second iteration after tool execution
-      const mockSecondStream = [
-        { type: 'text-delta', text: 'Tool executed successfully!' },
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 15, outputTokens: 8 },
-        },
-      ];
-
       mockStreamText
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockFullStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('tool-calls'),
-        })
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockSecondStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('stop'),
-        });
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            {
+              type: 'tool-call',
+              toolName: 'testTool',
+              toolCallId: 'call-1',
+              input: { input: 'test' },
+            },
+            { type: 'done', finish_reason: 'tool-calls' },
+          ])
+        )
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            { type: 'text-delta', text: 'Tool executed successfully!' },
+            { type: 'done', finish_reason: 'stop' },
+          ])
+        );
 
       const options = createBasicOptions({
         tools: { testTool: mockTool },
@@ -470,45 +389,24 @@ describe('ChatService.runManualAgentLoop', () => {
     });
 
     it('should handle tool not found error', async () => {
-      const mockFullStream = [
-        {
-          type: 'tool-call',
-          toolName: 'nonExistentTool',
-          toolCallId: 'call-1',
-          args: {},
-        },
-      ];
-
-      // Second iteration should continue after tool error
-      const mockSecondStream = [
-        {
-          type: 'text-delta',
-          text: 'I apologize, let me try a different approach.',
-        },
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 15, outputTokens: 10 },
-        },
-      ];
-
       mockStreamText
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockFullStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('tool-calls'),
-        })
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockSecondStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('stop'),
-        });
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            {
+              type: 'tool-call',
+              toolName: 'nonExistentTool',
+              toolCallId: 'call-1',
+              input: {},
+            },
+            { type: 'done', finish_reason: 'tool-calls' },
+          ])
+        )
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            { type: 'text-delta', text: 'I apologize, let me try a different approach.' },
+            { type: 'done', finish_reason: 'stop' },
+          ])
+        );
 
       const options = createBasicOptions({
         tools: { validTool: { inputSchema: z.object({}), execute: vi.fn() } },
@@ -523,41 +421,24 @@ describe('ChatService.runManualAgentLoop', () => {
         execute: vi.fn().mockRejectedValue(new Error('Tool execution failed')),
       };
 
-      const mockFullStream = [
-        {
-          type: 'tool-call',
-          toolName: 'failingTool',
-          toolCallId: 'call-1',
-          args: {},
-        },
-      ];
-
-      const mockSecondStream = [
-        { type: 'text-delta', text: 'Let me handle this error.' },
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 15, outputTokens: 8 },
-        },
-      ];
-
       mockStreamText
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockFullStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('tool-calls'),
-        })
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockSecondStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('stop'),
-        });
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            {
+              type: 'tool-call',
+              toolName: 'failingTool',
+              toolCallId: 'call-1',
+              input: {},
+            },
+            { type: 'done', finish_reason: 'tool-calls' },
+          ])
+        )
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            { type: 'text-delta', text: 'Let me handle this error.' },
+            { type: 'done', finish_reason: 'stop' },
+          ])
+        );
 
       const options = createBasicOptions({
         tools: { failingTool: mockTool },
@@ -568,6 +449,21 @@ describe('ChatService.runManualAgentLoop', () => {
   });
 
   describe('Error handling', () => {
+    it('should reject with AbortError when aborted before loop iteration', async () => {
+      const abortController = new AbortController();
+      abortController.abort();
+
+      const options = createBasicOptions();
+
+      await expect(
+        chatService.runAgentLoop(options, mockCallbacks, abortController)
+      ).rejects.toThrow('Aborted');
+
+      expect(mockCallbacks.onError).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'AbortError' })
+      );
+    });
+
     it('should auto-compact on context length exceeded and retry', async () => {
       const overflowError = {
         type: 'error',
@@ -582,32 +478,27 @@ describe('ChatService.runManualAgentLoop', () => {
 
       const mockFirstStream = [{ type: 'error', error: overflowError }];
 
-      const mockSecondStream = [
-        { type: 'text-delta', text: 'Recovered after compaction.' },
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 10, outputTokens: 5 },
-        },
-      ];
-
       mockStreamText
         .mockReturnValueOnce({
-          fullStream: (async function* () {
+          events: (async function* () {
             for (const delta of mockFirstStream) {
-              yield delta;
+              if (delta.type === 'error' && typeof delta.error === 'object') {
+                const payload = delta.error as { error?: { code?: string } };
+                if (payload.error?.code) {
+                  yield { type: 'error', message: payload.error.code };
+                  continue;
+                }
+              }
+              yield delta as { type: string; message?: string };
             }
           })(),
-          finishReason: Promise.resolve('error'),
         })
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockSecondStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('stop'),
-        });
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            { type: 'text-delta', text: 'Recovered after compaction.' },
+            { type: 'done', finish_reason: 'stop' },
+          ])
+        );
 
       const options = createBasicOptions();
 
@@ -636,12 +527,18 @@ describe('ChatService.runManualAgentLoop', () => {
       const mockFirstStream = [{ type: 'error', error: overflowError }];
 
       mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
+        events: (async function* () {
           for (const delta of mockFirstStream) {
-            yield delta;
+            if (delta.type === 'error' && typeof delta.error === 'object') {
+              const payload = delta.error as { error?: { code?: string } };
+              if (payload.error?.code) {
+                yield { type: 'error', message: payload.error.code };
+                continue;
+              }
+            }
+            yield delta as { type: string; message?: string };
           }
         })(),
-        finishReason: Promise.resolve('error'),
       });
 
       const { ContextCompactor } = await import('../services/context/context-compactor');
@@ -671,40 +568,18 @@ describe('ChatService.runManualAgentLoop', () => {
     });
 
     it('should handle NoSuchToolError gracefully', async () => {
-      const { NoSuchToolError } = await import('ai');
-      const mockError = new Error('Tool not found');
-      vi.mocked(NoSuchToolError.isInstance).mockReturnValue(true);
-
-      // First stream with error
-      const mockFirstStream = [{ type: 'error', error: mockError }];
-
-      // Second stream with recovery response
-      const mockSecondStream = [
-        { type: 'text-delta', text: 'Using available tools instead.' },
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 15, outputTokens: 8 },
-        },
-      ];
-
       mockStreamText
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockFirstStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('error'),
-        })
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockSecondStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('stop'),
-        });
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            { type: 'error', message: 'tool_not_found' },
+          ])
+        )
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            { type: 'text-delta', text: 'Using available tools instead.' },
+            { type: 'done', finish_reason: 'stop' },
+          ])
+        );
 
       const options = createBasicOptions({
         tools: { validTool: { inputSchema: z.object({}), execute: vi.fn() } },
@@ -717,9 +592,7 @@ describe('ChatService.runManualAgentLoop', () => {
     });
 
     it('should handle InvalidToolInputError gracefully', async () => {
-      const { InvalidToolInputError } = await import('ai');
       const mockError = new Error('Invalid input parameters');
-      vi.mocked(InvalidToolInputError.isInstance).mockReturnValue(true);
 
       const mockFirstStream = [{ type: 'error', error: mockError }];
 
@@ -733,22 +606,17 @@ describe('ChatService.runManualAgentLoop', () => {
       ];
 
       mockStreamText
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockFirstStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('error'),
-        })
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockSecondStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('stop'),
-        });
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            { type: 'error', message: 'invalid_tool_input' },
+          ])
+        )
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            { type: 'text-delta', text: 'Let me correct the parameters.' },
+            { type: 'done', finish_reason: 'stop' },
+          ])
+        );
 
       const options = createBasicOptions();
 
@@ -774,22 +642,17 @@ describe('ChatService.runManualAgentLoop', () => {
       ];
 
       mockStreamText
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockFirstStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('error'),
-        })
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockSecondStream) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('stop'),
-        });
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            { type: 'error', message: 'tool_call_validation_failed' },
+          ])
+        )
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            { type: 'text-delta', text: 'I will use the available tools.' },
+            { type: 'done', finish_reason: 'stop' },
+          ])
+        );
 
       const options = createBasicOptions({
         tools: { validTool: { inputSchema: z.object({}), execute: vi.fn() } },
@@ -825,38 +688,21 @@ describe('ChatService.runManualAgentLoop', () => {
       ];
 
       mockStreamText
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockStream1) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('error'),
-        })
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockStream2) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('error'),
-        })
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockStream3) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('error'),
-        })
-        .mockReturnValueOnce({
-          fullStream: (async function* () {
-            for (const delta of mockStream4) {
-              yield delta;
-            }
-          })(),
-          finishReason: Promise.resolve('stop'),
-        });
+        .mockReturnValueOnce(
+          createLlmEventStream([{ type: 'error', message: 'tool_call_validation_failed' }])
+        )
+        .mockReturnValueOnce(
+          createLlmEventStream([{ type: 'error', message: 'tool_call_validation_failed' }])
+        )
+        .mockReturnValueOnce(
+          createLlmEventStream([{ type: 'error', message: 'tool_call_validation_failed' }])
+        )
+        .mockReturnValueOnce(
+          createLlmEventStream([
+            { type: 'text-delta', text: 'I understand now and will proceed correctly.' },
+            { type: 'done', finish_reason: 'stop' },
+          ])
+        );
 
       const options = createBasicOptions({
         tools: { validTool: { inputSchema: z.object({}), execute: vi.fn() } },
@@ -874,14 +720,9 @@ describe('ChatService.runManualAgentLoop', () => {
 
       const mockFullStream = [{ type: 'error', error: mockError }];
 
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          for (const delta of mockFullStream) {
-            yield delta;
-          }
-        })(),
-        finishReason: Promise.resolve('error'),
-      });
+      mockStreamText.mockReturnValue(
+        createLlmEventStream([{ type: 'error', message: 'Unknown stream error' }])
+      );
 
       const options = createBasicOptions();
 
@@ -902,14 +743,9 @@ describe('ChatService.runManualAgentLoop', () => {
 
       const mockFullStream = [{ type: 'error', error: mockError }];
 
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          for (const delta of mockFullStream) {
-            yield delta;
-          }
-        })(),
-        finishReason: Promise.resolve('error'),
-      });
+      mockStreamText.mockReturnValue(
+        createLlmEventStream([{ type: 'error', message: 'TimeoutError', name: 'TimeoutError' }])
+      );
 
       const options = createBasicOptions();
 
@@ -928,10 +764,11 @@ describe('ChatService.runManualAgentLoop', () => {
       // Make provider store throw error for unavailable model
       const { useProviderStore } = await import('@/providers/stores/provider-store');
       vi.mocked(useProviderStore.getState).mockReturnValueOnce({
-        getProviderModel: vi.fn(() => {
-          throw new Error('No available provider for model: unavailable-model');
-        }),
-        isModelAvailable: vi.fn(() => true),
+        getProviderModel: vi.fn(() => ({
+          provider: 'test-provider',
+          config: { id: 'test-provider' },
+        })),
+        isModelAvailable: vi.fn(() => false),
         availableModels: [],
         apiKeys: {},
         providers: new Map(),
@@ -948,22 +785,9 @@ describe('ChatService.runManualAgentLoop', () => {
 
   describe('Edge cases', () => {
     it('should surface stop hook reason in loop messages', async () => {
-      const mockFullStream = [
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 10, outputTokens: 0 },
-        },
-      ];
-
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          for (const delta of mockFullStream) {
-            yield delta;
-          }
-        })(),
-        finishReason: Promise.resolve('stop'),
-      });
+      mockStreamText.mockReturnValue(
+        createLlmEventStream([{ type: 'done', finish_reason: 'stop' }])
+      );
 
       vi.mocked(hookService.runStop).mockImplementation(async () => {
         await Promise.resolve();
@@ -991,26 +815,12 @@ describe('ChatService.runManualAgentLoop', () => {
     });
 
     it('should handle empty tool set', async () => {
-      const mockFullStream = [
-        {
-          type: 'text-delta',
-          text: 'No tools available, responding directly.',
-        },
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 10, outputTokens: 8 },
-        },
-      ];
-
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          for (const delta of mockFullStream) {
-            yield delta;
-          }
-        })(),
-        finishReason: Promise.resolve('stop'),
-      });
+      mockStreamText.mockReturnValue(
+        createLlmEventStream([
+          { type: 'text-delta', text: 'No tools available, responding directly.' },
+          { type: 'done', finish_reason: 'stop' },
+        ])
+      );
 
       const options = createBasicOptions({
         tools: {},
@@ -1024,22 +834,9 @@ describe('ChatService.runManualAgentLoop', () => {
     });
 
     it('should handle empty response content', async () => {
-      const mockFullStream = [
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 10, outputTokens: 0 },
-        },
-      ];
-
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          for (const delta of mockFullStream) {
-            yield delta;
-          }
-        })(),
-        finishReason: Promise.resolve('stop'),
-      });
+      mockStreamText.mockReturnValue(
+        createLlmEventStream([{ type: 'done', finish_reason: 'stop' }])
+      );
 
       const options = createBasicOptions();
 
@@ -1052,23 +849,12 @@ describe('ChatService.runManualAgentLoop', () => {
       const { aiPricingService } = await import('../services/ai/ai-pricing-service');
       vi.mocked(aiPricingService.calculateCost).mockRejectedValue(new Error('Pricing error'));
 
-      const mockFullStream = [
-        { type: 'text-delta', text: 'Test response' },
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 10, outputTokens: 5 },
-        },
-      ];
-
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          for (const delta of mockFullStream) {
-            yield delta;
-          }
-        })(),
-        finishReason: Promise.resolve('stop'),
-      });
+      mockStreamText.mockReturnValue(
+        createLlmEventStream([
+          { type: 'text-delta', text: 'Test response' },
+          { type: 'done', finish_reason: 'stop' },
+        ])
+      );
 
       const options = createBasicOptions();
 
@@ -1084,23 +870,12 @@ describe('ChatService.runManualAgentLoop', () => {
         new Error('Database error')
       );
 
-      const mockFullStream = [
-        { type: 'text-delta', text: 'Test response' },
-        {
-          type: 'step-finish',
-          finishReason: 'stop',
-          usage: { inputTokens: 10, outputTokens: 5 },
-        },
-      ];
-
-      mockStreamText.mockReturnValue({
-        fullStream: (async function* () {
-          for (const delta of mockFullStream) {
-            yield delta;
-          }
-        })(),
-        finishReason: Promise.resolve('stop'),
-      });
+      mockStreamText.mockReturnValue(
+        createLlmEventStream([
+          { type: 'text-delta', text: 'Test response' },
+          { type: 'done', finish_reason: 'stop' },
+        ])
+      );
 
       const options = createBasicOptions();
 

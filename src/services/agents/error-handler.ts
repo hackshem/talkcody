@@ -1,11 +1,13 @@
 // src/services/agents/error-handler.ts
-import { InvalidToolInputError, NoSuchToolError, type UserModelMessage } from 'ai';
+
 import {
   createErrorContext,
   createHttpStatusError,
   extractAndFormatError,
 } from '@/lib/error-utils';
 import { logger } from '@/lib/logger';
+import { InvalidToolInputError, NoSuchToolError } from '@/services/llm/errors';
+import type { Message as UserModelMessage } from '@/services/llm/types';
 import type { AgentLoopState, AgentToolSet } from '@/types/agent';
 
 export interface ErrorHandlerOptions {
@@ -163,20 +165,21 @@ export class ErrorHandler {
 
     const { errorDetails } = extractAndFormatError(error, errorContext);
 
-    // Handle specific error types
-    if (NoSuchToolError.isInstance(error)) {
-      return this.handleNoSuchToolError(error, options);
-    }
-
-    if (InvalidToolInputError.isInstance(error)) {
-      return this.handleInvalidToolInputError(error, options);
-    }
-
     // Check for tool validation errors
     const errorMessage = errorDetails.message;
+
+    // Handle specific error types
+    if (NoSuchToolError.isInstance(error) || errorMessage === 'tool_not_found') {
+      return this.handleNoSuchToolError(error as Error, options);
+    }
+
+    if (InvalidToolInputError.isInstance(error) || errorMessage === 'invalid_tool_input') {
+      return this.handleInvalidToolInputError(error as Error, options);
+    }
     if (
       errorMessage.includes('tool call validation failed') ||
-      errorMessage.includes('was not in request.tools')
+      errorMessage.includes('was not in request.tools') ||
+      errorMessage === 'tool_call_validation_failed'
     ) {
       return this.handleToolValidationError(errorMessage, options);
     }
@@ -194,7 +197,7 @@ export class ErrorHandler {
   /**
    * Check if should stop due to too many consecutive errors
    */
-  shouldStopOnConsecutiveErrors(consecutiveErrors: number, options: ErrorHandlerOptions): boolean {
+  addConsecutiveErrorGuidance(consecutiveErrors: number, options: ErrorHandlerOptions): void {
     if (consecutiveErrors >= this.maxConsecutiveToolErrors) {
       const { tools, loopState } = options;
       const availableTools = Object.keys(tools);
@@ -208,11 +211,7 @@ export class ErrorHandler {
         content: `Too many consecutive tool errors (${consecutiveErrors}). Available tools: ${availableTools.join(', ')}. Please carefully review which tools are available and use them correctly, or complete your response without using tools.`,
       };
       loopState.messages.push(consecutiveErrorMessage);
-
-      return true;
     }
-
-    return false;
   }
 
   handleMainLoopError(error: unknown, model: string, onError?: (error: Error) => void): Error {

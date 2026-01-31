@@ -4,7 +4,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { BaseDirectory, exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { logger } from '@/lib/logger';
 import type { ProxyRequest, ProxyResponse } from '@/lib/tauri-fetch';
-import { PROVIDER_CONFIGS, type ProviderIds } from '@/providers/config/provider-config';
+import { getOAuthToken } from '@/providers/config/oauth-config';
+import { PROVIDER_CONFIGS, PROVIDERS_WITH_INTERNATIONAL } from '@/providers/config/provider-config';
 import { customProviderService } from '@/providers/custom/custom-provider-service';
 import { useProviderStore } from '@/providers/stores/provider-store';
 import { settingsManager } from '@/stores/settings-store';
@@ -290,16 +291,33 @@ class CustomModelService {
         // Remove trailing slashes and append /models
         endpoint = customBaseUrl.replace(/\/+$/, '') + '/models';
         logger.info(`Using custom base URL for ${providerId}: ${endpoint}`);
+      } else if (PROVIDERS_WITH_INTERNATIONAL.includes(providerId)) {
+        const useInternational = await settingsManager.getProviderUseInternational(providerId);
+        if (useInternational) {
+          const providerConfig = PROVIDER_CONFIGS[providerId as keyof typeof PROVIDER_CONFIGS];
+          const internationalBaseUrl = providerConfig?.internationalBaseUrl;
+          if (internationalBaseUrl) {
+            endpoint = internationalBaseUrl.replace(/\/+$/, '') + '/models';
+            logger.info(`Using international base URL for ${providerId}: ${endpoint}`);
+          }
+        }
       }
 
       // Get API key for the provider
       apiKey = settingsManager.getProviderApiKey(providerId);
     }
 
+    const { oauthConfig } = useProviderStore.getState();
+    const oauthToken =
+      providerId === 'github_copilot'
+        ? oauthConfig.githubCopilotCopilotToken || getOAuthToken(providerId, oauthConfig)
+        : getOAuthToken(providerId, oauthConfig);
+    const authToken = apiKey || oauthToken;
+
     // For local providers (ollama, lmstudio), API key is optional
     // OAuth providers also don't need API key
-    if (!apiKey && !isLocalProvider(providerId) && !isCustomProvider) {
-      throw new Error(`No API key configured for provider ${providerId}`);
+    if (!authToken && !isLocalProvider(providerId) && !isCustomProvider) {
+      throw new Error(`No API key or OAuth token configured for provider ${providerId}`);
     }
 
     try {
@@ -308,7 +326,9 @@ class CustomModelService {
         Accept: 'application/json',
       };
 
-      if (isCustomProvider && customProviderType === 'anthropic' && apiKey) {
+      if (oauthToken && !isLocalProvider(providerId) && !isCustomProvider) {
+        headers['Authorization'] = `Bearer ${oauthToken}`;
+      } else if (isCustomProvider && customProviderType === 'anthropic' && apiKey) {
         // Custom Anthropic provider uses x-api-key header
         headers['x-api-key'] = apiKey;
         headers['anthropic-version'] = '2023-06-01';
@@ -402,7 +422,9 @@ class CustomModelService {
       // Get provider name from configs
       const providerDef = providerConfigs.get(providerId);
       const name =
-        providerDef?.name || PROVIDER_CONFIGS[providerId as ProviderIds]?.name || providerId;
+        providerDef?.name ||
+        PROVIDER_CONFIGS[providerId as keyof typeof PROVIDER_CONFIGS]?.name ||
+        providerId;
 
       providers.push({ id: providerId, name });
     }

@@ -3,7 +3,7 @@ import {
   MINIMAX_M21,
   NANO_BANANA_PRO,
   SCRIBE_V2_REALTIME,
-} from '@/providers/config/model-config';
+} from '@/providers/config/model-constants';
 
 export enum ModelType {
   MAIN = 'main_model',
@@ -69,9 +69,6 @@ export function isValidModelType(value: string): value is ModelType {
   return Object.values(ModelType).includes(value as ModelType);
 }
 
-/**
- * Helper function to get ModelType from string with fallback
- */
 export function getModelType(value: string | undefined): ModelType {
   if (value && isValidModelType(value)) {
     return value;

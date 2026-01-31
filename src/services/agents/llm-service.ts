@@ -1,13 +1,5 @@
 // src/services/agents/llm-service.ts
-import {
-  type AssistantModelMessage,
-  type ModelMessage,
-  smoothStream,
-  stepCountIs,
-  streamText,
-  type ToolModelMessage,
-  type ToolSet,
-} from 'ai';
+
 import {
   createErrorContext,
   extractAndFormatError,
@@ -18,12 +10,14 @@ import { logger } from '@/lib/logger';
 import { convertToAnthropicFormat } from '@/lib/message-convert';
 import { MessageTransform } from '@/lib/message-transform';
 import { validateAnthropicMessages } from '@/lib/message-validate';
+import { toOpenAIToolDefinition } from '@/lib/tool-schema';
 import { UsageTokenUtils } from '@/lib/usage-token-utils';
 import { generateId } from '@/lib/utils';
 import { getLocale, type SupportedLocale } from '@/locales';
 import { getContextLength } from '@/providers/config/model-config';
 import { parseModelIdentifier } from '@/providers/core/provider-utils';
 import { modelTypeService } from '@/providers/models/model-type-service';
+import { LLMStreamParams } from '@/services/agents/llm-stream-params';
 import {
   autoCodeReviewService,
   lastReviewedChangeTimestamp,
@@ -31,6 +25,13 @@ import {
 import { databaseService } from '@/services/database-service';
 import { hookService } from '@/services/hooks/hook-service';
 import { hookStateService } from '@/services/hooks/hook-state-service';
+import { llmClient, type StreamTextResult } from '@/services/llm/llm-client';
+import type {
+  ContentPart,
+  Message as LlmMessage,
+  StreamEvent as LlmStreamEvent,
+  Message as ModelMessage,
+} from '@/services/llm/types';
 import { messageService } from '@/services/message-service';
 import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
 import { useSettingsStore } from '@/stores/settings-store';
@@ -68,7 +69,6 @@ export interface AgentLoopCallbacks {
 
 import { useProviderStore } from '@/providers/stores/provider-store';
 import { ContextCompactor } from '../context/context-compactor';
-import { fileService } from '../file-service';
 import { taskFileService } from '../task-file-service';
 import { ErrorHandler } from './error-handler';
 import { StreamProcessor } from './stream-processor';
@@ -322,15 +322,15 @@ export class LLMService {
   ): Promise<void> {
     // biome-ignore lint/suspicious/noAsyncPromiseExecutor: Complex agent loop requires async Promise executor
     return new Promise<void>(async (resolve, reject) => {
-      const {
-        onChunk,
-        onComplete,
-        onError,
-        onStatus,
-        onToolMessage,
-        onAssistantMessageStart,
-        onAttachment,
-      } = callbacks;
+      const { onChunk, onComplete, onError, onStatus, onToolMessage, onAssistantMessageStart } =
+        callbacks;
+
+      const rejectOnAbort = (message: string) => {
+        logger.info(message);
+        const abortError = new DOMException('Aborted', 'AbortError');
+        onError?.(abortError);
+        reject(abortError);
+      };
 
       try {
         const {
@@ -386,7 +386,7 @@ export class LLMService {
             t.LLMService.errors.noProvider(model, errorContext.provider || 'unknown')
           );
         }
-        const providerModel = providerStore.getProviderModel(model);
+        providerStore.getProviderModel(model);
 
         const rootPath = await getEffectiveWorkspaceRoot(this.taskId);
 
@@ -525,7 +525,7 @@ export class LLMService {
           }
           // Check for abort signal
           if (abortController?.signal.aborted) {
-            logger.info('Agent loop aborted by user');
+            rejectOnAbort('Agent loop aborted by user');
             return;
           }
 
@@ -600,8 +600,8 @@ export class LLMService {
           // Log request context before calling streamText
           const requestStartTime = Date.now();
 
-          // Create tool definitions WITHOUT execute methods for AI SDK
-          // This prevents AI SDK from auto-executing tools, which would bypass ToolExecutor
+          // Create tool definitions without execute methods
+          // This prevents auto-executing tools, which would bypass ToolExecutor
           // ToolExecutor will manually execute tools using the filtered tools object
           const toolsForAI: Record<string, unknown> = Object.fromEntries(
             Object.entries(filteredTools).map(([name, toolDef]) => {
@@ -614,12 +614,12 @@ export class LLMService {
               }
               return [name, toolDef];
             })
-          ) as unknown as ToolSet;
+          );
 
           // Retry loop for handling intermittent OpenRouter streaming errors
           const MAX_STREAM_RETRIES = 3;
           let streamRetryCount = 0;
-          let streamResult: ReturnType<typeof streamText> | null = null;
+          let streamResult: StreamTextResult | null = null;
           let shouldAutoCompact = false;
 
           while (streamRetryCount <= MAX_STREAM_RETRIES) {
@@ -632,149 +632,85 @@ export class LLMService {
                 });
               }
 
-              const enableReasoningOptions = isThink;
-              const providerOptionsMap: Record<string, unknown> = {};
-
-              const normalizedReasoningEffort = (() => {
-                const { modelKey } = parseModelIdentifier(model);
-                const supportsXhigh =
-                  modelKey === 'gpt-5.2-codex' || modelKey === 'gpt-5.1-codex-max';
-                if (!supportsXhigh && reasoningEffort === 'xhigh') {
-                  return 'high';
-                }
-                return reasoningEffort;
-              })();
-
-              if (enableReasoningOptions) {
-                providerOptionsMap.google = {
-                  thinkingConfig: {
-                    thinkingBudget: 8192,
-                    includeThoughts: true,
-                  },
-                };
-                providerOptionsMap.anthropic = {
-                  thinking: { type: 'enabled', budgetTokens: 12_000 },
-                };
-
-                providerOptionsMap.openai = {
-                  reasoningEffort: normalizedReasoningEffort,
-                };
-                providerOptionsMap.openrouter = {
-                  effort: normalizedReasoningEffort,
-                };
-
-                providerOptionsMap.moonshot = {
-                  thinking: { type: 'enabled' },
-                  temperature: 1.0,
-                };
-              }
-
-              // biome-ignore lint/suspicious/noExplicitAny: providerOptions type varies by provider
-              const providerOptions: any =
-                Object.keys(providerOptionsMap).length > 0 ? providerOptionsMap : undefined;
-
-              streamResult = streamText({
-                model: providerModel,
-                messages: loopState.messages,
-                stopWhen: stepCountIs(1),
-                experimental_transform: smoothStream({
-                  delayInMs: 100, // optional: defaults to 10ms
-                  chunking: 'line', // optional: defaults to 'word'
-                }),
-                maxOutputTokens: 15000,
-                providerOptions,
-                onFinish: async ({ finishReason, usage, totalUsage, request }) => {
-                  const requestDuration = Date.now() - requestStartTime;
-                  const normalizedUsage = UsageTokenUtils.normalizeUsageTokens(usage, totalUsage);
-
-                  if (normalizedUsage?.totalTokens) {
-                    // Check if token count increased significantly
-                    if (loopState.lastRequestTokens > 0) {
-                      const tokenIncrease =
-                        normalizedUsage.totalTokens - loopState.lastRequestTokens;
-                      if (tokenIncrease > 10000) {
-                        logger.warn('Token count increased significantly', {
-                          currentTokens: normalizedUsage.totalTokens,
-                          previousTokens: loopState.lastRequestTokens,
-                          increase: tokenIncrease,
-                          iteration: loopState.currentIteration,
-                        });
-                      }
-                    }
-                    loopState.lastRequestTokens = normalizedUsage.totalTokens;
-                  }
-
-                  if (normalizedUsage) {
-                    const {
-                      inputTokens,
-                      outputTokens,
-                      cachedInputTokens,
-                      cacheCreationInputTokens,
-                    } = normalizedUsage;
-                    const cost = aiPricingService.calculateCost(model, {
-                      inputTokens,
-                      outputTokens,
-                      cachedInputTokens,
-                      cacheCreationInputTokens,
-                    });
-
-                    let contextUsage: number | undefined;
-                    if (loopState.lastRequestTokens > 0) {
-                      const maxContextTokens = getContextLength(model);
-                      contextUsage = Math.min(
-                        100,
-                        (loopState.lastRequestTokens / maxContextTokens) * 100
-                      );
-                    }
-
-                    if (this.taskId && !isSubagent) {
-                      useTaskStore.getState().updateTaskUsage(this.taskId, {
-                        costDelta: cost,
-                        inputTokensDelta: inputTokens,
-                        outputTokensDelta: outputTokens,
-                        requestCountDelta: 1,
-                        contextUsage,
-                      });
-                    }
-
-                    databaseService
-                      .insertApiUsageEvent({
-                        id: generateId(),
-                        conversationId:
-                          this.taskId && this.taskId !== 'nested' ? this.taskId : null,
-                        model,
-                        providerId: providerId ?? null,
-                        inputTokens,
-                        outputTokens,
-                        cost,
-                        createdAt: Date.now(),
-                      })
-                      .catch((error) => {
-                        logger.warn('[LLMService] Failed to insert usage event', error);
-                      });
-                  }
-
-                  logger.info('onFinish', {
-                    finishReason,
-                    requestDuration,
-                    totalUsage: totalUsage,
-                    lastRequestTokens: loopState.lastRequestTokens,
-                    request,
-                  });
-                },
-                tools: toolsForAI as ToolSet, // Use tool definitions WITHOUT execute methods
-                abortSignal: abortController?.signal,
-                includeRawChunks: true,
+              const { providerOptions, temperature, topP, topK } = LLMStreamParams.build({
+                modelIdentifier: model,
+                reasoningEffort,
+                enableReasoningOptions: isThink,
               });
+
+              const llmMessages: LlmMessage[] = loopState.messages.map((msg) => {
+                if (msg.role === 'tool' && Array.isArray(msg.content)) {
+                  return {
+                    role: 'tool',
+                    content: (msg.content as Array<{ type: string }>).map((part) => {
+                      if (part.type === 'tool-result') {
+                        return {
+                          type: 'tool-result',
+                          toolCallId: (part as unknown as { toolCallId: string }).toolCallId,
+                          toolName: (part as unknown as { toolName: string }).toolName,
+                          output: (part as unknown as { output: unknown }).output,
+                        };
+                      }
+                      return part as unknown as LlmMessage['content'][number];
+                    }),
+                    providerOptions: (msg as { providerOptions?: Record<string, unknown> })
+                      .providerOptions,
+                  } as LlmMessage;
+                }
+
+                if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+                  return {
+                    role: 'assistant',
+                    content: (msg.content as Array<{ type: string }>).map((part) => {
+                      if (part.type === 'tool-call') {
+                        return {
+                          type: 'tool-call',
+                          toolCallId: (part as unknown as { toolCallId: string }).toolCallId,
+                          toolName: (part as unknown as { toolName: string }).toolName,
+                          input: (part as unknown as { input: unknown }).input,
+                        };
+                      }
+                      return part as unknown as LlmMessage['content'][number];
+                    }),
+                    providerOptions: (msg as { providerOptions?: Record<string, unknown> })
+                      .providerOptions,
+                  } as LlmMessage;
+                }
+
+                return {
+                  role: msg.role as LlmMessage['role'],
+                  content: msg.content as LlmMessage['content'],
+                  providerOptions: (msg as { providerOptions?: Record<string, unknown> })
+                    .providerOptions,
+                } as LlmMessage;
+              });
+
+              const tools = Object.entries(toolsForAI).map(([name, tool]) => {
+                const toolDef = tool as { description?: string; inputSchema?: unknown };
+                return toOpenAIToolDefinition(name, toolDef.description, toolDef.inputSchema);
+              });
+
+              streamResult = await llmClient.streamText(
+                {
+                  model,
+                  messages: llmMessages,
+                  tools: tools.length > 0 ? tools : undefined,
+                  temperature,
+                  maxTokens: 15000,
+                  topP,
+                  topK,
+                  providerOptions: providerOptions ?? undefined,
+                },
+                abortController?.signal
+              );
 
               const streamCallbacks = { onChunk, onStatus, onAssistantMessageStart };
               const streamContext = { suppressReasoning };
 
               // Process current step stream
-              for await (const delta of streamResult.fullStream) {
-                // Check for abort signal during streaming
+              for await (const delta of streamResult.events) {
                 if (abortController?.signal.aborted) {
-                  logger.info('Agent loop aborted during streaming');
+                  rejectOnAbort('Agent loop aborted during streaming');
                   return;
                 }
 
@@ -792,90 +728,136 @@ export class LLMService {
                       {
                         toolCallId: delta.toolCallId,
                         toolName: delta.toolName,
-                        input:
-                          (delta as { input?: unknown; args?: unknown }).input ??
-                          (delta as { input?: unknown; args?: unknown }).args,
+                        input: delta.input,
                       },
                       streamCallbacks
                     );
                     break;
                   case 'reasoning-start':
                     streamProcessor.processReasoningStart(
-                      (delta as { id: string }).id,
-                      (delta as { providerMetadata?: Record<string, unknown> }).providerMetadata,
+                      delta.id,
+                      delta.providerMetadata ?? undefined,
                       streamCallbacks
                     );
                     break;
                   case 'reasoning-delta':
-                    // Always process reasoning-delta even if text is empty
-                    // because signature is delivered via providerMetadata with empty text
                     streamProcessor.processReasoningDelta(
-                      (delta as { id: string }).id || 'default',
+                      delta.id || 'default',
                       delta.text || '',
-                      (delta as { providerMetadata?: Record<string, unknown> }).providerMetadata,
+                      delta.providerMetadata ?? undefined,
                       streamContext,
                       streamCallbacks
                     );
                     break;
                   case 'reasoning-end':
-                    streamProcessor.processReasoningEnd(
-                      (delta as { id: string }).id,
-                      streamCallbacks
-                    );
+                    streamProcessor.processReasoningEnd(delta.id, streamCallbacks);
                     break;
-                  case 'file': {
-                    // Handle generated files (e.g., images from image generation models)
-                    const file = (delta as { file: { uint8Array: Uint8Array; mediaType: string } })
-                      .file;
-                    if (file && onAttachment) {
-                      try {
-                        // Generate filename based on media type
-                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                        const extension = file.mediaType?.split('/')[1] || 'png';
-                        const filename = `gen-${timestamp}.${extension}`;
+                  case 'usage': {
+                    const requestDuration = Date.now() - requestStartTime;
+                    const normalizedUsage = UsageTokenUtils.normalizeUsageTokens(
+                      {
+                        inputTokens: delta.input_tokens,
+                        outputTokens: delta.output_tokens,
+                        cachedInputTokens: delta.cached_input_tokens ?? undefined,
+                        cacheCreationInputTokens: delta.cache_creation_input_tokens ?? undefined,
+                        totalTokens: delta.total_tokens ?? undefined,
+                      },
+                      undefined
+                    );
 
-                        // Save file to disk
-                        const savedFilePath = await fileService.saveGeneratedImage(
-                          file.uint8Array,
-                          filename
-                        );
-
-                        // Create MessageAttachment
-                        const attachment: MessageAttachment = {
-                          id: generateId(),
-                          type: file.mediaType?.startsWith('image/') ? 'image' : 'file',
-                          filename,
-                          content: '',
-                          filePath: savedFilePath,
-                          mimeType: file.mediaType || 'application/octet-stream',
-                          size: file.uint8Array.length,
-                        };
-
-                        logger.info('Generated file saved as attachment', {
-                          filename,
-                          mediaType: file.mediaType,
-                          size: file.uint8Array.length,
-                        });
-
-                        onAttachment(attachment);
-                      } catch (error) {
-                        logger.error('Failed to save generated file:', error);
+                    if (normalizedUsage?.totalTokens) {
+                      if (loopState.lastRequestTokens > 0) {
+                        const tokenIncrease =
+                          normalizedUsage.totalTokens - loopState.lastRequestTokens;
+                        if (tokenIncrease > 10000) {
+                          logger.warn('Token count increased significantly', {
+                            currentTokens: normalizedUsage.totalTokens,
+                            previousTokens: loopState.lastRequestTokens,
+                            increase: tokenIncrease,
+                            iteration: loopState.currentIteration,
+                          });
+                        }
                       }
+                      loopState.lastRequestTokens = normalizedUsage.totalTokens;
                     }
+
+                    if (normalizedUsage) {
+                      const {
+                        inputTokens,
+                        outputTokens,
+                        cachedInputTokens,
+                        cacheCreationInputTokens,
+                      } = normalizedUsage;
+                      const cost = aiPricingService.calculateCost(model, {
+                        inputTokens,
+                        outputTokens,
+                        cachedInputTokens,
+                        cacheCreationInputTokens,
+                      });
+
+                      let contextUsage: number | undefined;
+                      if (loopState.lastRequestTokens > 0) {
+                        const maxContextTokens = getContextLength(model);
+                        contextUsage = Math.min(
+                          100,
+                          (loopState.lastRequestTokens / maxContextTokens) * 100
+                        );
+                      }
+
+                      if (this.taskId && !isSubagent) {
+                        useTaskStore.getState().updateTaskUsage(this.taskId, {
+                          costDelta: cost,
+                          inputTokensDelta: inputTokens,
+                          outputTokensDelta: outputTokens,
+                          requestCountDelta: 1,
+                          contextUsage,
+                        });
+                      }
+
+                      databaseService
+                        .insertApiUsageEvent({
+                          id: generateId(),
+                          conversationId:
+                            this.taskId && this.taskId !== 'nested' ? this.taskId : null,
+                          model,
+                          providerId: providerId ?? null,
+                          inputTokens,
+                          outputTokens,
+                          cost,
+                          createdAt: Date.now(),
+                        })
+                        .catch((error) => {
+                          logger.warn('[LLMService] Failed to insert usage event', error);
+                        });
+                    }
+
+                    logger.info('onFinish', {
+                      finishReason: delta.total_tokens ? 'stop' : 'unknown',
+                      requestDuration,
+                      totalUsage: delta.total_tokens,
+                      lastRequestTokens: loopState.lastRequestTokens,
+                      request: 'llm_stream_text',
+                    });
                     break;
                   }
+                  case 'done':
+                    loopState.lastFinishReason = delta.finish_reason ?? undefined;
+                    break;
                   case 'raw': {
-                    // Store raw chunks for post-analysis debugging
                     if (!loopState.rawChunks) {
                       loopState.rawChunks = [];
                     }
-                    loopState.rawChunks.push(delta.rawValue);
+                    loopState.rawChunks.push(delta.raw_value);
                     break;
                   }
                   case 'error': {
                     streamProcessor.markError();
 
-                    if (isContextLengthExceededError(delta.error)) {
+                    const errorObj = new Error(delta.message);
+                    if (delta.name) {
+                      errorObj.name = delta.name;
+                    }
+                    if (isContextLengthExceededError(errorObj)) {
                       const MAX_AUTO_COMPACTIONS = 1;
                       if (autoCompactionAttempts < MAX_AUTO_COMPACTIONS) {
                         autoCompactionAttempts++;
@@ -898,12 +880,11 @@ export class LLMService {
                     };
 
                     const errorResult = this.errorHandler.handleStreamError(
-                      delta.error,
+                      errorObj,
                       errorHandlerOptions
                     );
 
                     if (errorResult.shouldStop) {
-                      // Call onError callback before rejecting to notify the caller
                       const error =
                         errorResult.error || new Error('Unknown error occurred during streaming');
                       onError?.(error);
@@ -911,25 +892,17 @@ export class LLMService {
                       return;
                     }
 
-                    // For recoverable errors, notify UI immediately via onError callback
-                    // This ensures error message is displayed at the correct position in the chat
-                    // If we only add to loopState.messages, error will appear before the user's next message
                     if (errorResult.error) {
                       onError?.(errorResult.error);
                     }
 
-                    // Check for too many consecutive errors
                     const consecutiveErrors = streamProcessor.getConsecutiveToolErrors();
-                    if (
-                      this.errorHandler.shouldStopOnConsecutiveErrors(
-                        consecutiveErrors,
-                        errorHandlerOptions
-                      )
-                    ) {
-                      // Continue to next iteration after adding guidance message
-                    }
+                    // Add guidance message when too many consecutive errors occur, but continue the loop
+                    this.errorHandler.addConsecutiveErrorGuidance(
+                      consecutiveErrors,
+                      errorHandlerOptions
+                    );
 
-                    // Break out of the current stream and continue to next iteration
                     break;
                   }
                 }
@@ -1006,14 +979,16 @@ export class LLMService {
             continue;
           }
 
-          loopState.lastFinishReason = await streamResult.finishReason;
+          if (!loopState.lastFinishReason) {
+            loopState.lastFinishReason = 'stop';
+          }
           // Handle "unknown" finish reason by retrying without modifying messages
           if (loopState.lastFinishReason === 'other' && toolCalls.length === 0) {
             const maxUnknownRetries = 3;
             loopState.unknownFinishReasonCount = (loopState.unknownFinishReasonCount || 0) + 1;
 
             logger.warn('Unknown finish reason detected', {
-              provider: providerModel.provider,
+              provider: providerId ?? 'unknown',
               model: model,
               retryCount: loopState.unknownFinishReasonCount,
               maxRetries: maxUnknownRetries,
@@ -1033,7 +1008,7 @@ export class LLMService {
             // Max retries reached
             logger.error('Max unknown finish reason retries reached', {
               retries: loopState.unknownFinishReasonCount,
-              provider: providerModel.provider,
+              provider: providerId ?? 'unknown',
               model: model,
             });
             throw new Error(t.LLMService.errors.unknownFinishReason);
@@ -1076,7 +1051,7 @@ export class LLMService {
           if (toolCalls.length > 0) {
             // Check for abort signal before execution
             if (abortController?.signal.aborted) {
-              logger.info('Agent loop aborted before tool execution');
+              rejectOnAbort('Agent loop aborted before tool execution');
               return;
             }
 
@@ -1113,8 +1088,10 @@ export class LLMService {
                 toolCallId: tc.toolCallId,
                 toolName: tc.toolName,
                 input,
-              };
+              } satisfies ContentPart;
             });
+
+            const combinedAssistantContent: ContentPart[] = [...assistantContent, ...toolCallParts];
 
             // Apply provider-specific transformation (e.g., DeepSeek reasoning_content)
             const { providerId: pid } = parseModelIdentifier(model);
@@ -1122,19 +1099,19 @@ export class LLMService {
               loopState.messages,
               model,
               pid ?? undefined,
-              assistantContent
+              combinedAssistantContent
             );
 
-            const assistantMessage: AssistantModelMessage = {
+            const assistantMessage: ModelMessage = {
               role: 'assistant',
-              content: [...(transformedContent?.content ?? assistantContent), ...toolCallParts],
+              content: transformedContent?.content ?? combinedAssistantContent,
               ...(transformedContent?.providerOptions && {
                 providerOptions: transformedContent.providerOptions,
               }),
             };
             loopState.messages.push(assistantMessage);
 
-            const toolResultMessage: ToolModelMessage = {
+            const toolResultMessage: ModelMessage = {
               role: 'tool',
               content: results.map(({ toolCall, result }) => ({
                 type: 'tool-result' as const,
@@ -1151,7 +1128,7 @@ export class LLMService {
             // No tool calls - only add assistant message if there's text/reasoning content
             const assistantContent = streamProcessor.getAssistantContent();
             if (assistantContent.length > 0) {
-              const assistantMessage: AssistantModelMessage = {
+              const assistantMessage: ModelMessage = {
                 role: 'assistant',
                 content: assistantContent,
               };

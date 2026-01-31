@@ -7,7 +7,6 @@
 //     │   ├── provider-config.ts
 //     │   └── model-config.ts
 //     ├── core/             - Core provider functionality
-//     │   ├── provider-registry.ts
 //     │   ├── provider-factory.ts
 //     │   ├── provider-utils.ts
 //     │   └── talkcody-provider.ts
@@ -35,9 +34,6 @@ export type {
 
 // Config exports
 export * from './config/provider-config';
-
-// Core exports
-export { ProviderRegistry, providerRegistry } from './core/provider-registry';
 
 // OAuth modules - import directly to avoid naming conflicts:
 // - @/providers/oauth/claude-oauth-service

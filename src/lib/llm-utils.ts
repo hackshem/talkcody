@@ -1,8 +1,7 @@
-import { safeValidateTypes } from '@ai-sdk/provider-utils';
-import type { ModelMessage } from 'ai';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { parseModelIdentifier } from '@/providers/core/provider-utils';
+import type { Message as ModelMessage } from '@/services/llm/types';
 import type { ConvertMessagesOptions, ToolMessageContent, UIMessage } from '@/types/agent';
 
 const MAX_LINES = 2000;
@@ -349,10 +348,7 @@ export async function convertMessages(
   }
 
   // Validate converted messages (includes semantic validation for tool-call/tool-result pairing)
-  const validationResult = await safeValidateTypes({
-    value: mergedMessages,
-    schema: modelMessagesSchema,
-  });
+  const validationResult = modelMessagesSchema.safeParse(mergedMessages);
 
   if (!validationResult.success) {
     logger.error('[convertMessages] Validation failed:', validationResult.error);

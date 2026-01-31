@@ -1,8 +1,8 @@
 // src/lib/message-convert.ts
 // Message conversion functions for Anthropic API compliance
 
-import type { ModelMessage, TextPart, ToolCallPart, ToolResultPart } from 'ai';
 import { logger } from '@/lib/logger';
+import type { ContentPart, Message as ModelMessage } from '@/services/llm/types';
 import { type ValidationResult, validateAnthropicMessages } from './message-validate';
 
 /**
@@ -27,19 +27,17 @@ export interface ConvertResult {
 /**
  * Type guard for assistant content parts
  */
-type AssistantContentPart = TextPart | ToolCallPart;
+type AssistantContentPart = Extract<ContentPart, { type: 'text' | 'tool-call' }>;
 
 /**
  * Normalizes message content to array format.
  * Converts string content to an array with a single text part.
  */
-function normalizeContentToArray(
-  content: string | unknown[]
-): Array<TextPart | ToolCallPart | ToolResultPart> {
+function normalizeContentToArray(content: string | unknown[]): ContentPart[] {
   if (typeof content === 'string') {
     return content.trim() ? [{ type: 'text' as const, text: content }] : [];
   }
-  return content as Array<TextPart | ToolCallPart | ToolResultPart>;
+  return content as ContentPart[];
 }
 
 /**
@@ -104,7 +102,7 @@ export function removeOrphanedToolMessages(messages: ModelMessage[]): ModelMessa
       }
     }
     if (msg.role === 'tool' && Array.isArray(msg.content)) {
-      for (const part of msg.content as ToolResultPart[]) {
+      for (const part of msg.content as ContentPart[]) {
         if (part.type === 'tool-result' && part.toolCallId) {
           toolResultIds.add(part.toolCallId);
         }
@@ -150,7 +148,7 @@ export function removeOrphanedToolMessages(messages: ModelMessage[]): ModelMessa
       }
     } else if (msg.role === 'tool' && Array.isArray(msg.content)) {
       // Filter out orphaned tool-results
-      const filteredContent = (msg.content as ToolResultPart[]).filter((part) => {
+      const filteredContent = (msg.content as ContentPart[]).filter((part) => {
         if (part.type === 'tool-result' && part.toolCallId) {
           const keep = validPairIds.has(part.toolCallId);
           if (!keep) {

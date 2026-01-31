@@ -330,7 +330,7 @@ export function buildRemoteAgentConfig(params: {
     providerSettings: {
       agents_md: {
         maxChars: 8000,
-        searchStrategy: 'root-only',
+        searchStrategy: 'hierarchical',
       },
     },
   };

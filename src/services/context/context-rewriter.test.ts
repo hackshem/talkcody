@@ -1,4 +1,4 @@
-import type { ModelMessage, ToolCallPart, ToolResultPart } from 'ai';
+import type { ContentPart, Message as ModelMessage } from '@/services/llm/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContextRewriter } from './context-rewriter';
 
@@ -68,7 +68,7 @@ function createReadFileResult(
             2
           ),
         },
-      } as ToolResultPart,
+      },
     ],
   };
 }
@@ -90,7 +90,7 @@ function createWriteFileCall(
           file_path: filePath,
           content,
         },
-      } as ToolCallPart,
+      },
     ],
   };
 }
@@ -183,7 +183,10 @@ describe('MessageRewriter', () => {
 
       // Verify the content was replaced
       const toolResult = result[0] as ModelMessage & { role: 'tool' };
-      const part = toolResult.content[0] as ToolResultPart;
+      const part = toolResult.content[0] as ContentPart;
+      if (part.type !== 'tool-result') {
+        throw new Error('Expected tool-result content part');
+      }
       const output = part.output as { type: 'text'; value: string };
       const parsedOutput = JSON.parse(output.value);
       expect(parsedOutput.content).toBe(summarizedContent);
@@ -214,7 +217,10 @@ describe('MessageRewriter', () => {
       );
 
       const toolResult = result[0] as ModelMessage & { role: 'tool' };
-      const part = toolResult.content[0] as ToolResultPart;
+      const part = toolResult.content[0] as ContentPart;
+      if (part.type !== 'tool-result') {
+        throw new Error('Expected tool-result content part');
+      }
       const output = part.output as { type: 'text'; value: string };
       const parsed = JSON.parse(output.value);
       expect(parsed.content).toBe(summarizedContent);
@@ -292,7 +298,7 @@ describe('MessageRewriter', () => {
                   // Missing file_path
                 }),
               },
-            } as ToolResultPart,
+            },
           ],
         },
       ];
@@ -353,7 +359,7 @@ describe('MessageRewriter', () => {
                   message: 'Read file',
                 }),
               },
-            } as ToolResultPart,
+            },
             {
               type: 'tool-result',
               toolCallId: 'call-2',
@@ -367,7 +373,7 @@ describe('MessageRewriter', () => {
                   message: 'Read file',
                 }),
               },
-            } as ToolResultPart,
+            },
             {
               type: 'tool-result',
               toolCallId: 'call-3',
@@ -381,7 +387,7 @@ describe('MessageRewriter', () => {
                   message: 'Read file',
                 }),
               },
-            } as ToolResultPart,
+            },
           ],
         },
       ];
@@ -391,19 +397,31 @@ describe('MessageRewriter', () => {
       expect(mockSummarizeCodeContent).toHaveBeenCalledTimes(2);
 
       const toolMessage = result[0] as ModelMessage & { role: 'tool' };
-      const parts = toolMessage.content as ToolResultPart[];
+      const parts = toolMessage.content as ContentPart[];
 
       // First two should be summarized
-      const output1 = parts[0].output as { type: 'text'; value: string };
+      const part1 = parts[0];
+      if (part1?.type !== 'tool-result') {
+        throw new Error('Expected tool-result content part');
+      }
+      const output1 = part1.output as { type: 'text'; value: string };
       const parsed1 = JSON.parse(output1.value);
       expect(parsed1.content).toBe('// Summary 1');
 
-      const output2 = parts[1].output as { type: 'text'; value: string };
+      const part2 = parts[1];
+      if (part2?.type !== 'tool-result') {
+        throw new Error('Expected tool-result content part');
+      }
+      const output2 = part2.output as { type: 'text'; value: string };
       const parsed2 = JSON.parse(output2.value);
       expect(parsed2.content).toBe('// Summary 2');
 
       // Third should be unchanged (small file)
-      const output3 = parts[2].output as { type: 'text'; value: string };
+      const part3 = parts[2];
+      if (part3?.type !== 'tool-result') {
+        throw new Error('Expected tool-result content part');
+      }
+      const output3 = part3.output as { type: 'text'; value: string };
       const parsed3 = JSON.parse(output3.value);
       expect(parsed3.content).toBe(smallContent);
     });
@@ -442,7 +460,10 @@ describe('MessageRewriter', () => {
       );
 
       const assistantMsg = result[0] as ModelMessage & { role: 'assistant' };
-      const part = assistantMsg.content[0] as ToolCallPart;
+      const part = assistantMsg.content[0] as ContentPart;
+      if (part.type !== 'tool-call') {
+        throw new Error('Expected tool-call content part');
+      }
       const input = part.input as { file_path: string; content: string };
       expect(input.content).toBe(summarizedContent);
     });
@@ -472,7 +493,7 @@ describe('MessageRewriter', () => {
                 content: generateContent(150),
                 // Missing file_path
               },
-            } as ToolCallPart,
+            },
           ],
         },
       ];
@@ -496,7 +517,7 @@ describe('MessageRewriter', () => {
                 file_path: '/src/file.ts',
                 // Missing content
               },
-            } as ToolCallPart,
+            },
           ],
         },
       ];
@@ -560,7 +581,7 @@ describe('MessageRewriter', () => {
                 file_path: '/src/large.ts',
                 content: largeContent,
               }),
-            } as unknown as ToolCallPart,
+            } as unknown as ContentPart,
           ],
         },
       ];
@@ -570,7 +591,7 @@ describe('MessageRewriter', () => {
       expect(mockSummarizeCodeContent).toHaveBeenCalled();
 
       const assistantMsg = result[0] as ModelMessage & { role: 'assistant' };
-      const part = assistantMsg.content[0] as ToolCallPart;
+      const part = assistantMsg.content[0] as ContentPart;
       const input = part.input as { file_path: string; content: string };
       expect(input.content).toBe(summarizedContent);
     });
@@ -609,14 +630,20 @@ describe('MessageRewriter', () => {
 
       // Read result summarized
       const toolResult = result[1] as ModelMessage & { role: 'tool' };
-      const readPart = toolResult.content[0] as ToolResultPart;
+      const readPart = toolResult.content[0] as ContentPart;
+      if (readPart.type !== 'tool-result') {
+        throw new Error('Expected tool-result content part');
+      }
       const readOutput = readPart.output as { type: 'text'; value: string };
       const parsedReadOutput = JSON.parse(readOutput.value);
       expect(parsedReadOutput.content).toBe('// Read summary');
 
       // Write call summarized
       const assistantMsg = result[2] as ModelMessage & { role: 'assistant' };
-      const writePart = assistantMsg.content[0] as ToolCallPart;
+      const writePart = assistantMsg.content[0] as ContentPart;
+      if (writePart.type !== 'tool-call') {
+        throw new Error('Expected tool-call content part');
+      }
       const writeInput = writePart.input as { file_path: string; content: string };
       expect(writeInput.content).toBe('// Write summary');
     });
@@ -644,7 +671,7 @@ describe('MessageRewriter', () => {
                 file_path: '/src/large.ts',
                 content: largeContent,
               },
-            } as ToolCallPart,
+            },
           ],
         },
       ];
@@ -661,7 +688,10 @@ describe('MessageRewriter', () => {
       expect(textPart.text).toBe('Let me write the file for you.');
 
       // Tool call should be summarized
-      const toolCallPart = assistantMsg.content[1] as ToolCallPart;
+      const toolCallPart = assistantMsg.content[1] as ContentPart;
+      if (toolCallPart.type !== 'tool-call') {
+        throw new Error('Expected tool-call content part');
+      }
       const input = toolCallPart.input as { file_path: string; content: string };
       expect(input.content).toBe('// Summary');
     });
@@ -676,7 +706,7 @@ describe('MessageRewriter', () => {
               toolCallId: 'call-1',
               toolName: 'bash',
               input: { command: generateContent(150) },
-            } as ToolCallPart,
+            },
           ],
         },
         {
@@ -687,7 +717,7 @@ describe('MessageRewriter', () => {
               toolCallId: 'call-1',
               toolName: 'bash',
               output: { type: 'text', value: generateContent(150) },
-            } as ToolResultPart,
+            },
           ],
         },
       ];
@@ -722,7 +752,10 @@ describe('MessageRewriter', () => {
         expect(mockSummarizeCodeContent).toHaveBeenCalled();
 
         const toolResult = result[0] as ModelMessage & { role: 'tool' };
-        const part = toolResult.content[0] as ToolResultPart;
+        const part = toolResult.content[0] as ContentPart;
+        if (part.type !== 'tool-result') {
+          throw new Error('Expected tool-result content part');
+        }
         const output = part.output as { type: 'text'; value: string };
         const parsed = JSON.parse(output.value);
         expect(parsed.content).toBe(`// ${ext} summary`);
@@ -752,7 +785,7 @@ describe('MessageRewriter', () => {
       const messages: ModelMessage[] = [
         {
           role: 'tool',
-          content: 'plain string content' as unknown as ToolResultPart[],
+          content: 'plain string content' as unknown as ContentPart[],
         },
       ];
 

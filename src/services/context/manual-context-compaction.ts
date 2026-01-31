@@ -1,11 +1,11 @@
 // src/services/context/manual-context-compaction.ts
-import type { ModelMessage } from 'ai';
 import { convertMessages } from '@/lib/llm-utils';
 import { logger } from '@/lib/logger';
 import { convertToAnthropicFormat } from '@/lib/message-convert';
 import { generateId } from '@/lib/utils';
 import { getLocale, type SupportedLocale } from '@/locales';
 import { modelTypeService } from '@/providers/models/model-type-service';
+import type { Message as ModelMessage } from '@/services/llm/types';
 import { taskFileService } from '@/services/task-file-service';
 import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
 import { useSettingsStore } from '@/stores/settings-store';

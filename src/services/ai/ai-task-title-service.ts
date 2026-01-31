@@ -1,7 +1,6 @@
-import { streamText } from 'ai';
 import { logger } from '@/lib/logger';
 import { modelTypeService } from '@/providers/models/model-type-service';
-import { useProviderStore } from '@/providers/stores/provider-store';
+import { buildPromptRequest, llmClient } from '@/services/llm/llm-client';
 import { settingsManager } from '@/stores/settings-store';
 import { ModelType } from '@/types/model-types';
 
@@ -52,14 +51,14 @@ ${languageInstruction}
 
 Provide ONLY the title without any quotes, explanations, or additional formatting.`;
 
-      const { textStream } = await streamText({
-        model: useProviderStore.getState().getProviderModel(modelIdentifier),
-        prompt,
-      });
+      const request = buildPromptRequest(modelIdentifier, prompt);
+      const { events } = await llmClient.streamText(request);
 
       let fullText = '';
-      for await (const delta of textStream) {
-        fullText += delta;
+      for await (const delta of events) {
+        if (delta.type === 'text-delta') {
+          fullText += delta.text;
+        }
       }
 
       const endTime = performance.now();

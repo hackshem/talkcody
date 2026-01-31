@@ -5,7 +5,7 @@
  * Uses @tauri-apps/api/mocks to intercept invoke() calls and route them to appropriate adapters.
  */
 
-import { clearMocks, mockIPC } from '@tauri-apps/api/mocks';
+import { clearMocks, emit, mockIPC } from '@tauri-apps/api/mocks';
 import { type DatabaseConfig, TestDatabaseAdapter } from './adapters/test-database-adapter';
 import { type FileSystemConfig, TestFileSystemAdapter } from './adapters/test-file-system-adapter';
 import { type ShellConfig, TestShellAdapter } from './adapters/test-shell-adapter';
@@ -111,7 +111,7 @@ export class TestIPCHandler {
 
     // Check for custom handlers first
     if (this.customHandlers.has(cmd)) {
-      return this.customHandlers.get(cmd)!(cmd, args);
+      return this.customHandlers.get(cmd)?.(cmd, args);
     }
 
     // Database commands
@@ -216,6 +216,32 @@ export class TestIPCHandler {
     // Skill commands
     if (cmd === 'create_skill_tarball' || cmd === 'extract_skill_tarball') {
       return null;
+    }
+
+    // LLM commands
+    if (cmd === 'llm_list_available_models') {
+      return [];
+    }
+    if (cmd === 'llm_get_provider_configs') {
+      return [];
+    }
+    if (cmd === 'llm_is_model_available') {
+      return true;
+    }
+    if (cmd === 'llm_set_setting') {
+      return null;
+    }
+    if (cmd === 'llm_register_custom_provider') {
+      return null;
+    }
+    if (cmd === 'llm_stream_text') {
+      const response = { request_id: Date.now() };
+      queueMicrotask(() => {
+        emit(`llm-stream-${response.request_id}`, { type: 'text-start' });
+        emit(`llm-stream-${response.request_id}`, { type: 'text-delta', text: 'Test' });
+        emit(`llm-stream-${response.request_id}`, { type: 'done', finish_reason: 'stop' });
+      });
+      return response;
     }
 
     // Lint commands

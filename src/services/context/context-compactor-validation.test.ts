@@ -10,7 +10,7 @@ vi.mock('@/services/ai/ai-context-compaction', () => ({
   },
 }));
 
-import type { ModelMessage } from 'ai';
+import type { Message as ModelMessage } from '@/services/llm/types';
 import type { CompressionResult } from '@/types/agent';
 import { ContextCompactor } from './context-compactor';
 
@@ -29,8 +29,11 @@ describe('MessageCompactor Validation', () => {
       messages: ModelMessage[],
       preserveCount: number
     ): number => {
-      return (compactor as unknown as { adjustPreserveBoundary: (m: ModelMessage[], p: number) => number })
-        .adjustPreserveBoundary(messages, preserveCount);
+      return (
+        compactor as unknown as {
+          adjustPreserveBoundary: (m: ModelMessage[], p: number) => number;
+        }
+      ).adjustPreserveBoundary(messages, preserveCount);
     };
 
     it('should not adjust when no tool messages in preserved section', () => {
@@ -54,14 +57,19 @@ describe('MessageCompactor Validation', () => {
         {
           role: 'assistant',
           content: [
-            { type: 'tool-call', toolCallId: 'call-1', toolName: 'readFile', args: {} },
+            { type: 'tool-call', toolCallId: 'call-1', toolName: 'readFile', input: {} },
           ],
         },
         // Tool result at position 4
         {
           role: 'tool',
           content: [
-            { type: 'tool-result', toolCallId: 'call-1', toolName: 'readFile', result: 'file contents' },
+            {
+              type: 'tool-result',
+              toolCallId: 'call-1',
+              toolName: 'readFile',
+              output: { type: 'text', value: 'file contents' },
+            },
           ],
         },
         { role: 'assistant', content: 'Done reading file' },
@@ -81,16 +89,26 @@ describe('MessageCompactor Validation', () => {
         {
           role: 'assistant',
           content: [
-            { type: 'tool-call', toolCallId: 'call-1', toolName: 'readFile', args: {} },
-            { type: 'tool-call', toolCallId: 'call-2', toolName: 'readFile', args: {} },
+            { type: 'tool-call', toolCallId: 'call-1', toolName: 'readFile', input: {} },
+            { type: 'tool-call', toolCallId: 'call-2', toolName: 'readFile', input: {} },
           ],
         },
         // Tool results
         {
           role: 'tool',
           content: [
-            { type: 'tool-result', toolCallId: 'call-1', toolName: 'readFile', result: 'result 1' },
-            { type: 'tool-result', toolCallId: 'call-2', toolName: 'readFile', result: 'result 2' },
+            {
+              type: 'tool-result',
+              toolCallId: 'call-1',
+              toolName: 'readFile',
+              output: { type: 'text', value: 'result 1' },
+            },
+            {
+              type: 'tool-result',
+              toolCallId: 'call-2',
+              toolName: 'readFile',
+              output: { type: 'text', value: 'result 2' },
+            },
           ],
         },
         { role: 'assistant', content: 'Done' },
@@ -108,26 +126,36 @@ describe('MessageCompactor Validation', () => {
         {
           role: 'assistant',
           content: [
-            { type: 'tool-call', toolCallId: 'call-1', toolName: 'readFile', args: {} },
+            { type: 'tool-call', toolCallId: 'call-1', toolName: 'readFile', input: {} },
           ],
         },
         {
           role: 'tool',
           content: [
-            { type: 'tool-result', toolCallId: 'call-1', toolName: 'readFile', result: 'result 1' },
+            {
+              type: 'tool-result',
+              toolCallId: 'call-1',
+              toolName: 'readFile',
+              output: { type: 'text', value: 'result 1' },
+            },
           ],
         },
         // Second tool call (based on first result)
         {
           role: 'assistant',
           content: [
-            { type: 'tool-call', toolCallId: 'call-2', toolName: 'editFile', args: {} },
+            { type: 'tool-call', toolCallId: 'call-2', toolName: 'editFile', input: {} },
           ],
         },
         {
           role: 'tool',
           content: [
-            { type: 'tool-result', toolCallId: 'call-2', toolName: 'editFile', result: 'result 2' },
+            {
+              type: 'tool-result',
+              toolCallId: 'call-2',
+              toolName: 'editFile',
+              output: { type: 'text', value: 'result 2' },
+            },
           ],
         },
         { role: 'assistant', content: 'Done' },
@@ -159,13 +187,18 @@ describe('MessageCompactor Validation', () => {
         {
           role: 'assistant',
           content: [
-            { type: 'tool-call', toolCallId: 'call-1', toolName: 'readFile', args: {} },
+            { type: 'tool-call', toolCallId: 'call-1', toolName: 'readFile', input: {} },
           ],
         },
         {
           role: 'tool',
           content: [
-            { type: 'tool-result', toolCallId: 'call-1', toolName: 'readFile', result: 'contents' },
+            {
+              type: 'tool-result',
+              toolCallId: 'call-1',
+              toolName: 'readFile',
+              output: { type: 'text', value: 'contents' },
+            },
           ],
         },
         { role: 'assistant', content: 'Here is the file' },
@@ -183,7 +216,12 @@ describe('MessageCompactor Validation', () => {
         {
           role: 'tool',
           content: [
-            { type: 'tool-result', toolCallId: 'orphan-1', toolName: 'test', output: { type: 'text', value: '' } },
+            {
+              type: 'tool-result',
+              toolCallId: 'orphan-1',
+              toolName: 'test',
+              output: { type: 'text', value: '' },
+            },
           ],
         },
       ];
@@ -268,7 +306,7 @@ describe('MessageCompactor Validation', () => {
         {
           role: 'assistant',
           content: [
-            { type: 'tool-call', toolCallId: 'orphan-1', toolName: 'test', args: {} },
+            { type: 'tool-call', toolCallId: 'orphan-1', toolName: 'test', input: {} },
           ],
         },
         { role: 'user', content: 'Next message' },
@@ -371,20 +409,30 @@ describe('MessageCompactor Validation', () => {
         {
           role: 'assistant',
           content: [
-            { type: 'tool-call', toolCallId: 'valid-1', toolName: 'test', args: {} },
+            { type: 'tool-call', toolCallId: 'valid-1', toolName: 'test', input: {} },
           ],
         },
         {
           role: 'tool',
           content: [
-            { type: 'tool-result', toolCallId: 'valid-1', toolName: 'test', result: '' },
+            {
+              type: 'tool-result',
+              toolCallId: 'valid-1',
+              toolName: 'test',
+              output: { type: 'text', value: '' },
+            },
           ],
         },
         // Orphaned tool-result
         {
           role: 'tool',
           content: [
-            { type: 'tool-result', toolCallId: 'orphan-1', toolName: 'test', result: '' },
+            {
+              type: 'tool-result',
+              toolCallId: 'orphan-1',
+              toolName: 'test',
+              output: { type: 'text', value: '' },
+            },
           ],
         },
       ];
@@ -606,13 +654,18 @@ ${'Extra content to make it long. '.repeat(300)}`;
         {
           role: 'assistant',
           content: [
-            { type: 'tool-call', toolCallId: 'call-1', toolName: 'readFile', args: {} },
+            { type: 'tool-call', toolCallId: 'call-1', toolName: 'readFile', input: {} },
           ],
         },
         {
           role: 'tool',
           content: [
-            { type: 'tool-result', toolCallId: 'call-1', toolName: 'readFile', result: 'content' },
+            {
+              type: 'tool-result',
+              toolCallId: 'call-1',
+              toolName: 'readFile',
+              output: { type: 'text', value: 'content' },
+            },
           ],
         },
         { role: 'assistant', content: 'Here is the file content' },
@@ -644,13 +697,18 @@ ${'Extra content to make it long. '.repeat(300)}`;
         {
           role: 'assistant',
           content: [
-            { type: 'tool-call', toolCallId: 'call-2', toolName: 'editFile', args: {} },
+            { type: 'tool-call', toolCallId: 'call-2', toolName: 'editFile', input: {} },
           ],
         },
         {
           role: 'tool',
           content: [
-            { type: 'tool-result', toolCallId: 'call-2', toolName: 'editFile', result: 'edited' },
+            {
+              type: 'tool-result',
+              toolCallId: 'call-2',
+              toolName: 'editFile',
+              output: { type: 'text', value: 'edited' },
+            },
           ],
         },
         { role: 'assistant', content: 'File has been edited' }

@@ -3,10 +3,10 @@
 // if (loopState.lastFinishReason === 'tool-calls' && toolCalls.length > 0)
 // When toolCalls.length is 0, the loop should exit gracefully
 
-import type { AssistantModelMessage, ToolModelMessage } from 'ai';
+import { UsageTokenUtils } from '@/lib/usage-token-utils';
+import type { Message as ModelMessage } from '@/services/llm/types';
 import { describe, expect, it } from 'vitest';
 
-import { UsageTokenUtils } from '@/lib/usage-token-utils';
 import type { ToolCallInfo } from './tool-executor';
 
 describe('LLMService - empty tool calls bug fix', () => {
@@ -149,7 +149,7 @@ describe('LLMService - parallel tool calls message structure', () => {
     ];
 
     // This is the fixed logic from llm-service.ts:523-531
-    const assistantMessage: AssistantModelMessage = {
+    const assistantMessage: ModelMessage = {
       role: 'assistant',
       content: toolCalls.map((tc) => ({
         type: 'tool-call' as const,
@@ -188,7 +188,7 @@ describe('LLMService - parallel tool calls message structure', () => {
     ];
 
     // This is the fixed logic from llm-service.ts:534-545
-    const toolResultMessage: ToolModelMessage = {
+    const toolResultMessage: ModelMessage = {
       role: 'tool',
       content: results.map(({ toolCall, result }) => ({
         type: 'tool-result' as const,
@@ -423,6 +423,25 @@ describe('LLMService - usage normalization', () => {
     );
 
     expect(normalized).toEqual({ inputTokens: 11, outputTokens: 13, totalTokens: 24 });
+  });
+
+  it('supports snake_case usage fields', () => {
+    const normalized = UsageTokenUtils.normalizeUsageTokens(
+      {
+        prompt_tokens: 9,
+        completion_tokens: 6,
+        total_tokens: 15,
+        cached_tokens: 2,
+      },
+      { total_tokens: 99 }
+    );
+
+    expect(normalized).toEqual({
+      inputTokens: 9,
+      outputTokens: 6,
+      totalTokens: 15,
+      cachedInputTokens: 2,
+    });
   });
 });
 

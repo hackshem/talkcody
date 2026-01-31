@@ -1,0 +1,56 @@
+use crate::llm::types::{Message, StreamEvent, ToolDefinition};
+use serde_json::Value;
+use std::collections::{HashMap, HashSet};
+
+pub trait LlmProtocol: Send + Sync {
+    fn name(&self) -> &str;
+    fn endpoint_path(&self) -> &'static str;
+    fn build_request(
+        &self,
+        model: &str,
+        messages: &[Message],
+        tools: Option<&[ToolDefinition]>,
+        temperature: Option<f32>,
+        max_tokens: Option<i32>,
+        top_p: Option<f32>,
+        top_k: Option<i32>,
+        provider_options: Option<&Value>,
+        extra_body: Option<&Value>,
+    ) -> Result<Value, String>;
+    fn parse_stream_event(
+        &self,
+        event_type: Option<&str>,
+        data: &str,
+        state: &mut ProtocolStreamState,
+    ) -> Result<Option<StreamEvent>, String>;
+    fn build_headers(
+        &self,
+        api_key: Option<&str>,
+        oauth_token: Option<&str>,
+        extra_headers: Option<&HashMap<String, String>>,
+    ) -> HashMap<String, String>;
+}
+
+#[derive(Default)]
+pub struct ProtocolStreamState {
+    pub finish_reason: Option<String>,
+    pub tool_calls: HashMap<String, ToolCallAccum>,
+    pub tool_call_order: Vec<String>,
+    pub emitted_tool_calls: HashSet<String>,
+    pub tool_call_index_map: HashMap<u64, String>,
+    pub current_thinking_id: Option<String>,
+    pub pending_events: Vec<StreamEvent>,
+    pub text_started: bool,
+    pub content_block_types: HashMap<usize, String>,
+    pub content_block_ids: HashMap<usize, String>,
+}
+
+#[derive(Default, Clone)]
+pub struct ToolCallAccum {
+    pub tool_call_id: String,
+    pub tool_name: String,
+    pub arguments: String,
+}
+
+pub mod claude_protocol;
+pub mod openai_protocol;

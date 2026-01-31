@@ -17,7 +17,7 @@ export interface ProviderDefinition {
   required?: boolean;
   type: ProviderType;
   // biome-ignore lint/suspicious/noExplicitAny: Provider return types vary by implementation
-  createProvider?: (apiKey: string, baseUrl?: string) => any;
+  createProvider?: (apiKey: string, baseUrl?: string, useInternational?: boolean) => any;
   isCustom?: boolean;
   customConfig?: CustomProviderConfig;
   /** Whether this provider supports Coding Plan feature */
@@ -26,6 +26,10 @@ export interface ProviderDefinition {
   codingPlanBaseUrl?: string;
   /** Whether this provider supports OAuth authentication (e.g., Claude Pro/Max) */
   supportsOAuth?: boolean;
+  /** Whether this provider supports International/International mode toggle */
+  supportsInternational?: boolean;
+  /** International base URL to use when International mode is enabled */
+  internationalBaseUrl?: string;
 }
 
 export interface ProviderRegistry {

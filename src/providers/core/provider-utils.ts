@@ -1,20 +1,14 @@
 // src/providers/core/provider-utils.ts
 // Pure utility functions for provider/model operations - no state management
 
-import { logger } from '@/lib/logger';
 import { getProvidersForModel, MODEL_CONFIGS } from '@/providers/config/model-config';
 import { getOAuthToken } from '@/providers/config/oauth-config';
 import { isLocalProvider } from '@/providers/custom/custom-model-service';
-import { createCustomProvider } from '@/providers/custom/custom-provider-factory';
 import type { ProviderDefinition } from '@/types';
 import type { AvailableModel } from '@/types/api-keys';
 import type { CustomProviderConfig } from '@/types/custom-provider';
 import type { ModelConfig } from '@/types/models';
 import { PROVIDER_CONFIGS } from '../config/provider-config';
-import { createAnthropicOAuthProvider } from '../oauth/claude-oauth-service';
-import { createGitHubCopilotOAuthProvider } from '../oauth/github-copilot-oauth-service';
-import { createOpenAIOAuthProvider } from '../oauth/openai-oauth-service';
-import { createQwenCodeOAuthProvider } from '../oauth/qwen-code-oauth-service';
 
 // OAuth configuration for provider creation
 export interface OAuthConfig {
@@ -29,7 +23,11 @@ export interface OAuthConfig {
 
 // Type for provider factory function (returns a function that creates model instances)
 // biome-ignore lint/suspicious/noExplicitAny: Provider return types vary by implementation
-export type ProviderFactory = (modelName: string) => any;
+// ProviderFactory kept for backward compatibility; provider creation now happens in Rust.
+export type ProviderFactory = (modelName: string) => {
+  provider: string;
+  config: ProviderDefinition;
+};
 
 /**
  * Parse model identifier into modelKey and provider
@@ -130,131 +128,7 @@ export function createProviderDefinitionFromCustomConfig(
     type: config.type === 'anthropic' ? 'custom' : 'openai-compatible',
     isCustom: true,
     customConfig: config,
-    createProvider: (apiKey: string, baseUrl?: string) => {
-      return createCustomProvider(config, apiKey, baseUrl);
-    },
   };
-}
-
-/**
- * Helper function to create OAuth provider by provider ID
- * Centralizes OAuth provider creation logic
- */
-function createOAuthProviderByType(
-  providerId: string,
-  oauthConfig?: OAuthConfig
-): ProviderFactory | null {
-  if (!oauthConfig) return null;
-
-  switch (providerId) {
-    case 'anthropic':
-      if (oauthConfig.anthropicAccessToken) {
-        logger.info('Creating Anthropic provider with OAuth (dynamic token refresh enabled)');
-        return createAnthropicOAuthProvider();
-      }
-      break;
-    case 'openai':
-      if (oauthConfig.openaiAccessToken) {
-        logger.info('Creating OpenAI provider with OAuth (dynamic token refresh enabled)');
-        return createOpenAIOAuthProvider();
-      }
-      break;
-    case 'qwen_code':
-      if (oauthConfig.qwenAccessToken) {
-        logger.info('Creating Qwen provider with OAuth');
-        return createQwenCodeOAuthProvider();
-      }
-      break;
-    case 'github_copilot':
-      if (oauthConfig.githubCopilotCopilotToken) {
-        logger.info('Creating GitHub Copilot provider with OAuth');
-        return createGitHubCopilotOAuthProvider(
-          oauthConfig.githubCopilotCopilotToken,
-          oauthConfig.githubCopilotEnterpriseUrl || undefined
-        );
-      }
-      break;
-  }
-
-  return null;
-}
-
-/**
- * Create all provider factory instances based on API keys and configs
- */
-export function createProviders(
-  apiKeys: Record<string, string | undefined>,
-  providerConfigs: Map<string, ProviderDefinition>,
-  baseUrls: Map<string, string>,
-  useCodingPlanSettings: Map<string, boolean>,
-  oauthConfig?: OAuthConfig
-): Map<string, ProviderFactory> {
-  const providers = new Map<string, ProviderFactory>();
-
-  for (const [providerId, providerDef] of providerConfigs) {
-    let apiKey = apiKeys[providerId];
-
-    // For custom providers, get API key from custom provider config
-    if (providerDef.isCustom && providerDef.customConfig) {
-      apiKey = providerDef.customConfig.apiKey;
-    }
-
-    // TalkCody Free uses JWT auth, not API key - always create it
-    const isTalkCody = providerId === 'talkcody';
-
-    // Check if this provider uses OAuth (unified check using configuration)
-    const oauthToken = getOAuthToken(providerId, oauthConfig);
-    const useOAuth = providerDef.supportsOAuth && !!oauthToken && !baseUrls.has(providerId); // Don't use OAuth if custom base URL is set
-
-    // Skip if no API key and no OAuth (except for special providers)
-    if (!apiKey && !isTalkCody && !useOAuth) {
-      logger.debug(`Skipping provider ${providerId}: no API key or OAuth configured`);
-      continue;
-    }
-
-    // For ollama/lmstudio, check if enabled
-    if ((providerId === 'ollama' || providerId === 'lmstudio') && apiKey !== 'enabled') {
-      continue;
-    }
-
-    // Create provider using OAuth or API key
-    try {
-      // Try to create OAuth provider if applicable
-      if (useOAuth) {
-        const createdProvider = createOAuthProviderByType(providerId, oauthConfig);
-        if (createdProvider) {
-          providers.set(providerId, createdProvider);
-          continue;
-        }
-      }
-
-      // Create provider using the definition's factory function
-      if (providerDef.createProvider) {
-        // Use custom base URL if set, otherwise use the default from provider definition
-        let customBaseUrl = baseUrls.get(providerId);
-
-        // Special handling for providers with Coding Plan: determine base URL based on useCodingPlan setting
-        if (!customBaseUrl) {
-          const useCodingPlan = useCodingPlanSettings.get(providerId);
-          if (useCodingPlan && providerDef.codingPlanBaseUrl) {
-            customBaseUrl = providerDef.codingPlanBaseUrl;
-          }
-        }
-
-        const baseUrl = customBaseUrl || providerDef.baseUrl;
-        // For talkcody, apiKey is not used (uses JWT auth), pass empty string
-        const createdProvider = providerDef.createProvider(apiKey || '', baseUrl);
-        providers.set(providerId, createdProvider);
-      } else {
-        logger.warn(`Provider ${providerId} has no createProvider function`);
-      }
-    } catch (error) {
-      logger.error(`Failed to create provider ${providerId}:`, error);
-    }
-  }
-
-  logger.info(`Created ${providers.size} providers`);
-  return providers;
 }
 
 /**

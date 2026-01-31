@@ -308,10 +308,14 @@ export interface LocaleDefinition {
       testFailed: (provider: string) => string;
       customBaseUrl: string;
       useCodingPlan: string;
+      useInternational: string;
       loadFailed: string;
       codingPlanEnabled: (provider: string) => string;
       codingPlanDisabled: (provider: string) => string;
       codingPlanUpdateFailed: (provider: string) => string;
+      internationalEnabled: (provider: string) => string;
+      internationalDisabled: (provider: string) => string;
+      internationalUpdateFailed: (provider: string) => string;
       tooltipTitle: string;
       tooltipDescription: string;
       viewDocumentation: string;
@@ -1985,6 +1989,10 @@ export interface LocaleDefinition {
       success: (operation: string, location: string) => string;
       failed: (operation: string, message: string) => string;
       unknownError: string;
+    };
+    Bash: {
+      outputSaved: (path: string) => string;
+      errorSaved: (path: string) => string;
     };
   };
 

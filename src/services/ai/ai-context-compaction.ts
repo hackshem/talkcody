@@ -1,7 +1,7 @@
-import { streamText } from 'ai';
 import { logger } from '@/lib/logger';
 import { GEMINI_25_FLASH_LITE, getContextLength } from '@/providers/config/model-config';
 import { useProviderStore } from '@/providers/stores/provider-store';
+import { buildPromptRequest, llmClient } from '@/services/llm/llm-client';
 
 export interface ContextCompactionResult {
   compressedSummary: string;
@@ -66,11 +66,8 @@ Please be comprehensive and technical in your summary. Include specific file pat
       const prompt = `${AIContextCompactionService.COMPRESSION_PROMPT}\n\nCONVERSATION HISTORY TO SUMMARIZE:\n${conversationHistory}\n\nPlease provide a comprehensive structured summary following the 8-section format above.`;
 
       // Use streamText to perform compression
-      const { textStream } = await streamText({
-        model: useProviderStore.getState().getProviderModel(availableModel),
-        prompt,
-        abortSignal,
-      });
+      const request = buildPromptRequest(availableModel, prompt);
+      const { events } = await llmClient.streamText(request, abortSignal);
 
       let compressedSummary = '';
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -80,11 +77,12 @@ Please be comprehensive and technical in your summary. Include specific file pat
       });
 
       try {
-        // Race between streaming and timeout
         await Promise.race([
           (async () => {
-            for await (const delta of textStream) {
-              compressedSummary += delta;
+            for await (const delta of events) {
+              if (delta.type === 'text-delta') {
+                compressedSummary += delta.text;
+              }
             }
           })(),
           timeoutPromise,

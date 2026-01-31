@@ -1,4 +1,4 @@
-import type { ModelMessage, ToolCallPart, ToolResultPart } from 'ai';
+import type { Message as ModelMessage } from '@/services/llm/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContextFilter } from './context-filter';
 
@@ -16,7 +16,7 @@ function createToolCallMessage(
         toolCallId,
         toolName,
         input,
-      } as ToolCallPart,
+      },
     ],
   };
 }
@@ -35,7 +35,7 @@ function createToolResultMessage(
         toolCallId,
         toolName,
         output: { type: 'text', value: output },
-      } as ToolResultPart,
+      },
     ],
   };
 }
@@ -154,8 +154,10 @@ describe('MessageFilter', () => {
       const toolCall = filtered[0];
       expect(toolCall.role).toBe('assistant');
       if (toolCall.role === 'assistant' && Array.isArray(toolCall.content)) {
-        const part = toolCall.content[0] as ToolCallPart;
-        expect(part.toolCallId).toBe('call-2');
+        const part = toolCall.content[0];
+        if (part?.type === 'tool-call') {
+          expect(part.toolCallId).toBe('call-2');
+        }
       }
     });
 
@@ -206,14 +208,14 @@ describe('MessageFilter', () => {
         if (msg.role === 'assistant' && Array.isArray(msg.content)) {
           for (const part of msg.content) {
             if (part.type === 'tool-call') {
-              toolCallIds.add((part as ToolCallPart).toolCallId);
+              toolCallIds.add(part.toolCallId);
             }
           }
         }
         if (msg.role === 'tool' && Array.isArray(msg.content)) {
           for (const part of msg.content) {
             if (part.type === 'tool-result') {
-              toolResultIds.add((part as ToolResultPart).toolCallId);
+              toolResultIds.add(part.toolCallId);
             }
           }
         }
@@ -234,13 +236,13 @@ describe('MessageFilter', () => {
               toolCallId: 'call-1',
               toolName: 'readFile',
               input: { file_path: '/file1.ts' },
-            } as ToolCallPart,
+            },
             {
               type: 'tool-call',
               toolCallId: 'call-2',
               toolName: 'readFile',
               input: { file_path: '/file2.ts' },
-            } as ToolCallPart,
+            },
           ],
         },
         createToolResultMessage('call-1', 'readFile', 'content1'),
@@ -261,8 +263,10 @@ describe('MessageFilter', () => {
       expect(firstAssistant.role).toBe('assistant');
       if (firstAssistant.role === 'assistant' && Array.isArray(firstAssistant.content)) {
         expect(firstAssistant.content.length).toBe(1);
-        const part = firstAssistant.content[0] as ToolCallPart;
-        expect(part.toolCallId).toBe('call-2');
+        const part = firstAssistant.content[0];
+        if (part?.type === 'tool-call') {
+          expect(part.toolCallId).toBe('call-2');
+        }
       }
     });
 
@@ -302,7 +306,7 @@ describe('MessageFilter', () => {
               toolCallId: 'call-1',
               toolName: 'readFile',
               input: { file_path: '/file.ts' },
-            } as ToolCallPart,
+            },
           ],
         },
         createToolResultMessage('call-1', 'readFile', 'content'),
@@ -324,7 +328,10 @@ describe('MessageFilter', () => {
       expect(firstMsg?.role).toBe('assistant');
       if (firstMsg?.role === 'assistant' && Array.isArray(firstMsg.content)) {
         expect(firstMsg.content[0]?.type).toBe('tool-call');
-        expect((firstMsg.content[0] as ToolCallPart).toolCallId).toBe('call-2');
+        const contentPart = firstMsg.content[0];
+        if (contentPart?.type === 'tool-call') {
+          expect(contentPart.toolCallId).toBe('call-2');
+        }
       }
 
       // Second message should be the tool-result
@@ -344,13 +351,13 @@ describe('MessageFilter', () => {
               toolCallId: 'call-1',
               toolName: 'readFile',
               input: { file_path: '/file1.ts' },
-            } as ToolCallPart,
+            },
             {
               type: 'tool-call',
               toolCallId: 'call-2',
               toolName: 'readFile',
               input: { file_path: '/file2.ts' },
-            } as ToolCallPart,
+            },
           ],
         },
         createToolResultMessage('call-1', 'readFile', 'content1'),
@@ -376,7 +383,10 @@ describe('MessageFilter', () => {
         expect(firstAssistant.content.length).toBe(2);
         expect(firstAssistant.content[0]?.type).toBe('text');
         expect(firstAssistant.content[1]?.type).toBe('tool-call');
-        expect((firstAssistant.content[1] as ToolCallPart).toolCallId).toBe('call-2');
+        const contentPart = firstAssistant.content[1];
+        if (contentPart?.type === 'tool-call') {
+          expect(contentPart.toolCallId).toBe('call-2');
+        }
       }
     });
 
@@ -394,7 +404,7 @@ describe('MessageFilter', () => {
             toolCallId: 'call-glob',
             toolName: 'glob',
             input: { pattern: '*.ts' },
-          } as ToolCallPart,
+          },
         ],
       });
       messages.push(createToolResultMessage('call-glob', 'glob', 'file1.ts\nfile2.ts'));
@@ -443,14 +453,14 @@ describe('MessageFilter', () => {
         if (msg.role === 'assistant' && Array.isArray(msg.content)) {
           for (const part of msg.content) {
             if (part.type === 'tool-call') {
-              toolCallIds.add((part as ToolCallPart).toolCallId);
+              toolCallIds.add(part.toolCallId);
             }
           }
         }
         if (msg.role === 'tool' && Array.isArray(msg.content)) {
           for (const part of msg.content) {
             if (part.type === 'tool-result') {
-              toolResultIds.add((part as ToolResultPart).toolCallId);
+              toolResultIds.add(part.toolCallId);
             }
           }
         }
@@ -477,14 +487,16 @@ describe('MessageFilter', () => {
         if (msg.role === 'assistant' && Array.isArray(msg.content)) {
           for (const part of msg.content) {
             if (part.type === 'tool-call') {
-              toolCallIds.add((part as ToolCallPart).toolCallId);
+              toolCallIds.add(part.toolCallId);
             }
           }
         }
         if (msg.role === 'tool' && Array.isArray(msg.content)) {
           for (const part of msg.content) {
             if (part.type === 'tool-result') {
-              toolResultIds.add((part as ToolResultPart).toolCallId);
+              if (part.type === 'tool-result') {
+                toolResultIds.add(part.toolCallId);
+              }
             }
           }
         }
@@ -545,8 +557,10 @@ describe('MessageFilter', () => {
 
       const toolCall = result[0];
       if (toolCall.role === 'assistant' && Array.isArray(toolCall.content)) {
-        const part = toolCall.content[0] as ToolCallPart;
-        expect(part.toolCallId).toBe('call-3');
+        const part = toolCall.content[0];
+        if (part?.type === 'tool-call') {
+          expect(part.toolCallId).toBe('call-3');
+        }
       }
     });
   });
@@ -576,8 +590,10 @@ describe('MessageFilter', () => {
       expect(toolCalls.length).toBe(1);
       const toolCall = toolCalls[0];
       if (toolCall.role === 'assistant' && Array.isArray(toolCall.content)) {
-        const part = toolCall.content[0] as ToolCallPart;
-        expect(part.toolCallId).toBe('call-todo-3');
+        const part = toolCall.content[0];
+        if (part?.type === 'tool-call') {
+          expect(part.toolCallId).toBe('call-todo-3');
+        }
       }
     });
 
@@ -602,8 +618,10 @@ describe('MessageFilter', () => {
       expect(toolCalls.length).toBe(1);
       const toolCall = toolCalls[0];
       if (toolCall.role === 'assistant' && Array.isArray(toolCall.content)) {
-        const part = toolCall.content[0] as ToolCallPart;
-        expect(part.toolCallId).toBe('call-exit-2');
+        const part = toolCall.content[0];
+        if (part?.type === 'tool-call') {
+          expect(part.toolCallId).toBe('call-exit-2');
+        }
       }
     });
 
@@ -631,7 +649,7 @@ describe('MessageFilter', () => {
         if (msg.role === 'assistant' && Array.isArray(msg.content)) {
           for (const part of msg.content) {
             if (part.type === 'tool-call') {
-              toolCallIds.add((part as ToolCallPart).toolCallId);
+              toolCallIds.add(part.toolCallId);
             }
           }
         }
@@ -758,9 +776,11 @@ describe('MessageFilter', () => {
 
       const toolCall = toolCalls[0];
       if (toolCall.role === 'assistant' && Array.isArray(toolCall.content)) {
-        const part = toolCall.content[0] as ToolCallPart;
-        expect(part.toolCallId).toBe('call-bash-3');
-        expect(part.toolName).toBe('bash');
+        const part = toolCall.content[0];
+        if (part?.type === 'tool-call') {
+          expect(part.toolCallId).toBe('call-bash-3');
+          expect(part.toolName).toBe('bash');
+        }
       }
     });
 
@@ -793,7 +813,7 @@ describe('MessageFilter', () => {
         if (msg.role === 'assistant' && Array.isArray(msg.content)) {
           for (const part of msg.content) {
             if (part.type === 'tool-call') {
-              toolCallIds.add((part as ToolCallPart).toolCallId);
+              toolCallIds.add(part.toolCallId);
             }
           }
         }
@@ -825,8 +845,10 @@ describe('MessageFilter', () => {
 
       const toolCall = result[0];
       if (toolCall.role === 'assistant' && Array.isArray(toolCall.content)) {
-        const part = toolCall.content[0] as ToolCallPart;
-        expect(part.toolCallId).toBe('call-2');
+        const part = toolCall.content[0];
+        if (part?.type === 'tool-call') {
+          expect(part.toolCallId).toBe('call-2');
+        }
       }
     });
 
@@ -851,8 +873,10 @@ describe('MessageFilter', () => {
 
       const toolCall = result[0];
       if (toolCall.role === 'assistant' && Array.isArray(toolCall.content)) {
-        const part = toolCall.content[0] as ToolCallPart;
-        expect(part.toolCallId).toBe('call-edit-2');
+        const part = toolCall.content[0];
+        if (part?.type === 'tool-call') {
+          expect(part.toolCallId).toBe('call-edit-2');
+        }
       }
     });
 
@@ -898,7 +922,9 @@ describe('MessageFilter', () => {
         if (msg.role === 'assistant' && Array.isArray(msg.content)) {
           for (const part of msg.content) {
             if (part.type === 'tool-call') {
-              toolCallIds.add((part as ToolCallPart).toolCallId);
+              if (part.type === 'tool-call') {
+                toolCallIds.add(part.toolCallId);
+              }
             }
           }
         }
@@ -935,8 +961,10 @@ describe('MessageFilter', () => {
 
       const toolCall = result[0];
       if (toolCall.role === 'assistant' && Array.isArray(toolCall.content)) {
-        const part = toolCall.content[0] as ToolCallPart;
-        expect(part.toolCallId).toBe('call-2');
+        const part = toolCall.content[0];
+        if (part?.type === 'tool-call') {
+          expect(part.toolCallId).toBe('call-2');
+        }
       }
     });
 
@@ -971,7 +999,9 @@ describe('MessageFilter', () => {
         if (msg.role === 'assistant' && Array.isArray(msg.content)) {
           for (const part of msg.content) {
             if (part.type === 'tool-call') {
-              toolCallIds.add((part as ToolCallPart).toolCallId);
+              if (part.type === 'tool-call') {
+                toolCallIds.add(part.toolCallId);
+              }
             }
           }
         }
@@ -1016,8 +1046,10 @@ describe('MessageFilter', () => {
 
       const toolCall = result[0];
       if (toolCall.role === 'assistant' && Array.isArray(toolCall.content)) {
-        const part = toolCall.content[0] as ToolCallPart;
-        expect(part.toolCallId).toBe('call-2');
+        const part = toolCall.content[0];
+        if (part?.type === 'tool-call') {
+          expect(part.toolCallId).toBe('call-2');
+        }
       }
     });
   });

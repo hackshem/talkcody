@@ -1,6 +1,5 @@
 // src/services/agents/message-rewriter.ts
 
-import type { ModelMessage, TextPart, ToolCallPart, ToolResultPart } from 'ai';
 import { logger } from '@/lib/logger';
 import { timedMethod } from '@/lib/timer';
 import {
@@ -8,9 +7,10 @@ import {
   getLangIdFromPath,
   summarizeCodeContent,
 } from '@/services/code-navigation-service';
+import type { ContentPart, Message as ModelMessage } from '@/services/llm/types';
 
 // Type for assistant message content parts
-type AssistantContentPart = TextPart | ToolCallPart;
+type AssistantContentPart = Extract<ContentPart, { type: 'text' | 'tool-call' }>;
 
 /**
  * MessageRewriter handles content rewriting for message compaction.
@@ -34,7 +34,7 @@ export class ContextRewriter {
     for (const message of messages) {
       if (message.role === 'tool' && Array.isArray(message.content)) {
         // Process tool results (readFile outputs)
-        const processedContent = await this.processToolResults(message.content as ToolResultPart[]);
+        const processedContent = await this.processToolResults(message.content as ContentPart[]);
         result.push({
           ...message,
           content: processedContent,
@@ -59,8 +59,8 @@ export class ContextRewriter {
   /**
    * Process tool result messages to summarize large readFile outputs
    */
-  private async processToolResults(parts: ToolResultPart[]): Promise<ToolResultPart[]> {
-    const processedParts: ToolResultPart[] = [];
+  private async processToolResults(parts: ContentPart[]): Promise<ContentPart[]> {
+    const processedParts: ContentPart[] = [];
 
     for (const part of parts) {
       if (part.type === 'tool-result' && part.toolName === 'readFile') {
@@ -77,8 +77,12 @@ export class ContextRewriter {
   /**
    * Process a readFile tool result to summarize large content
    */
-  private async processReadFileResult(part: ToolResultPart): Promise<ToolResultPart> {
+  private async processReadFileResult(part: ContentPart): Promise<ContentPart> {
     try {
+      if (part.type !== 'tool-result') {
+        return part;
+      }
+
       // llm-service always uses type: 'text' with JSON.stringify'd value
       const output = part.output as { type: 'text'; value: string };
 
@@ -166,7 +170,9 @@ export class ContextRewriter {
   /**
    * Process a writeFile tool call to summarize large content
    */
-  private async processWriteFileCall(part: ToolCallPart): Promise<ToolCallPart> {
+  private async processWriteFileCall(
+    part: Extract<AssistantContentPart, { type: 'tool-call' }>
+  ): Promise<AssistantContentPart> {
     try {
       // input is the arguments passed to the tool
       let input: Record<string, unknown>;

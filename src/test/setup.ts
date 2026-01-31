@@ -72,7 +72,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 vi.mock('@/stores/settings-store', () => mockSettingsStore);
 vi.mock('@/services/workspace-root-service', () => mockWorkspaceRootService);
-vi.mock('@/services/database-service', () => ({ databaseService: mockDatabaseService }));
+vi.mock('@/services/database-service', () => mockDatabaseService);
 vi.mock('@/services/task-service', () => ({
   taskService: {
     getTaskSettings: vi.fn().mockResolvedValue(null),

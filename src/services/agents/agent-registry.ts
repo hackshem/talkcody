@@ -108,7 +108,7 @@ class AgentRegistry {
       let convertedAgent = agent;
       if (agent.tools && Object.keys(agent.tools).length > 0) {
         const convertedTools = convertToolsForAI(agent.tools);
-        convertedAgent = { ...agent, tools: convertedTools };
+        convertedAgent = { ...agent, tools: convertedTools as AgentToolSet };
       }
 
       this.systemAgents.set(convertedAgent.id, convertedAgent);
@@ -152,7 +152,8 @@ class AgentRegistry {
 
       for (const agentConfig of agents) {
         try {
-          if (this.systemAgents.has(agentConfig.id) || this.persistentAgents.has(agentConfig.id)) {
+          // Skip if it's a system agent (loaded from code)
+          if (this.systemAgents.has(agentConfig.id)) {
             continue;
           }
 
@@ -175,6 +176,8 @@ class AgentRegistry {
             canBeSubagent: agentConfig.canBeSubagent,
           };
 
+          // Always update from file source - file content takes precedence over database
+          // This ensures that when users edit agent files and click refresh, the changes are reflected
           this.persistentAgents.set(agentDef.id, agentDef);
         } catch (error) {
           logger.warn('loadFileAgents: Failed to load local agent:', error);
@@ -278,7 +281,7 @@ class AgentRegistry {
     let convertedAgent = agent;
     if (agent.tools && Object.keys(agent.tools).length > 0) {
       const convertedTools = convertToolsForAI(agent.tools);
-      convertedAgent = { ...agent, tools: convertedTools };
+      convertedAgent = { ...agent, tools: convertedTools as AgentToolSet };
     }
     this.persistentAgents.set(agent.id, convertedAgent);
 
@@ -300,7 +303,7 @@ class AgentRegistry {
     let convertedAgent = agent;
     if (agent.tools && Object.keys(agent.tools).length > 0) {
       const convertedTools = convertToolsForAI(agent.tools);
-      convertedAgent = { ...agent, tools: convertedTools };
+      convertedAgent = { ...agent, tools: convertedTools as AgentToolSet };
       logger.info(
         `Converted and registered UI renderers for agent ${agent.id} tools (forceRegister)`
       );
@@ -443,7 +446,7 @@ class AgentRegistry {
     let convertedAgent = agent;
     if (agent.tools && Object.keys(agent.tools).length > 0) {
       const convertedTools = convertToolsForAI(agent.tools);
-      convertedAgent = { ...agent, tools: convertedTools };
+      convertedAgent = { ...agent, tools: convertedTools as AgentToolSet };
       logger.info(`Converted and registered UI renderers for agent ${id} tools (setAgent)`);
     }
 
@@ -821,7 +824,10 @@ class AgentRegistry {
       const plannerAgent = this.systemAgents.get('planner');
       if (plannerAgent) {
         const convertedTools = convertToolsForAI(plannerTools);
-        this.systemAgents.set('planner', { ...plannerAgent, tools: convertedTools });
+        this.systemAgents.set('planner', {
+          ...plannerAgent,
+          tools: convertedTools as AgentToolSet,
+        });
         logger.info('refreshMCPTools: Updated PlannerAgent tools');
       }
 
@@ -846,7 +852,10 @@ class AgentRegistry {
       const plannerAgent = this.systemAgents.get('planner');
       if (plannerAgent) {
         const convertedTools = convertToolsForAI(plannerTools);
-        this.systemAgents.set('planner', { ...plannerAgent, tools: convertedTools });
+        this.systemAgents.set('planner', {
+          ...plannerAgent,
+          tools: convertedTools as AgentToolSet,
+        });
         logger.info('refreshCustomTools: Updated PlannerAgent tools');
       }
 

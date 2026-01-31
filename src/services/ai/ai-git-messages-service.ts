@@ -1,7 +1,7 @@
-import { streamText } from 'ai';
 import { logger } from '@/lib/logger';
 import { GEMINI_25_FLASH_LITE } from '@/providers/config/model-config';
 import { useProviderStore } from '@/providers/stores/provider-store';
+import { buildPromptRequest, llmClient } from '@/services/llm/llm-client';
 
 export interface GitMessageContext {
   userInput?: string;
@@ -68,13 +68,14 @@ Provide ONLY the commit message without any explanations or formatting.`;
         }
       }
 
-      const { textStream } = await streamText({
-        model: useProviderStore.getState().getProviderModel(modelIdentifier),
-        prompt,
-      });
+      const request = buildPromptRequest(modelIdentifier, prompt);
+      const { events } = await llmClient.streamText(request);
 
       let fullText = '';
-      for await (const delta of textStream) {
+      for await (const delta of events) {
+        if (delta.type !== 'text-delta') {
+          continue;
+        }
         deltaCount++;
 
         if (isFirstDelta) {
@@ -86,7 +87,7 @@ Provide ONLY the commit message without any explanations or formatting.`;
           isFirstDelta = false;
         }
 
-        fullText += delta;
+        fullText += delta.text;
       }
 
       const endTime = performance.now();

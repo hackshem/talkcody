@@ -1,18 +1,29 @@
 import { logger } from '@/lib/logger';
-import { providerRegistry } from '@/providers';
 import { modelLoader } from '@/providers/models/model-loader';
 import type { ProviderConfig } from '@/types/api-keys';
 import type { ModelConfig as ModelConfigType } from '@/types/models';
+import {
+  CLAUDE_HAIKU,
+  CODE_STARL,
+  GEMINI_25_FLASH_LITE,
+  GPT5_MINI,
+  GROK_CODE_FAST,
+  MINIMAX_M21,
+  NANO_BANANA_PRO,
+  SCRIBE_V2_REALTIME,
+} from './model-constants';
+import { PROVIDER_CONFIGS } from './provider-config';
 
-// Model constants - these should be defined before any imports that might use them
-export const GPT5_MINI = 'gpt-5-mini';
-export const MINIMAX_M21 = 'minimax-m21';
-export const GEMINI_25_FLASH_LITE = 'gemini-2.5-flash-lite';
-export const CODE_STARL = 'codestral';
-export const CLAUDE_HAIKU = 'claude-haiku-4.5';
-export const GROK_CODE_FAST = 'grok-code-fast-1';
-export const NANO_BANANA_PRO = 'gemini-3-pro-image';
-export const SCRIBE_V2_REALTIME = 'scribe-v2-realtime';
+export {
+  CLAUDE_HAIKU,
+  CODE_STARL,
+  GEMINI_25_FLASH_LITE,
+  GPT5_MINI,
+  GROK_CODE_FAST,
+  MINIMAX_M21,
+  NANO_BANANA_PRO,
+  SCRIBE_V2_REALTIME,
+};
 
 // Dynamic model configs loaded from JSON
 let MODEL_CONFIGS: Record<string, ModelConfigType> = {};
@@ -54,7 +65,6 @@ if (typeof window !== 'undefined') {
   initPromise = initializeModels();
 }
 
-// Refresh model configs - used for hot-reload
 export async function refreshModelConfigs(): Promise<void> {
   try {
     // Clear memory cache to force reload from file/remote
@@ -76,8 +86,8 @@ export { MODEL_CONFIGS };
 
 export type ModelKey = string;
 
-// Import provider types from the new registry system
-export type { ProviderIds as ProviderType } from '@/providers';
+// Import provider types from provider configs
+export type { ProviderIds as ProviderType } from '@/providers/config/provider-config';
 
 // Re-export ModelConfig from types
 export type { ModelConfig } from '@/types/models';
@@ -86,8 +96,12 @@ export function getProvidersForModel(model: string): ProviderConfig[] {
   const modelKey = model.split('@')[0] || model;
   const config = MODEL_CONFIGS[modelKey as ModelKey];
   if (!config || !config.providers) return [];
+
   return config.providers
-    .map((id) => providerRegistry.getProvider(String(id)))
+    .map((id) => {
+      const providerId = String(id) as keyof typeof PROVIDER_CONFIGS;
+      return PROVIDER_CONFIGS[providerId];
+    })
     .filter((p) => p !== undefined) as ProviderConfig[];
 }
 

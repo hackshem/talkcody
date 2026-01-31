@@ -3,19 +3,13 @@
 
 import { create } from 'zustand';
 import { logger } from '@/lib/logger';
+import { llmClient } from '@/services/llm/llm-client';
 import {
   exchangeCode,
   isTokenExpired,
   refreshAccessToken,
   startOAuthFlow,
 } from './claude-oauth-service';
-
-// Storage keys for OAuth tokens in settings database
-const STORAGE_KEYS = {
-  ACCESS_TOKEN: 'claude_oauth_access_token',
-  REFRESH_TOKEN: 'claude_oauth_refresh_token',
-  EXPIRES_AT: 'claude_oauth_expires_at',
-} as const;
 
 interface ClaudeOAuthState {
   // Connection state
@@ -51,11 +45,13 @@ interface ClaudeOAuthActions {
 
 type ClaudeOAuthStore = ClaudeOAuthState & ClaudeOAuthActions;
 
-// Helper to get settings database
-async function getSettingsDb() {
-  const { settingsDb } = await import('@/stores/settings-store');
-  await settingsDb.initialize();
-  return settingsDb;
+async function loadOAuthSnapshot() {
+  try {
+    return await llmClient.getOAuthStatus();
+  } catch (error) {
+    logger.warn('[ClaudeOAuth] Failed to read OAuth status from Rust:', error);
+    return null;
+  }
 }
 
 export const useClaudeOAuthStore = create<ClaudeOAuthStore>((set, get) => ({
@@ -78,18 +74,11 @@ export const useClaudeOAuthStore = create<ClaudeOAuthStore>((set, get) => ({
 
     try {
       logger.info('[ClaudeOAuth] Initializing store');
-      const db = await getSettingsDb();
 
-      const values = await db.getBatch([
-        STORAGE_KEYS.ACCESS_TOKEN,
-        STORAGE_KEYS.REFRESH_TOKEN,
-        STORAGE_KEYS.EXPIRES_AT,
-      ]);
-
-      const accessToken = values[STORAGE_KEYS.ACCESS_TOKEN] || null;
-      const refreshToken = values[STORAGE_KEYS.REFRESH_TOKEN] || null;
-      const expiresAtStr = values[STORAGE_KEYS.EXPIRES_AT];
-      const expiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : null;
+      const snapshot = await loadOAuthSnapshot();
+      const accessToken = snapshot?.anthropic?.accessToken || null;
+      const refreshToken = snapshot?.anthropic?.refreshToken || null;
+      const expiresAt = snapshot?.anthropic?.expiresAt || null;
 
       const isConnected = !!(accessToken && refreshToken && expiresAt);
 
@@ -156,14 +145,6 @@ export const useClaudeOAuthStore = create<ClaudeOAuthStore>((set, get) => ({
 
       const { accessToken, refreshToken, expiresAt } = result.tokens;
 
-      // Save to database
-      const db = await getSettingsDb();
-      await db.setBatch({
-        [STORAGE_KEYS.ACCESS_TOKEN]: accessToken,
-        [STORAGE_KEYS.REFRESH_TOKEN]: refreshToken,
-        [STORAGE_KEYS.EXPIRES_AT]: expiresAt.toString(),
-      });
-
       logger.info('[ClaudeOAuth] OAuth completed successfully');
 
       set({
@@ -190,12 +171,7 @@ export const useClaudeOAuthStore = create<ClaudeOAuthStore>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const db = await getSettingsDb();
-      await db.setBatch({
-        [STORAGE_KEYS.ACCESS_TOKEN]: '',
-        [STORAGE_KEYS.REFRESH_TOKEN]: '',
-        [STORAGE_KEYS.EXPIRES_AT]: '',
-      });
+      await llmClient.disconnectClaudeOAuth();
 
       logger.info('[ClaudeOAuth] Disconnected');
 
@@ -260,14 +236,6 @@ export const useClaudeOAuthStore = create<ClaudeOAuthStore>((set, get) => ({
       }
 
       const { accessToken, refreshToken: newRefreshToken, expiresAt: newExpiresAt } = result.tokens;
-
-      // Save to database
-      const db = await getSettingsDb();
-      await db.setBatch({
-        [STORAGE_KEYS.ACCESS_TOKEN]: accessToken,
-        [STORAGE_KEYS.REFRESH_TOKEN]: newRefreshToken,
-        [STORAGE_KEYS.EXPIRES_AT]: newExpiresAt.toString(),
-      });
 
       logger.info('[ClaudeOAuth] Token refreshed successfully');
 

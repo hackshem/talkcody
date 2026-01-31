@@ -1,7 +1,6 @@
-import { streamText } from 'ai';
 import { logger } from '@/lib/logger';
 import { CODE_STARL } from '@/providers/config/model-config';
-import { useProviderStore } from '@/providers/stores/provider-store';
+import { buildPromptRequest, llmClient } from '@/services/llm/llm-client';
 
 export interface CompletionContext {
   fileContent: string;
@@ -23,7 +22,12 @@ export interface CompletionResult {
 class AICompletionService {
   async getCompletion(context: CompletionContext): Promise<CompletionResult | null> {
     try {
-      logger.info('getCompletion context', context);
+      logger.info('getCompletion context', {
+        fileName: context.fileName,
+        language: context.language,
+        cursorPosition: context.cursorPosition,
+        contentLength: context.fileContent.length,
+      });
       const startTime = performance.now();
       let firstDeltaTime: number | null = null;
       let isFirstDelta = true;
@@ -60,13 +64,14 @@ Provide ONLY the completion text that should be inserted at the cursor position.
 Response should be plain text without markdown formatting.
 Keep the completion concise and relevant to the current context.`;
 
-      const { textStream } = await streamText({
-        model: useProviderStore.getState().getProviderModel(CODE_STARL),
-        prompt,
-      });
+      const request = buildPromptRequest(CODE_STARL, prompt);
+      const { events } = await llmClient.streamText(request);
 
       let fullText = '';
-      for await (const delta of textStream) {
+      for await (const delta of events) {
+        if (delta.type !== 'text-delta') {
+          continue;
+        }
         deltaCount++;
 
         if (isFirstDelta) {
@@ -76,7 +81,7 @@ Keep the completion concise and relevant to the current context.`;
           isFirstDelta = false;
         }
 
-        fullText += delta;
+        fullText += delta.text;
       }
 
       const endTime = performance.now();

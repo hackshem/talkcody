@@ -43,7 +43,7 @@ export function DynamicContextPanel({ agent, onChange }: DynamicContextPanelProp
   );
   const [agentsMdSearchStrategy, setAgentsMdSearchStrategy] = useState<string>(
     (agent.dynamicPrompt?.providerSettings?.agents_md as { searchStrategy?: string })
-      ?.searchStrategy ?? 'root-only'
+      ?.searchStrategy ?? 'hierarchical'
   );
   const [agentsMdMaxDepth, setAgentsMdMaxDepth] = useState<number | undefined>(
     (agent.dynamicPrompt?.providerSettings?.agents_md as { maxDepth?: number })?.maxDepth

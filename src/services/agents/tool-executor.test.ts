@@ -1,12 +1,11 @@
-import type { ToolSet } from 'ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import type { AgentLoopState } from '@/types/agent';
+import type { AgentLoopState, AgentToolSet } from '@/types/agent';
 import { ToolExecutor } from './tool-executor';
 
 describe('tool-executor - callAgent toolCallId passing', () => {
   let mockCallAgentExecute: any;
-  let mockTools: ToolSet;
+  let mockTools: AgentToolSet;
   let mockOnToolMessage: any;
   let toolExecutor: ToolExecutor;
   let mockLoopState: AgentLoopState;
@@ -132,7 +131,7 @@ describe('tool-executor - callAgent toolCallId passing', () => {
   it('should not add _toolCallId to other tools', async () => {
     const mockBashExecute = vi.fn().mockResolvedValue('command output');
 
-    const bashTools: ToolSet = {
+    const bashTools: AgentToolSet = {
       bash: {
         description: 'Execute bash command',
         inputSchema: z.object({}),

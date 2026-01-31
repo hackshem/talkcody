@@ -115,7 +115,7 @@ export async function restoreToolsFromConfig(toolsConfig: unknown): Promise<Agen
     ) {
       // Important: Even if it's already a ToolSet, we must pass it through convertToolsForAI
       // to ensure UI renderers (renderToolDoing, renderToolResult) are registered in toolUIRegistry
-      return convertToolsForAI(toolsConfig as Record<string, unknown>);
+      return convertToolsForAI(toolsConfig as Record<string, unknown>) as AgentToolSet;
     }
   }
 
@@ -175,7 +175,7 @@ export async function restoreToolsFromConfig(toolsConfig: unknown): Promise<Agen
   }
 
   // Convert tools for AI and register UI renderers
-  return convertToolsForAI(rawTools);
+  return convertToolsForAI(rawTools) as AgentToolSet;
 }
 
 /**

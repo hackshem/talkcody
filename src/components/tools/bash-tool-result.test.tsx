@@ -1,7 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { BashToolResult } from './bash-tool-result';
 import React from 'react';
+import { BashToolResult } from './bash-tool-result';
+
+vi.mock('@/hooks/use-locale', () => ({
+  useTranslation: () => ({
+    ToolMessages: {
+      Bash: {
+        outputSaved: (path: string) => `Full stdout saved to: ${path}`,
+        errorSaved: (path: string) => `Full stderr saved to: ${path}`,
+      },
+    },
+  }),
+}));
 
 describe('BashToolResult', () => {
   describe('basic rendering', () => {
@@ -192,6 +203,20 @@ describe('BashToolResult', () => {
       const preElement = container.querySelector('pre');
       expect(preElement?.textContent).toContain('500 lines truncated');
       expect(preElement?.textContent).toContain('Last line of output');
+    });
+  });
+
+  describe('output file path message', () => {
+    it('should render output file path when provided', () => {
+      render(
+        <BashToolResult
+          output="short output"
+          outputFilePath="/test/root/.talkcody/output/task-123/tool-456_stdout.log"
+          success={true}
+        />
+      );
+
+      expect(screen.getByText((content) => content.includes('Full stdout saved to'))).toBeInTheDocument();
     });
   });
 

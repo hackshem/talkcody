@@ -10,6 +10,8 @@ export async function previewSystemPrompt(opts: {
   workspaceRoot: string;
   extraVariables?: Record<string, string>;
   taskId?: string;
+  currentWorkingDirectory?: string;
+  recentFilePaths?: string[];
 }): Promise<PromptBuildResult> {
   const providers = defaultProviderRegistry.buildProviders(
     opts.agent.dynamicPrompt?.providers || [],
@@ -21,5 +23,7 @@ export async function previewSystemPrompt(opts: {
     extraVariables: opts.extraVariables,
     workspaceRoot: opts.workspaceRoot,
     taskId: opts.taskId,
+    currentWorkingDirectory: opts.currentWorkingDirectory,
+    recentFilePaths: opts.recentFilePaths,
   });
 }

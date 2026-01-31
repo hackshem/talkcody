@@ -54,7 +54,7 @@ vi.mock('@/lib/mcp/multi-mcp-adapter', () => ({
   multiMCPAdapter: {
     getAdaptedTool: vi.fn(),
   },
-  isMCPTool: vi.fn((toolName: string) => toolName.startsWith('mcp__')),
+  isMCPTool: vi.fn((toolName: string) => toolName.includes('__')),
 }));
 
 import { multiMCPAdapter } from '@/lib/mcp/multi-mcp-adapter';
@@ -125,16 +125,16 @@ describe('tool-registry', () => {
     });
 
     it('should handle MCP tools', async () => {
-      const mcpTool = { name: 'mcp__test-tool', execute: vi.fn() };
+      const mcpTool = { name: 'server__test-tool', execute: vi.fn() };
       mockMultiMCPAdapter.getAdaptedTool.mockResolvedValue(mcpTool);
 
-      const config = ['todoWrite', 'mcp__test-tool'];
+      const config = ['todoWrite', 'server__test-tool'];
 
       const result = await restoreToolsFromConfig(config);
 
-      expect(mockMultiMCPAdapter.getAdaptedTool).toHaveBeenCalledWith('mcp__test-tool');
+      expect(mockMultiMCPAdapter.getAdaptedTool).toHaveBeenCalledWith('server__test-tool');
       expect(result).toHaveProperty('todoWrite');
-      expect(result).toHaveProperty('mcp__test-tool');
+      expect(result).toHaveProperty('server__test-tool');
     });
 
     it('should handle already formatted ToolSet', async () => {

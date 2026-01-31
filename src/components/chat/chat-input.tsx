@@ -1,7 +1,6 @@
 // src/components/chat/chat-input.tsx
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import type { ChatStatus } from 'ai';
 import { ExternalLink, FileIcon, Image, Plus } from 'lucide-react';
 import {
   type ChangeEventHandler,
@@ -32,6 +31,7 @@ import { logger } from '@/lib/logger';
 import { generateId } from '@/lib/utils';
 import { modelService, useProviderStore } from '@/providers/stores/provider-store';
 import { fileUploadService } from '@/services/file-upload-service';
+import type { ChatStatus } from '@/services/llm/ui';
 import { repositoryService } from '@/services/repository-service';
 import { usePlanModeStore } from '@/stores/plan-mode-store';
 import { useRalphLoopStore } from '@/stores/ralph-loop-store';

@@ -59,7 +59,6 @@ vi.mock('@/providers/core/provider-utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/providers/core/provider-utils')>();
   return {
     ...actual,
-    createProviders: vi.fn().mockReturnValue(new Map()),
     computeAvailableModels: vi.fn().mockReturnValue([]),
     buildProviderConfigs: vi.fn().mockReturnValue(new Map()),
   };

@@ -1,5 +1,6 @@
 // src/components/chat-box.tsx
-import type { ChatStatus } from 'ai';
+
+import { dirname } from '@tauri-apps/api/path';
 import { LoaderCircle, Square } from 'lucide-react';
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ import { commandRegistry } from '@/services/commands/command-registry';
 import { databaseService } from '@/services/database-service';
 import { executionService } from '@/services/execution-service';
 import { hookService } from '@/services/hooks/hook-service';
+import type { ChatStatus } from '@/services/llm/ui';
 import { messageService } from '@/services/message-service';
 import { previewSystemPrompt } from '@/services/prompt/preview';
 import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
@@ -260,6 +262,7 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
         if (agent?.dynamicPrompt?.enabled) {
           try {
             const root = await getEffectiveWorkspaceRoot(activeTaskId);
+            const currentWorkingDirectory = selectedFile ? await dirname(selectedFile) : undefined;
             // logger.info('[ChatBox] Building system prompt with workspaceRoot', {
             //   activeTaskId,
             //   isNewTask,
@@ -269,6 +272,7 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
               agent: agent,
               workspaceRoot: root,
               taskId: activeTaskId,
+              currentWorkingDirectory,
             });
             systemPrompt = finalSystemPrompt;
           } catch (e) {

@@ -2,98 +2,14 @@
  * Tests for LLM test helpers
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  createMockLLM,
   createStreamTextMock,
-  createMockStreamResponse,
   createCompressionSummaryResponse,
-  createMockErrorModel,
   streamScenarios,
 } from './llm-test-helpers';
 
 describe('llm-test-helpers', () => {
-  describe('createMockLLM', () => {
-    it('should create a mock LLM with default response', async () => {
-      const mockLLM = createMockLLM();
-
-      const result = await mockLLM.doGenerate({
-        inputFormat: 'messages',
-        mode: { type: 'regular' },
-        prompt: [],
-      });
-
-      expect(result.text).toBe('Mock response');
-      expect(result.finishReason).toBe('stop');
-      expect(result.usage.inputTokens).toBe(100);
-      expect(result.usage.outputTokens).toBe(50);
-    });
-
-    it('should create a mock LLM with custom text', async () => {
-      const mockLLM = createMockLLM({ text: 'Custom response' });
-
-      const result = await mockLLM.doGenerate({
-        inputFormat: 'messages',
-        mode: { type: 'regular' },
-        prompt: [],
-      });
-
-      expect(result.text).toBe('Custom response');
-    });
-
-    it('should create a mock LLM that throws errors', async () => {
-      const mockLLM = createMockLLM({
-        shouldError: true,
-        errorMessage: 'API rate limit exceeded',
-      });
-
-      await expect(
-        mockLLM.doGenerate({
-          inputFormat: 'messages',
-          mode: { type: 'regular' },
-          prompt: [],
-        })
-      ).rejects.toThrow('API rate limit exceeded');
-
-      await expect(
-        mockLLM.doStream({
-          inputFormat: 'messages',
-          mode: { type: 'regular' },
-          prompt: [],
-        })
-      ).rejects.toThrow('API rate limit exceeded');
-    });
-
-    it('should create a mock LLM with custom token usage', async () => {
-      const mockLLM = createMockLLM({
-        inputTokens: 500,
-        outputTokens: 200,
-      });
-
-      const result = await mockLLM.doGenerate({
-        inputFormat: 'messages',
-        mode: { type: 'regular' },
-        prompt: [],
-      });
-
-      expect(result.usage.inputTokens).toBe(500);
-      expect(result.usage.outputTokens).toBe(200);
-    });
-
-    it('should support streaming', async () => {
-      const mockLLM = createMockLLM({ text: 'Hello world' });
-
-      const result = await mockLLM.doStream({
-        inputFormat: 'messages',
-        mode: { type: 'regular' },
-        prompt: [],
-      });
-
-      expect(result.stream).toBeDefined();
-      expect(result.rawCall).toBeDefined();
-    });
-  });
-
   describe('createStreamTextMock', () => {
     it('should create a stream with text chunks', async () => {
       const mock = createStreamTextMock({
@@ -101,7 +17,7 @@ describe('llm-test-helpers', () => {
       });
 
       const chunks: unknown[] = [];
-      for await (const chunk of mock.fullStream) {
+      for await (const chunk of mock.events) {
         chunks.push(chunk);
       }
 
@@ -109,7 +25,7 @@ describe('llm-test-helpers', () => {
       expect(chunks).toContainEqual({ type: 'text-delta', text: 'Hello' });
       expect(chunks).toContainEqual({ type: 'text-delta', text: ' world' });
       expect(chunks).toContainEqual(
-        expect.objectContaining({ type: 'step-finish', finishReason: 'stop' })
+        expect.objectContaining({ type: 'done', finish_reason: 'stop' })
       );
     });
 
@@ -117,12 +33,12 @@ describe('llm-test-helpers', () => {
       const mock = createStreamTextMock({
         textChunks: ['Processing...'],
         toolCalls: [
-          { toolCallId: 'tc-1', toolName: 'readFile', args: { path: '/test.ts' } },
+          { toolCallId: 'tc-1', toolName: 'readFile', input: { path: '/test.ts' } },
         ],
       });
 
       const chunks: unknown[] = [];
-      for await (const chunk of mock.fullStream) {
+      for await (const chunk of mock.events) {
         chunks.push(chunk);
       }
 
@@ -130,21 +46,27 @@ describe('llm-test-helpers', () => {
         expect.objectContaining({
           type: 'tool-call',
           toolName: 'readFile',
-          args: { path: '/test.ts' },
+          input: { path: '/test.ts' },
         })
       );
       expect(chunks).toContainEqual(
-        expect.objectContaining({ type: 'step-finish', finishReason: 'tool-calls' })
+        expect.objectContaining({ type: 'done', finish_reason: 'tool-calls' })
       );
     });
 
     it('should auto-set finishReason to tool-calls when toolCalls are present', async () => {
       const mock = createStreamTextMock({
-        toolCalls: [{ toolCallId: 'tc-1', toolName: 'test', args: {} }],
+        toolCalls: [{ toolCallId: 'tc-1', toolName: 'test', input: {} }],
       });
 
-      const finishReason = await mock.finishReason;
-      expect(finishReason).toBe('tool-calls');
+      const chunks: unknown[] = [];
+      for await (const chunk of mock.events) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toContainEqual(
+        expect.objectContaining({ type: 'done', finish_reason: 'tool-calls' })
+      );
     });
 
     it('should default finishReason to stop when no toolCalls', async () => {
@@ -152,19 +74,14 @@ describe('llm-test-helpers', () => {
         textChunks: ['Hello'],
       });
 
-      const finishReason = await mock.finishReason;
-      expect(finishReason).toBe('stop');
-    });
-  });
+      const chunks: unknown[] = [];
+      for await (const chunk of mock.events) {
+        chunks.push(chunk);
+      }
 
-  describe('createMockStreamResponse', () => {
-    it('should create a MockLanguageModelV2 doStream format response', () => {
-      const response = createMockStreamResponse({
-        textChunks: ['Hello', ' world'],
-      });
-
-      expect(response.stream).toBeDefined();
-      expect(response.rawCall).toEqual({ rawPrompt: null, rawSettings: {} });
+      expect(chunks).toContainEqual(
+        expect.objectContaining({ type: 'done', finish_reason: 'stop' })
+      );
     });
   });
 
@@ -173,7 +90,7 @@ describe('llm-test-helpers', () => {
       const mock = streamScenarios.simpleText('Hello!');
 
       const chunks: unknown[] = [];
-      for await (const chunk of mock.fullStream) {
+      for await (const chunk of mock.events) {
         chunks.push(chunk);
       }
 
@@ -184,7 +101,7 @@ describe('llm-test-helpers', () => {
       const mock = streamScenarios.withToolCall('readFile', { path: '/test.ts' });
 
       const chunks: unknown[] = [];
-      for await (const chunk of mock.fullStream) {
+      for await (const chunk of mock.events) {
         chunks.push(chunk);
       }
 
@@ -198,17 +115,20 @@ describe('llm-test-helpers', () => {
 
     it('multipleToolCalls should create multiple tool calls', async () => {
       const mock = streamScenarios.multipleToolCalls([
-        { name: 'readFile', args: { path: '/a.ts' } },
-        { name: 'readFile', args: { path: '/b.ts' } },
+        { name: 'readFile', input: { path: '/a.ts' } },
+        { name: 'readFile', input: { path: '/b.ts' } },
       ]);
 
       const chunks: unknown[] = [];
-      for await (const chunk of mock.fullStream) {
+      for await (const chunk of mock.events) {
         chunks.push(chunk);
       }
 
       const toolCalls = chunks.filter(
-        (c: unknown) => typeof c === 'object' && c !== null && (c as { type: string }).type === 'tool-call'
+        (c: unknown) =>
+          typeof c === 'object' &&
+          c !== null &&
+          (c as { type: string }).type === 'tool-call'
       );
       expect(toolCalls).toHaveLength(2);
     });
@@ -217,19 +137,22 @@ describe('llm-test-helpers', () => {
       const mock = streamScenarios.emptyToolCallsBug();
 
       const chunks: unknown[] = [];
-      for await (const chunk of mock.fullStream) {
+      for await (const chunk of mock.events) {
         chunks.push(chunk);
       }
 
       // Should have text but finishReason is tool-calls (the bug)
       expect(chunks).toContainEqual({ type: 'text-delta', text: 'Task completed.' });
       expect(chunks).toContainEqual(
-        expect.objectContaining({ type: 'step-finish', finishReason: 'tool-calls' })
+        expect.objectContaining({ type: 'done', finish_reason: 'tool-calls' })
       );
 
       // Should NOT have any tool-call events
       const toolCalls = chunks.filter(
-        (c: unknown) => typeof c === 'object' && c !== null && (c as { type: string }).type === 'tool-call'
+        (c: unknown) =>
+          typeof c === 'object' &&
+          c !== null &&
+          (c as { type: string }).type === 'tool-call'
       );
       expect(toolCalls).toHaveLength(0);
     });
@@ -238,7 +161,7 @@ describe('llm-test-helpers', () => {
       const mock = streamScenarios.streamError();
 
       const chunks: unknown[] = [];
-      for await (const chunk of mock.fullStream) {
+      for await (const chunk of mock.events) {
         chunks.push(chunk);
       }
 
@@ -251,11 +174,10 @@ describe('llm-test-helpers', () => {
       const mock = streamScenarios.emptyResponse();
 
       const chunks: unknown[] = [];
-      for await (const chunk of mock.fullStream) {
+      for await (const chunk of mock.events) {
         chunks.push(chunk);
       }
 
-      // Should only have text-start and step-finish, no text-delta with content
       const textDeltas = chunks.filter(
         (c: unknown) =>
           typeof c === 'object' &&
@@ -268,63 +190,31 @@ describe('llm-test-helpers', () => {
   });
 
   describe('createCompressionSummaryResponse', () => {
-    it('should create a compression summary response with default summary', () => {
+    it('should create a compression summary response with default summary', async () => {
       const response = createCompressionSummaryResponse();
 
-      expect(response.stream).toBeDefined();
-      expect(response.rawCall).toEqual({ rawPrompt: null, rawSettings: {} });
+      const chunks: unknown[] = [];
+      for await (const chunk of response.events) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toContainEqual(
+        expect.objectContaining({ type: 'done', finish_reason: 'stop' })
+      );
     });
 
-    it('should create a compression summary response with custom summary', () => {
+    it('should create a compression summary response with custom summary', async () => {
       const customSummary = 'Custom compression summary for testing';
       const response = createCompressionSummaryResponse(customSummary);
 
-      expect(response.stream).toBeDefined();
-    });
-  });
+      const chunks: unknown[] = [];
+      for await (const chunk of response.events) {
+        chunks.push(chunk);
+      }
 
-  describe('createMockErrorModel', () => {
-    it('should create a model that errors on both stream and generate', async () => {
-      const model = createMockErrorModel({ errorMessage: 'Test error' });
-
-      await expect(
-        model.doStream({
-          inputFormat: 'messages',
-          mode: { type: 'regular' },
-          prompt: [],
-        })
-      ).rejects.toThrow('Test error');
-
-      await expect(
-        model.doGenerate({
-          inputFormat: 'messages',
-          mode: { type: 'regular' },
-          prompt: [],
-        })
-      ).rejects.toThrow('Test error');
-    });
-
-    it('should allow selective error on stream only', async () => {
-      const model = createMockErrorModel({
-        errorOnStream: true,
-        errorOnGenerate: false,
-      });
-
-      await expect(
-        model.doStream({
-          inputFormat: 'messages',
-          mode: { type: 'regular' },
-          prompt: [],
-        })
-      ).rejects.toThrow();
-
-      // Should not throw on generate
-      const result = await model.doGenerate({
-        inputFormat: 'messages',
-        mode: { type: 'regular' },
-        prompt: [],
-      });
-      expect(result.text).toBe('Mock response');
+      expect(chunks).toContainEqual(
+        expect.objectContaining({ type: 'done', finish_reason: 'stop' })
+      );
     });
   });
 });

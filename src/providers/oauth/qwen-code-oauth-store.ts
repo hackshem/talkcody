@@ -3,10 +3,8 @@
 
 import { create } from 'zustand';
 import { logger } from '@/lib/logger';
+import { llmClient } from '@/services/llm/llm-client';
 import { readTokenFromPath, testToken, validateTokenPath } from './qwen-code-oauth-service';
-
-// Storage key for OAuth token path in settings database
-const STORAGE_KEY = 'qwen_code_oauth_path';
 
 interface QwenCodeOAuthState {
   // Connection state
@@ -36,11 +34,13 @@ interface QwenCodeOAuthActions {
 
 type QwenCodeOAuthStore = QwenCodeOAuthState & QwenCodeOAuthActions;
 
-// Helper to get settings database
-async function getSettingsDb() {
-  const { settingsDb } = await import('@/stores/settings-store');
-  await settingsDb.initialize();
-  return settingsDb;
+async function loadOAuthSnapshot() {
+  try {
+    return await llmClient.getOAuthStatus();
+  } catch (error) {
+    logger.warn('[QwenOAuth] Failed to read OAuth status from Rust:', error);
+    return null;
+  }
 }
 
 export const useQwenCodeOAuthStore = create<QwenCodeOAuthStore>((set, get) => ({
@@ -60,15 +60,10 @@ export const useQwenCodeOAuthStore = create<QwenCodeOAuthStore>((set, get) => ({
 
     try {
       logger.info('[QwenOAuth] Initializing store');
-      const db = await getSettingsDb();
 
-      const tokenPath = (await db.get(STORAGE_KEY)) || null;
-
-      // Check if we have a valid token path
-      let isConnected = false;
-      if (tokenPath) {
-        isConnected = await validateTokenPath(tokenPath);
-      }
+      const snapshot = await loadOAuthSnapshot();
+      const tokenPath = snapshot?.qwen?.tokenPath || null;
+      const isConnected = !!snapshot?.qwen?.isConnected;
 
       logger.info('[QwenOAuth] Initialized', { isConnected, hasPath: !!tokenPath });
 
@@ -88,12 +83,11 @@ export const useQwenCodeOAuthStore = create<QwenCodeOAuthStore>((set, get) => ({
     }
   },
 
-  // Set token path and save to database
+  // Set token path and save to Rust
   setTokenPath: async (path: string) => {
     set({ isLoading: true, error: null });
 
     try {
-      // Validate path first
       const isValid = await validateTokenPath(path);
 
       if (!isValid) {
@@ -102,9 +96,7 @@ export const useQwenCodeOAuthStore = create<QwenCodeOAuthStore>((set, get) => ({
         );
       }
 
-      // Save to database
-      const db = await getSettingsDb();
-      await db.set(STORAGE_KEY, path);
+      await llmClient.setQwenTokenPath({ path });
 
       logger.info('[QwenOAuth] Token path set successfully');
 
@@ -129,8 +121,7 @@ export const useQwenCodeOAuthStore = create<QwenCodeOAuthStore>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const db = await getSettingsDb();
-      await db.set(STORAGE_KEY, '');
+      await llmClient.clearQwenTokenPath();
 
       logger.info('[QwenOAuth] Disconnected');
 
@@ -182,10 +173,7 @@ export const useQwenCodeOAuthStore = create<QwenCodeOAuthStore>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      // Read token from file
       const token = await readTokenFromPath(tokenPath);
-
-      // Test if token is valid
       const isValid = await testToken(token);
 
       if (!isValid) {

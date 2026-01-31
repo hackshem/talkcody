@@ -63,6 +63,8 @@ Output can be read using \`cat\` or \`tail -f\` on the output file path returned
     <BashToolResult
       output={result?.output}
       error={result?.error}
+      outputFilePath={result?.outputFilePath}
+      errorFilePath={result?.errorFilePath}
       success={result?.success ?? false}
       exitCode={result?.exit_code}
       idleTimedOut={result?.idle_timed_out}

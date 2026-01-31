@@ -17,7 +17,11 @@ import { getDocLinks } from '@/lib/doc-links';
 import { logger } from '@/lib/logger';
 import { simpleFetch } from '@/lib/tauri-fetch';
 import { cn } from '@/lib/utils';
-import { PROVIDER_CONFIGS, PROVIDERS_WITH_CODING_PLAN } from '@/providers';
+import {
+  PROVIDER_CONFIGS,
+  PROVIDERS_WITH_CODING_PLAN,
+  PROVIDERS_WITH_INTERNATIONAL,
+} from '@/providers';
 import { customModelService, isLocalProvider } from '@/providers/custom/custom-model-service';
 import { useProviderStore } from '@/providers/stores/provider-store';
 import { databaseService } from '@/services/database-service';
@@ -33,6 +37,9 @@ export function ApiKeysSettings() {
   const [apiKeys, setApiKeys] = useState<ApiKeySettings>({});
   const [baseUrls, setBaseUrls] = useState<Record<string, string>>({});
   const [useCodingPlanSettings, setUseCodingPlanSettings] = useState<Record<string, boolean>>({});
+  const [useInternationalSettings, setUseInternationalSettings] = useState<Record<string, boolean>>(
+    {}
+  );
   const [apiKeyVisibility, setApiKeyVisibility] = useState<ApiKeyVisibility>({});
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [apiKeyTimeouts, setApiKeyTimeouts] = useState<{
@@ -106,6 +113,7 @@ export function ApiKeysSettings() {
         // Load base URLs and useCodingPlan settings for all providers
         const loadedBaseUrls: Record<string, string> = {};
         const loadedUseCodingPlanSettings: Record<string, boolean> = {};
+        const loadedUseInternationalSettings: Record<string, boolean> = {};
         for (const providerId of Object.keys(PROVIDER_CONFIGS)) {
           const baseUrl = await settingsManager.getProviderBaseUrl(providerId);
           if (baseUrl) {
@@ -117,9 +125,16 @@ export function ApiKeysSettings() {
             const useCodingPlan = await settingsManager.getProviderUseCodingPlan(providerId);
             loadedUseCodingPlanSettings[providerId] = useCodingPlan;
           }
+
+          // Load useInternational setting for providers that support it
+          if (PROVIDERS_WITH_INTERNATIONAL.includes(providerId)) {
+            const useInternational = await settingsManager.getProviderUseInternational(providerId);
+            loadedUseInternationalSettings[providerId] = useInternational;
+          }
         }
         setBaseUrls(loadedBaseUrls);
         setUseCodingPlanSettings(loadedUseCodingPlanSettings);
+        setUseInternationalSettings(loadedUseInternationalSettings);
       } catch (error) {
         logger.error('Failed to load API keys settings:', error);
       }
@@ -203,6 +218,28 @@ export function ApiKeysSettings() {
     } catch (error) {
       logger.error(`Failed to update ${providerId} useCodingPlan:`, error);
       toast.error(t.Settings.apiKeys.codingPlanUpdateFailed(providerId));
+    }
+  };
+
+  const handleUseInternationalChange = async (providerId: string, value: boolean) => {
+    const updatedSettings = { ...useInternationalSettings, [providerId]: value };
+    setUseInternationalSettings(updatedSettings);
+
+    try {
+      await settingsManager.setProviderUseInternational(providerId, value);
+      logger.info('Model service cache invalidated after useInternational update');
+
+      // Refresh providers after useInternational change
+      await useProviderStore.getState().refresh();
+      logger.info(`${providerId} useInternational updated to ${value}`);
+      toast.success(
+        value
+          ? t.Settings.apiKeys.internationalEnabled(providerId)
+          : t.Settings.apiKeys.internationalDisabled(providerId)
+      );
+    } catch (error) {
+      logger.error(`Failed to update ${providerId} useInternational:`, error);
+      toast.error(t.Settings.apiKeys.internationalUpdateFailed(providerId));
     }
   };
 
@@ -309,7 +346,13 @@ export function ApiKeysSettings() {
           if (customBaseUrl) {
             testedUrl = `${customBaseUrl.replace(/\/+$/, '')}/models`;
           } else {
-            testedUrl = customModelService.getModelsEndpoint(providerId) || '';
+            const useInternational = useInternationalSettings[providerId] || false;
+            const providerConfig = PROVIDER_CONFIGS[providerId];
+            const internationalBaseUrl = providerConfig?.internationalBaseUrl;
+            testedUrl =
+              useInternational && internationalBaseUrl
+                ? `${internationalBaseUrl.replace(/\/+$/, '')}/models`
+                : customModelService.getModelsEndpoint(providerId) || '';
           }
 
           const models = await customModelService.fetchProviderModels(providerId);
@@ -415,6 +458,25 @@ export function ApiKeysSettings() {
 
                   <CollapsibleContent className="px-3 pb-3 pt-0 border-t">
                     <div className="pt-3 space-y-3">
+                      {/* Use International toggle for providers that support it */}
+                      {PROVIDERS_WITH_INTERNATIONAL.includes(providerId) && (
+                        <div className="flex items-center justify-between">
+                          <Label
+                            htmlFor={`use-international-${providerId}`}
+                            className="text-sm text-muted-foreground"
+                          >
+                            {t.Settings.apiKeys.useInternational}
+                          </Label>
+                          <Switch
+                            id={`use-international-${providerId}`}
+                            checked={useInternationalSettings[providerId] || false}
+                            onCheckedChange={(checked) =>
+                              handleUseInternationalChange(providerId, checked)
+                            }
+                          />
+                        </div>
+                      )}
+
                       {/* Use Coding Plan toggle for providers that support it */}
                       {PROVIDERS_WITH_CODING_PLAN.includes(providerId) && (
                         <div className="flex items-center justify-between">

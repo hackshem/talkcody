@@ -15,6 +15,7 @@ mod http_proxy;
 mod keep_awake;
 mod lint;
 mod list_files;
+mod llm;
 mod lsp;
 mod oauth_callback_server;
 mod script_executor;
@@ -659,7 +660,14 @@ pub fn run() {
             let db_path = app_data_dir.join("talkcody.db");
             let db_path_str = db_path.to_string_lossy().to_string();
             let database = Arc::new(Database::new(db_path_str));
-            app.manage(database);
+            app.manage(database.clone());
+
+            let llm_state = llm::auth::api_key_manager::LlmState::new(
+                database.clone(),
+                llm::providers::provider_configs::builtin_providers(),
+            );
+            app.manage(llm_state);
+
             let ws_state = Arc::new(TokioMutex::new(WebSocketState::new()));
             app.manage(ws_state);
             let code_nav_state = CodeNavState(RwLock::new(CodeNavigationService::new()));
@@ -817,6 +825,12 @@ pub fn run() {
             lsp::lsp_get_server_status,
             lsp::lsp_download_server,
             oauth_callback_server::start_oauth_callback_server,
+            llm::commands::llm_stream_text,
+            llm::commands::llm_list_available_models,
+            llm::commands::llm_register_custom_provider,
+            llm::commands::llm_get_provider_configs,
+            llm::commands::llm_is_model_available,
+            llm::auth::api_key_manager::llm_set_setting,
             device_id::get_device_id,
             keep_awake::keep_awake_acquire,
             keep_awake::keep_awake_release,

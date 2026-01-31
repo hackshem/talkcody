@@ -11,7 +11,7 @@ vi.mock('@/services/ai/ai-context-compaction', () => ({
   },
 }));
 
-import type { ModelMessage } from 'ai';
+import type { Message as ModelMessage } from '@/services/llm/types';
 import { ContextCompactor } from './context-compactor';
 import type {
   CompressionConfig,

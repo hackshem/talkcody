@@ -1,8 +1,8 @@
 // src/stores/settings-store.ts
 import { create } from 'zustand';
 import { logger } from '@/lib/logger';
-import { providerRegistry } from '@/providers';
 import { GROK_CODE_FAST } from '@/providers/config/model-config';
+import { PROVIDER_CONFIGS } from '@/providers/config/provider-config';
 import type { TursoClient } from '@/services/database/turso-client';
 import { databaseService } from '@/services/database-service';
 import type { ApiKeySettings, CustomProviderApiKeys } from '@/types/api-keys';
@@ -11,11 +11,11 @@ import { DEFAULT_SHORTCUTS } from '@/types/shortcuts';
 
 export const DEFAULT_PROJECT = 'default';
 
-// Generate default API key settings from provider registry
+// Generate default API key settings from provider configs
 function generateDefaultApiKeySettings(): Record<string, string> {
   const settings: Record<string, string> = {};
-  for (const provider of providerRegistry.getAllProviders()) {
-    settings[`api_key_${provider.id}`] = '';
+  for (const providerId of Object.keys(PROVIDER_CONFIGS)) {
+    settings[`api_key_${providerId}`] = '';
   }
   return settings;
 }
@@ -159,6 +159,10 @@ interface SettingsActions {
   // Use Coding Plan
   setProviderUseCodingPlan: (providerId: string, useCodingPlan: boolean) => Promise<void>;
   getProviderUseCodingPlan: (providerId: string) => boolean | undefined;
+
+  // Use International mode
+  setProviderUseInternational: (providerId: string, useInternational: boolean) => Promise<void>;
+  getProviderUseInternational: (providerId: string) => boolean | undefined;
 
   // MiniMax Cookie
   setMinimaxCookie: (cookie: string) => Promise<void>;
@@ -477,13 +481,13 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       ];
 
       // Add API key keys
-      const allProviders = providerRegistry.getAllProviders();
+      const providerIds = Object.keys(PROVIDER_CONFIGS);
       logger.debug('[initialize] Loading API keys for providers', {
-        providerCount: allProviders.length,
-        providerIds: allProviders.map((p) => p.id),
+        providerCount: providerIds.length,
+        providerIds,
       });
-      for (const provider of allProviders) {
-        keys.push(`api_key_${provider.id}`);
+      for (const providerId of providerIds) {
+        keys.push(`api_key_${providerId}`);
       }
 
       // Add shortcut keys
@@ -495,9 +499,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
       // Parse API keys
       const apiKeys: Partial<ApiKeySettings> = {};
-      for (const provider of allProviders) {
-        const key = provider.id as keyof ApiKeySettings;
-        const value = rawSettings[`api_key_${provider.id}`];
+      for (const providerId of providerIds) {
+        const key = providerId as keyof ApiKeySettings;
+        const value = rawSettings[`api_key_${providerId}`];
         apiKeys[key] = value || undefined;
       }
       logger.debug('[initialize] Parsed API keys', {
@@ -743,10 +747,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       })),
     });
 
-    for (const provider of providerRegistry.getAllProviders()) {
-      const key = provider.id as keyof ApiKeySettings;
+    for (const providerId of Object.keys(PROVIDER_CONFIGS)) {
+      const key = providerId as keyof ApiKeySettings;
       if (apiKeys[key] !== undefined) {
-        settingsToUpdate[`api_key_${provider.id}`] = apiKeys[key] as string;
+        settingsToUpdate[`api_key_${providerId}`] = apiKeys[key] as string;
       }
     }
 
@@ -870,6 +874,21 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   getProviderUseCodingPlan: (_providerId: string) => {
+    // We need to get this from the database directly since we don't cache it in state
+    // For now, we'll return undefined and let the component handle async loading
+    return undefined;
+  },
+
+  // Use International mode
+  setProviderUseInternational: async (providerId: string, useInternational: boolean) => {
+    await settingsDb.set(`use_international_${providerId}`, useInternational.toString());
+    logger.info('Updated provider use international', {
+      provider: providerId,
+      useInternational,
+    });
+  },
+
+  getProviderUseInternational: (_providerId: string) => {
     // We need to get this from the database directly since we don't cache it in state
     // For now, we'll return undefined and let the component handle async loading
     return undefined;
@@ -1188,6 +1207,18 @@ export const settingsManager = {
   },
   getProviderUseCodingPlanSync: (providerId: string) => {
     return useSettingsStore.getState().getProviderUseCodingPlan(providerId);
+  },
+
+  // Use International mode
+  setProviderUseInternational: (providerId: string, useInternational: boolean) =>
+    useSettingsStore.getState().setProviderUseInternational(providerId, useInternational),
+  getProviderUseInternational: async (providerId: string) => {
+    await settingsDb.initialize();
+    const value = await settingsDb.get(`use_international_${providerId}`);
+    return value === 'true';
+  },
+  getProviderUseInternationalSync: (providerId: string) => {
+    return useSettingsStore.getState().getProviderUseInternational(providerId);
   },
 
   // Shortcuts

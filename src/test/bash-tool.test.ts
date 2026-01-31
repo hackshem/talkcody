@@ -5,6 +5,10 @@ const { mockInvoke } = vi.hoisted(() => ({
   mockInvoke: vi.fn(),
 }));
 
+const { mockSaveOutput } = vi.hoisted(() => ({
+  mockSaveOutput: vi.fn(),
+}));
+
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: mockInvoke,
 }));
@@ -27,6 +31,12 @@ vi.mock('@/stores/settings-store', () => ({
 vi.mock('@/services/workspace-root-service', () => ({
   getValidatedWorkspaceRoot: vi.fn().mockResolvedValue('/test/root'),
   getEffectiveWorkspaceRoot: vi.fn().mockResolvedValue('/test/root'),
+}));
+
+vi.mock('@/services/task-file-service', () => ({
+  taskFileService: {
+    saveOutput: mockSaveOutput,
+  },
 }));
 
 // Mock the logger
@@ -65,6 +75,7 @@ function createMockShellResult(overrides: {
 describe('bashTool', () => {
   beforeEach(() => {
     mockInvoke.mockClear();
+    mockSaveOutput.mockClear();
   });
 
   it('should execute a safe command successfully', async () => {
@@ -424,6 +435,7 @@ describe('bashTool', () => {
         code: 0,
         stdout: largeOutput,
       }));
+      mockSaveOutput.mockResolvedValue('/test/root/.talkcody/output/task-123/tool-456_stdout.log');
 
       if (!bashTool.execute) {
         throw new Error('bashTool.execute is not defined');
@@ -436,6 +448,8 @@ describe('bashTool', () => {
       expect(result.success).toBe(true);
       expect(result.output).toContain('chars truncated');
       expect(result.output!.length).toBeLessThanOrEqual(10100);
+      expect(result.outputFilePath).toBe('/test/root/.talkcody/output/task-123/tool-456_stdout.log');
+      expect(mockSaveOutput).toHaveBeenCalledWith('task-123', 'tool-456', largeOutput, 'stdout');
     });
 
     it('should return minimal output for successful build commands', async () => {

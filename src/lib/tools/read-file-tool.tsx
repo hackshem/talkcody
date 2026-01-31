@@ -127,23 +127,35 @@ The file path should be an absolute path.`,
       .describe('Number of lines to read from start_line. If not specified, reads to end of file'),
   }),
   canConcurrent: true,
-  execute: async ({ file_path, start_line, line_count }, context) => {
+  execute: async ({ file_path, start_line, line_count, filePath, path }, context) => {
     try {
       const rootPath = await getEffectiveWorkspaceRoot(context.taskId);
+      const resolvedPath = file_path ?? filePath ?? path;
       if (!rootPath) {
         return {
           success: false,
-          file_path,
+          file_path: resolvedPath,
           content: null,
           message: 'Project root path is not set.',
         };
       }
+      if (!resolvedPath) {
+        logger.warn('readFile called without file_path', {
+          taskId: context.taskId,
+        });
+        return {
+          success: false,
+          file_path: resolvedPath,
+          content: null,
+          message: 'Missing required file_path parameter.',
+        };
+      }
       // logger.info('readFile: Normalizing file path. taskId:', {
-      //   file_path,
+      //   file_path: resolvedPath,
       //   rootPath,
       //   contextTaskId: context.taskId,
       // });
-      file_path = await normalizeFilePath(rootPath, file_path);
+      file_path = await normalizeFilePath(rootPath, resolvedPath);
 
       // Check if file exists before attempting to read it
       const fileExists = await exists(file_path);

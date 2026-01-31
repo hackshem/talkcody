@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { create } from 'zustand';
 import { logger } from '@/lib/logger';
+import { llmClient } from '@/services/llm/llm-client';
 import {
   exchangeCode,
   isTokenExpired,
@@ -19,14 +20,6 @@ interface OAuthCallbackResult {
   state: string | null;
   error: string | null;
 }
-
-// Storage keys for OAuth tokens in settings database
-const STORAGE_KEYS = {
-  ACCESS_TOKEN: 'openai_oauth_access_token',
-  REFRESH_TOKEN: 'openai_oauth_refresh_token',
-  EXPIRES_AT: 'openai_oauth_expires_at',
-  ACCOUNT_ID: 'openai_oauth_account_id',
-} as const;
 
 interface OpenAIOAuthState {
   // Connection state
@@ -70,11 +63,13 @@ interface OpenAIOAuthActions {
 
 type OpenAIOAuthStore = OpenAIOAuthState & OpenAIOAuthActions;
 
-// Helper to get settings database
-async function getSettingsDb() {
-  const { settingsDb } = await import('@/stores/settings-store');
-  await settingsDb.initialize();
-  return settingsDb;
+async function loadOAuthSnapshot() {
+  try {
+    return await llmClient.getOAuthStatus();
+  } catch (error) {
+    logger.warn('[OpenAIOAuth] Failed to read OAuth status from Rust:', error);
+    return null;
+  }
 }
 
 export const useOpenAIOAuthStore = create<OpenAIOAuthStore>((set, get) => ({
@@ -101,20 +96,12 @@ export const useOpenAIOAuthStore = create<OpenAIOAuthStore>((set, get) => ({
 
     try {
       logger.info('[OpenAIOAuth] Initializing store');
-      const db = await getSettingsDb();
 
-      const values = await db.getBatch([
-        STORAGE_KEYS.ACCESS_TOKEN,
-        STORAGE_KEYS.REFRESH_TOKEN,
-        STORAGE_KEYS.EXPIRES_AT,
-        STORAGE_KEYS.ACCOUNT_ID,
-      ]);
-
-      const accessToken = values[STORAGE_KEYS.ACCESS_TOKEN] || null;
-      const refreshToken = values[STORAGE_KEYS.REFRESH_TOKEN] || null;
-      const expiresAtStr = values[STORAGE_KEYS.EXPIRES_AT];
-      const expiresAt = expiresAtStr ? Number.parseInt(expiresAtStr, 10) : null;
-      const accountId = values[STORAGE_KEYS.ACCOUNT_ID] || null;
+      const snapshot = await loadOAuthSnapshot();
+      const accessToken = snapshot?.openai?.accessToken || null;
+      const refreshToken = snapshot?.openai?.refreshToken || null;
+      const expiresAt = snapshot?.openai?.expiresAt || null;
+      const accountId = snapshot?.openai?.accountId || null;
 
       const isConnected = !!(accessToken && refreshToken && expiresAt);
 
@@ -265,15 +252,6 @@ export const useOpenAIOAuthStore = create<OpenAIOAuthStore>((set, get) => ({
 
       const { accessToken, refreshToken, expiresAt, accountId } = result.tokens;
 
-      // Save to database
-      const db = await getSettingsDb();
-      await db.setBatch({
-        [STORAGE_KEYS.ACCESS_TOKEN]: accessToken,
-        [STORAGE_KEYS.REFRESH_TOKEN]: refreshToken,
-        [STORAGE_KEYS.EXPIRES_AT]: expiresAt.toString(),
-        [STORAGE_KEYS.ACCOUNT_ID]: accountId || '',
-      });
-
       logger.info('[OpenAIOAuth] OAuth completed successfully');
 
       set({
@@ -303,13 +281,7 @@ export const useOpenAIOAuthStore = create<OpenAIOAuthStore>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const db = await getSettingsDb();
-      await db.setBatch({
-        [STORAGE_KEYS.ACCESS_TOKEN]: '',
-        [STORAGE_KEYS.REFRESH_TOKEN]: '',
-        [STORAGE_KEYS.EXPIRES_AT]: '',
-        [STORAGE_KEYS.ACCOUNT_ID]: '',
-      });
+      await llmClient.disconnectOpenAIOAuth();
 
       logger.info('[OpenAIOAuth] Disconnected');
 
@@ -380,15 +352,6 @@ export const useOpenAIOAuthStore = create<OpenAIOAuthStore>((set, get) => ({
         expiresAt: newExpiresAt,
         accountId,
       } = result.tokens;
-
-      // Save to database
-      const db = await getSettingsDb();
-      await db.setBatch({
-        [STORAGE_KEYS.ACCESS_TOKEN]: accessToken,
-        [STORAGE_KEYS.REFRESH_TOKEN]: newRefreshToken,
-        [STORAGE_KEYS.EXPIRES_AT]: newExpiresAt.toString(),
-        [STORAGE_KEYS.ACCOUNT_ID]: accountId || '',
-      });
 
       logger.info('[OpenAIOAuth] Token refreshed successfully');
 

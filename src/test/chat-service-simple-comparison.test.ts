@@ -6,15 +6,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLLMService, type LLMService } from '@/services/agents/llm-service';
 import type { UIMessage } from '@/types/agent';
 
-vi.mock('@/providers/models/model-service', () => ({
-  modelService: { isModelAvailableSync: vi.fn(() => true) },
-}));
-
-vi.mock('@/providers/core/provider-factory', () => ({
-  aiProviderService: {
-    getProviderModel: vi.fn(() => ({ modelId: 'test-model', provider: 'test' })),
-  },
-}));
 
 // Mock provider store
 const mockProviderStore = {
@@ -86,12 +77,21 @@ vi.mock('@/lib/llm-utils', () => ({
   formatReasoningText: vi.fn((text, isFirst) => (isFirst ? `\n<thinking>\n${text}` : text)),
 }));
 
-vi.mock('ai', () => ({
-  streamText: vi.fn(),
-  stepCountIs: vi.fn((count) => ({ type: 'step-count', count })),
-  smoothStream: vi.fn(() => undefined),
-  NoSuchToolError: { isInstance: vi.fn(() => false) },
-  InvalidToolInputError: { isInstance: vi.fn(() => false) },
+vi.mock('@/services/llm/llm-client', () => ({
+  llmClient: {
+    streamText: vi.fn(),
+  },
+}));
+
+vi.mock('@/services/database-service', () => ({
+  databaseService: {
+    initialize: vi.fn().mockResolvedValue(undefined),
+    insertApiUsageEvent: vi.fn().mockResolvedValue(undefined),
+    db: {
+      select: vi.fn().mockResolvedValue([]),
+      execute: vi.fn().mockResolvedValue({ rowsAffected: 0 }),
+    },
+  },
 }));
 
 describe('ChatService Methods Simple Comparison', () => {
@@ -109,8 +109,8 @@ describe('ChatService Methods Simple Comparison', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const aiModule = await import('ai');
-    mockStreamText = vi.mocked(aiModule.streamText);
+    const llmModule = await import('@/services/llm/llm-client');
+    mockStreamText = vi.mocked(llmModule.llmClient.streamText);
 
     // Create a new LLMService instance for each test
     llmService = createLLMService('test-task-id');
@@ -118,26 +118,20 @@ describe('ChatService Methods Simple Comparison', () => {
 
   it('should demonstrate that runAgent can replace streamChat functionality', async () => {
     // Setup consistent mock
-    const mockFullStream = [
-      { type: 'text-delta', text: 'Hello' },
-      { type: 'text-delta', text: ' World' },
-      { type: 'step-finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5 } },
-    ];
-
-    mockStreamText.mockReturnValue({
-      fullStream: (async function* () {
-        for (const delta of mockFullStream) {
-          yield delta;
-        }
+    mockStreamText.mockResolvedValue({
+      requestId: 1,
+      events: (async function* () {
+        yield { type: 'text-start' };
+        yield { type: 'text-delta', text: 'Hello' };
+        yield { type: 'text-delta', text: ' World' };
+        yield {
+          type: 'usage',
+          input_tokens: 10,
+          output_tokens: 5,
+          total_tokens: 15,
+        };
+        yield { type: 'done', finish_reason: 'stop' };
       })(),
-      textStream: (async function* () {
-        for (const delta of mockFullStream) {
-          if (delta.type === 'text-delta') {
-            yield delta;
-          }
-        }
-      })(),
-      onFinish: async () => {},
     });
 
     const runAgentOutput: string[] = [];
@@ -171,16 +165,18 @@ describe('ChatService Methods Simple Comparison', () => {
   });
 
   it('should demonstrate runManualAgentLoop advanced features', async () => {
-    const mockFullStream = [
-      { type: 'text-delta', text: 'Advanced response' },
-      { type: 'step-finish', finishReason: 'stop', usage: { inputTokens: 5, outputTokens: 3 } },
-    ];
-
-    mockStreamText.mockReturnValue({
-      fullStream: (async function* () {
-        for (const delta of mockFullStream) {
-          yield delta;
-        }
+    mockStreamText.mockResolvedValue({
+      requestId: 2,
+      events: (async function* () {
+        yield { type: 'text-start' };
+        yield { type: 'text-delta', text: 'Advanced response' };
+        yield {
+          type: 'usage',
+          input_tokens: 5,
+          output_tokens: 3,
+          total_tokens: 8,
+        };
+        yield { type: 'done', finish_reason: 'stop' };
       })(),
     });
 

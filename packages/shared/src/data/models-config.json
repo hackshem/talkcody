@@ -236,6 +236,7 @@
     "claude-opus-4.5": {
       "name": "Claude Opus 4.5",
       "imageInput": true,
+      "interleaved": true,
       "providers": [
         "aiGateway",
         "anthropic",
@@ -259,6 +260,7 @@
     "claude-sonnet-4.5": {
       "name": "Claude Sonnet 4.5",
       "imageInput": true,
+      "interleaved": true,
       "providers": [
         "aiGateway",
         "anthropic",
@@ -282,6 +284,7 @@
     "claude-haiku-4.5": {
       "name": "Claude Haiku 4.5",
       "imageInput": true,
+      "interleaved": true,
       "providers": [
         "aiGateway",
         "openRouter",
@@ -325,8 +328,9 @@
       "context_length": 1000000
     },
     "kimi-k2.5": {
-      "name": "kimi K2.5",
+      "name": "Kimi K2.5",
       "imageInput": true,
+      "interleaved": true,
       "providers": [
         "aiGateway",
         "openRouter",
@@ -346,6 +350,7 @@
     },
     "deepseek-v3.2": {
       "name": "Deepseek V3.2",
+      "interleaved": true,
       "providers": [
         "deepseek"
       ],
@@ -399,6 +404,7 @@
     "glm-4.7": {
       "name": "GLM 4.7",
       "imageInput": true,
+      "interleaved": true,
       "providers": [
         "zhipu",
         "openRouter",
@@ -447,6 +453,7 @@
     "minimax-m21": {
       "name": "MiniMax M2.1",
       "imageInput": true,
+      "interleaved": true,
       "providers": [
         "talkcody",
         "MiniMax",

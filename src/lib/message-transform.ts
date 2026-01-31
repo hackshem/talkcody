@@ -73,14 +73,23 @@ export namespace MessageTransform {
       (normalizedProviderId === 'moonshot' || normalizedProviderId === 'deepseek')
     ) {
       const extracted = extractReasoning(assistantContent);
+      const hasToolCall = assistantContent.some((part) => part.type === 'tool-call');
       const shouldIncludeReasoningContent =
-        normalizedProviderId === 'deepseek' || extracted.reasoningText.length > 0;
+        normalizedProviderId === 'deepseek' ||
+        extracted.reasoningText.length > 0 ||
+        (normalizedProviderId === 'moonshot' && hasToolCall);
+      const reasoningContent =
+        normalizedProviderId === 'moonshot' &&
+        shouldIncludeReasoningContent &&
+        extracted.reasoningText.length === 0
+          ? ' '
+          : extracted.reasoningText;
       const transformedContent = {
         content: extracted.content,
         providerOptions: shouldIncludeReasoningContent
           ? {
               openaiCompatible: {
-                reasoning_content: extracted.reasoningText,
+                reasoning_content: reasoningContent,
               },
             }
           : undefined,

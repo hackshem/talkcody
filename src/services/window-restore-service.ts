@@ -50,13 +50,15 @@ export class WindowRestoreService {
 
       logger.info(`Restoring ${windowsToRestore.length} windows`);
 
-      // Restore windows one by one
+      // Restore windows one by one without focusing existing windows
       for (const windowState of windowsToRestore) {
         try {
           if (windowState.rootPath) {
             await WindowManagerService.openProjectInWindow(
               windowState.rootPath,
-              windowState.projectId
+              windowState.projectId,
+              false,
+              true
             );
             logger.info(`Restored window for: ${windowState.rootPath}`);
           }

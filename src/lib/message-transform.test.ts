@@ -58,4 +58,30 @@ describe('MessageTransform.transform', () => {
     expect(transformedContent?.content).toEqual(assistantContent);
     expect(transformedContent?.providerOptions).toBeUndefined();
   });
+
+  it('adds non-empty reasoning_content for Moonshot when tool calls are present', () => {
+    const msgs: ModelMessage[] = [];
+    const assistantContent = [
+      {
+        type: 'tool-call',
+        toolCallId: 'call_1',
+        toolName: 'webFetch',
+        input: { url: 'https://example.com' },
+      },
+    ];
+
+    const { transformedContent } = MessageTransform.transform(
+      msgs,
+      'moonshot-v1',
+      'moonshot',
+      assistantContent
+    );
+
+    expect(transformedContent?.content).toEqual(assistantContent);
+    expect(transformedContent?.providerOptions).toEqual({
+      openaiCompatible: {
+        reasoning_content: ' ',
+      },
+    });
+  });
 });

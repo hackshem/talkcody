@@ -191,6 +191,23 @@ impl<'a> StreamHandler<'a> {
             oauth_token.as_deref(),
             provider.headers.as_ref(),
         );
+
+        if provider.id == "moonshot" && provider.supports_coding_plan {
+            if let Some(use_coding_plan) = self
+                .api_keys
+                .get_setting(&format!("use_coding_plan_{}", provider.id))
+                .await?
+            {
+                if use_coding_plan == "true" {
+                    if let Some(coding_plan_url) = &provider.coding_plan_base_url {
+                        if base_url == *coding_plan_url {
+                            headers.insert("User-Agent".to_string(), "KimiCLI/1.3".to_string());
+                        }
+                    }
+                }
+            }
+        }
+
         if use_openai_oauth {
             headers.insert(
                 "OpenAI-Beta".to_string(),
@@ -1855,6 +1872,62 @@ mod tests {
                 .as_ref()
                 .expect("coding plan url")
         );
+    }
+
+    #[tokio::test]
+    async fn moonshot_coding_plan_adds_kimi_cli_user_agent() {
+        let dir = TempDir::new().expect("temp dir");
+        let db_path = dir.path().join("talkcody-base-url.db");
+        let db = Arc::new(Database::new(db_path.to_string_lossy().to_string()));
+        db.connect().await.expect("db connect");
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT, updated_at INTEGER)",
+            vec![],
+        )
+        .await
+        .expect("create settings");
+
+        let api_keys = ApiKeyManager::new(db);
+        api_keys
+            .set_setting("use_coding_plan_moonshot", "true")
+            .await
+            .expect("set setting");
+
+        let providers = builtin_providers();
+        let provider = providers
+            .iter()
+            .find(|item| item.id == "moonshot")
+            .expect("moonshot provider")
+            .clone();
+        let registry = ProviderRegistry::new(providers);
+        let handler = StreamHandler::new(&registry, &api_keys);
+
+        let base_url = handler
+            .resolve_base_url(&provider)
+            .await
+            .expect("resolve base url");
+
+        let protocol = registry
+            .protocol(provider.protocol)
+            .expect("protocol exists");
+        let mut headers = protocol.build_headers(None, None, provider.headers.as_ref());
+        if provider.supports_coding_plan {
+            if let Some(use_coding_plan) = api_keys
+                .get_setting(&format!("use_coding_plan_{}", provider.id))
+                .await
+                .expect("get setting")
+            {
+                if use_coding_plan == "true" {
+                    if let Some(coding_plan_url) = &provider.coding_plan_base_url {
+                        if base_url == *coding_plan_url {
+                            headers.insert("User-Agent".to_string(), "KimiCLI/1.3".to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        assert_eq!(headers.get("User-Agent"), Some(&"KimiCLI/1.3".to_string()));
     }
 
     #[test]

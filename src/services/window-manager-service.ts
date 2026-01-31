@@ -204,14 +204,17 @@ export class WindowManagerService {
   static async openProjectInWindow(
     rootPath: string,
     projectId?: string,
-    forceNew: boolean = false
+    forceNew: boolean = false,
+    suppressFocus: boolean = false
   ): Promise<string> {
     // Check if project is already open
     if (!forceNew) {
       const existingLabel = await WindowManagerService.checkProjectWindowExists(rootPath);
       if (existingLabel) {
-        // Focus existing window
-        await WindowManagerService.focusWindow(existingLabel);
+        // Skip focusing during restore to prevent focus flicker
+        if (!suppressFocus) {
+          await WindowManagerService.focusWindow(existingLabel);
+        }
         return existingLabel;
       }
     }

@@ -1,6 +1,8 @@
 use crate::llm::testing::fixtures::{
-    fixture_path, ProviderFixture, RecordedRequest, RecordedResponse, RecordedSseEvent,
+    fixture_path, FixtureInput, ProviderFixture, RecordedRequest, RecordedResponse,
+    RecordedSseEvent,
 };
+use crate::llm::types::StreamEvent;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -57,6 +59,7 @@ pub struct RecordingContext {
     pub model: String,
     pub endpoint_path: String,
     pub url: String,
+    pub channel: String,
     pub request_headers: HashMap<String, String>,
     pub request_body: Value,
 }
@@ -92,11 +95,20 @@ impl Recorder {
                 sse_events: Vec::new(),
             },
             test_input: None,
-            expected_events: None,
+            expected_events: Some(Vec::new()),
         };
 
-        let path = fixture_path(&config.fixture_dir, &fixture);
+        let path = recorded_fixture_path(config, &fixture, &ctx.channel);
         Some(Self { fixture, path })
+    }
+
+    pub fn set_test_input(&mut self, input: FixtureInput) {
+        self.fixture.test_input = Some(input);
+    }
+
+    pub fn record_expected_event(&mut self, event: &StreamEvent) {
+        let events = self.fixture.expected_events.get_or_insert_with(Vec::new);
+        events.push(event.clone());
     }
 
     pub fn record_sse_event(&mut self, event: Option<&str>, data: &str) {
@@ -136,6 +148,15 @@ impl Recorder {
         };
         crate::llm::testing::fixtures::write_fixture(&self.path, &self.fixture)
     }
+}
+
+fn recorded_fixture_path(config: &TestConfig, fixture: &ProviderFixture, channel: &str) -> PathBuf {
+    let model = fixture.model.replace('/', "_").replace(' ', "_");
+    let file_name = format!(
+        "{}__{}__{}__{}.json",
+        fixture.provider_id, fixture.protocol, model, channel
+    );
+    config.fixture_dir.join(file_name)
 }
 
 fn headers_from_header_map(map: &reqwest::header::HeaderMap) -> HashMap<String, String> {

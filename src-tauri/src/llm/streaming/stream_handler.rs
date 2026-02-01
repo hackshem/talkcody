@@ -1,6 +1,7 @@
 use crate::llm::auth::api_key_manager::ApiKeyManager;
 use crate::llm::protocols::{ProtocolStreamState, ToolCallAccum};
 use crate::llm::providers::provider_registry::ProviderRegistry;
+use crate::llm::testing::fixtures::FixtureInput;
 use crate::llm::testing::{Recorder, RecordingContext, TestConfig, TestMode};
 use crate::llm::tracing::types::{float_attr, int_attr};
 use crate::llm::tracing::TraceWriter;
@@ -266,8 +267,16 @@ impl<'a> StreamHandler<'a> {
         } else {
             base_url
         };
+        let channel = Self::recording_channel(
+            &base_url,
+            provider,
+            use_openai_oauth,
+            test_config.base_url_override.as_deref(),
+        );
         let endpoint_path = if use_openai_oauth {
             "codex/responses"
+        } else if provider.id == "github_copilot" {
+            "chat/completions"
         } else {
             protocol.endpoint_path()
         };
@@ -282,10 +291,25 @@ impl<'a> StreamHandler<'a> {
                 model: provider_model_name.clone(),
                 endpoint_path: endpoint_path.to_string(),
                 url: url.clone(),
+                channel: channel.clone(),
                 request_headers: headers.clone(),
                 request_body: body.clone(),
             },
         );
+
+        if let Some(recorder) = recorder.as_mut() {
+            recorder.set_test_input(FixtureInput {
+                model: provider_model_name.clone(),
+                messages: request.messages.clone(),
+                tools: request.tools.clone(),
+                temperature: request.temperature,
+                max_tokens: request.max_tokens,
+                top_p: request.top_p,
+                top_k: request.top_k,
+                provider_options: request.provider_options.clone(),
+                extra_body: provider.extra_body.clone(),
+            });
+        }
 
         let client = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
@@ -544,10 +568,16 @@ impl<'a> StreamHandler<'a> {
                                 _ => {}
                             }
 
+                            if let Some(recorder) = recorder.as_mut() {
+                                recorder.record_expected_event(&event);
+                            }
                             Self::append_text_delta(&mut response_text, &event);
                             self.emit_stream_event(&window, &event_name, request_id, &event);
                             if !state.pending_events.is_empty() {
                                 for pending in state.pending_events.drain(..) {
+                                    if let Some(recorder) = recorder.as_mut() {
+                                        recorder.record_expected_event(&pending);
+                                    }
                                     Self::append_text_delta(&mut response_text, &pending);
                                     self.emit_stream_event(
                                         &window,
@@ -573,6 +603,9 @@ impl<'a> StreamHandler<'a> {
                             );
                             if !state.pending_events.is_empty() {
                                 for pending in state.pending_events.drain(..) {
+                                    if let Some(recorder) = recorder.as_mut() {
+                                        recorder.record_expected_event(&pending);
+                                    }
                                     Self::append_text_delta(&mut response_text, &pending);
                                     self.emit_stream_event(
                                         &window,
@@ -635,6 +668,11 @@ impl<'a> StreamHandler<'a> {
             );
         }
         if let Some(recorder) = recorder.as_mut() {
+            if state.finish_reason.as_deref() == Some("tool_calls") {
+                recorder.record_expected_event(&StreamEvent::Done {
+                    finish_reason: state.finish_reason.clone(),
+                });
+            }
             let _ = recorder.finish_stream(status, &response_headers);
         }
 
@@ -732,11 +770,15 @@ impl<'a> StreamHandler<'a> {
     ) -> Result<(String, String), String> {
         let api_keys = self.api_keys.load_api_keys().await?;
         let custom_providers = self.api_keys.load_custom_providers().await?;
+        let models =
+            crate::llm::models::model_registry::ModelRegistry::load_models_config(self.api_keys)
+                .await?;
         crate::llm::models::model_registry::ModelRegistry::get_model_provider(
             model_identifier,
             &api_keys,
             self.registry,
             &custom_providers,
+            &models,
         )
     }
 
@@ -852,6 +894,40 @@ impl<'a> StreamHandler<'a> {
     ) {
         log::debug!("[LLM Stream {}] Emitting event: {:?}", request_id, event);
         let _ = window.emit(event_name, event);
+    }
+
+    fn recording_channel(
+        base_url: &str,
+        provider: &crate::llm::types::ProviderConfig,
+        use_openai_oauth: bool,
+        base_url_override: Option<&str>,
+    ) -> String {
+        if use_openai_oauth {
+            return "oauth".to_string();
+        }
+        if provider.supports_coding_plan {
+            if let Some(coding_plan_url) = provider.coding_plan_base_url.as_deref() {
+                if coding_plan_url == base_url {
+                    return "coding_plan".to_string();
+                }
+            }
+        }
+        if provider.supports_international {
+            if let Some(international_url) = provider.international_base_url.as_deref() {
+                if international_url == base_url {
+                    return "international".to_string();
+                }
+            }
+        }
+        if let Some(override_url) = base_url_override {
+            if override_url == base_url {
+                return "custom".to_string();
+            }
+        }
+        if base_url != provider.base_url {
+            return "custom".to_string();
+        }
+        "api".to_string()
     }
 
     fn build_openai_oauth_request(

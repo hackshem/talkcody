@@ -36,14 +36,32 @@ pub fn builtin_providers() -> Vec<ProviderConfig> {
             id: "github_copilot".to_string(),
             name: "GitHub Copilot".to_string(),
             protocol: ProtocolType::OpenAiCompatible,
-            base_url: "https://api.githubcopilot.com/v1".to_string(),
+            base_url: "https://api.githubcopilot.com".to_string(),
             api_key_name: "GITHUB_COPILOT_TOKEN".to_string(),
             supports_oauth: true,
             supports_coding_plan: false,
             supports_international: false,
             coding_plan_base_url: None,
             international_base_url: None,
-            headers: None,
+            headers: Some(
+                [
+                    (
+                        "User-Agent".to_string(),
+                        "GitHubCopilotChat/0.35.0".to_string(),
+                    ),
+                    ("Editor-Version".to_string(), "vscode/1.105.1".to_string()),
+                    (
+                        "Editor-Plugin-Version".to_string(),
+                        "copilot-chat/0.35.0".to_string(),
+                    ),
+                    (
+                        "Copilot-Integration-Id".to_string(),
+                        "vscode-chat".to_string(),
+                    ),
+                ]
+                .into_iter()
+                .collect(),
+            ),
             extra_body: None,
             auth_type: AuthType::OAuthBearer,
         },

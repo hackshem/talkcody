@@ -135,10 +135,24 @@ impl ModelRegistry {
         api_keys: &HashMap<String, String>,
         registry: &ProviderRegistry,
         custom_providers: &CustomProvidersConfiguration,
+        config: &ModelsConfiguration,
     ) -> Result<(String, String), String> {
         let parts: Vec<&str> = model_identifier.split('@').collect();
         if parts.len() == 2 {
             return Ok((parts[0].to_string(), parts[1].to_string()));
+        }
+
+        if let Some(model_cfg) = config.models.get(model_identifier) {
+            for provider_id in &model_cfg.providers {
+                if Self::provider_available(provider_id, api_keys, registry, custom_providers) {
+                    return Ok((model_identifier.to_string(), provider_id.clone()));
+                }
+            }
+
+            return Err(format!(
+                "No available provider for model {}",
+                model_identifier
+            ));
         }
 
         for provider_id in registry.providers().iter().map(|p| p.id.clone()) {
@@ -320,11 +334,13 @@ mod tests {
             providers: HashMap::new(),
         };
 
+        let config = build_models_config();
         let (model, provider) = ModelRegistry::get_model_provider(
             "gpt-4o@openai",
             &api_keys,
             &registry,
             &custom_providers,
+            &config,
         )
         .expect("resolve provider");
         assert_eq!(model, "gpt-4o");
@@ -392,5 +408,38 @@ mod tests {
             &custom_providers,
         );
         assert!(!available.is_empty());
+    }
+
+    #[test]
+    fn get_model_provider_prefers_model_config_providers_over_registry_order() {
+        let mut config = build_models_config();
+        if let Some(model_cfg) = config.models.get_mut("gpt-4o") {
+            model_cfg.providers = vec!["openai".to_string()];
+        }
+
+        let registry = ProviderRegistry::new(vec![
+            provider_config("deepseek", crate::llm::types::AuthType::Bearer),
+            provider_config("openai", crate::llm::types::AuthType::Bearer),
+        ]);
+        let api_keys = HashMap::from([
+            ("deepseek".to_string(), "key".to_string()),
+            ("openai".to_string(), "key".to_string()),
+        ]);
+        let custom_providers = CustomProvidersConfiguration {
+            version: "1".to_string(),
+            providers: HashMap::new(),
+        };
+
+        let (model, provider) = ModelRegistry::get_model_provider(
+            "gpt-4o",
+            &api_keys,
+            &registry,
+            &custom_providers,
+            &config,
+        )
+        .expect("resolve provider");
+
+        assert_eq!(model, "gpt-4o");
+        assert_eq!(provider, "openai");
     }
 }

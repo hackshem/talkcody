@@ -148,6 +148,18 @@ function extractEnumValues(source: unknown): Array<string | number | boolean | n
   return values;
 }
 
+function inferEnumType(values: Array<string | number | boolean | null>): JSONSchema7['type'] {
+  if (values.length === 0) return undefined;
+  const types = new Set(values.map((value) => (value === null ? 'null' : typeof value)));
+  if (types.size !== 1) return undefined;
+  const onlyType = Array.from(types)[0];
+  if (onlyType === 'string') return 'string';
+  if (onlyType === 'number') return 'number';
+  if (onlyType === 'boolean') return 'boolean';
+  if (onlyType === 'null') return 'null';
+  return undefined;
+}
+
 function wrapNullable(schema: JSONSchema7): JSONSchema7 {
   return { anyOf: [schema, { type: 'null' }] };
 }
@@ -196,7 +208,8 @@ function convertInternal(schema: unknown): { json: JSONSchema7 | null; optional:
     case 'enum':
     case 'nativeEnum': {
       const enumValues = extractEnumValues(def?.values ?? def?.entries ?? def?.options);
-      json = { enum: enumValues };
+      const enumType = inferEnumType(enumValues);
+      json = enumType ? { type: enumType, enum: enumValues } : { enum: enumValues };
       break;
     }
     case 'null':

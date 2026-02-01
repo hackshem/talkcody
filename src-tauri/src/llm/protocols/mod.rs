@@ -43,6 +43,9 @@ pub struct ProtocolStreamState {
     pub text_started: bool,
     pub content_block_types: HashMap<usize, String>,
     pub content_block_ids: HashMap<usize, String>,
+    // Reasoning content tracking for DeepSeek-style reasoning_content
+    pub reasoning_started: bool,
+    pub reasoning_id: Option<String>,
 }
 
 #[derive(Default, Clone)]

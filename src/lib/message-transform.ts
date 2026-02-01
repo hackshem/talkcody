@@ -1,4 +1,5 @@
 import type { ContentPart, Message as ModelMessage } from '@/services/llm/types';
+import { logger } from './logger';
 
 export namespace MessageTransform {
   function shouldApplyCaching(providerId: string, modelId: string): boolean {
@@ -12,6 +13,47 @@ export namespace MessageTransform {
       lowerModelId.includes('claude') ||
       lowerModelId.includes('minimax')
     );
+  }
+
+  function resolveReasoningProviders(
+    modelId: string,
+    providerId?: string
+  ): { usesDeepseek: boolean; usesMoonshot: boolean } {
+    const normalizedProviderId = providerId?.toLowerCase();
+    const normalizedModelId = modelId.toLowerCase();
+    const usesDeepseek =
+      normalizedProviderId === 'deepseek' || normalizedModelId.includes('deepseek');
+    const usesMoonshot =
+      !usesDeepseek &&
+      (normalizedProviderId === 'moonshot' || normalizedModelId.includes('kimi-k2'));
+
+    return { usesDeepseek, usesMoonshot };
+  }
+
+  function getReasoningText(content: ContentPart[]): string {
+    return content
+      .filter((part) => part.type === 'reasoning')
+      .map((part) => part.text)
+      .join('');
+  }
+
+  function getHasToolCall(content?: ContentPart[]): boolean {
+    return content?.some((part) => part.type === 'tool-call') ?? false;
+  }
+
+  function getLatestAssistantContent(msgs: ModelMessage[]): ContentPart[] | undefined {
+    for (let i = msgs.length - 1; i >= 0; i -= 1) {
+      const msg = msgs[i];
+      if (!msg || msg.role !== 'assistant') {
+        continue;
+      }
+      if (Array.isArray(msg.content)) {
+        return msg.content as ContentPart[];
+      }
+      return undefined;
+    }
+
+    return undefined;
   }
 
   function applyCacheToMessage(msg: ModelMessage, providerId: string): void {
@@ -65,23 +107,23 @@ export namespace MessageTransform {
       applyCaching(msgs, providerId);
     }
 
-    const normalizedProviderId = providerId?.toLowerCase();
+    const { usesDeepseek, usesMoonshot } = resolveReasoningProviders(modelId, providerId);
+    logger.info('Applying reasoning content to messages', { usesDeepseek, usesMoonshot });
+    const latestAssistantContent = getLatestAssistantContent(msgs);
+    const includesToolCall =
+      getHasToolCall(assistantContent) ||
+      (assistantContent ? false : getHasToolCall(latestAssistantContent));
+    const reasoningText = assistantContent ? getReasoningText(assistantContent) : '';
+    const shouldIncludeReasoningContent =
+      usesDeepseek || reasoningText.length > 0 || (usesMoonshot && includesToolCall);
+    logger.info('Determined reasoning content inclusion', { shouldIncludeReasoningContent });
 
     // Transform assistant content for providers that require reasoning_content
-    if (
-      assistantContent &&
-      (normalizedProviderId === 'moonshot' || normalizedProviderId === 'deepseek')
-    ) {
+    if (assistantContent && (usesDeepseek || usesMoonshot || shouldIncludeReasoningContent)) {
       const extracted = extractReasoning(assistantContent);
-      const hasToolCall = assistantContent.some((part) => part.type === 'tool-call');
-      const shouldIncludeReasoningContent =
-        normalizedProviderId === 'deepseek' ||
-        extracted.reasoningText.length > 0 ||
-        (normalizedProviderId === 'moonshot' && hasToolCall);
+      logger.info('Extracted reasoning content', extracted.reasoningText);
       const reasoningContent =
-        normalizedProviderId === 'moonshot' &&
-        shouldIncludeReasoningContent &&
-        extracted.reasoningText.length === 0
+        usesMoonshot && shouldIncludeReasoningContent && extracted.reasoningText.length === 0
           ? ' '
           : extracted.reasoningText;
       const transformedContent = {
@@ -96,6 +138,20 @@ export namespace MessageTransform {
       };
 
       return { messages: msgs, transformedContent };
+    }
+
+    if (shouldIncludeReasoningContent) {
+      return {
+        messages: msgs,
+        transformedContent: {
+          content: assistantContent ?? [],
+          providerOptions: {
+            openaiCompatible: {
+              reasoning_content: reasoningText,
+            },
+          },
+        },
+      };
     }
 
     // Default passthrough

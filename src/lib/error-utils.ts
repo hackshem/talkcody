@@ -292,12 +292,6 @@ export function formatErrorForLogging(errorInfo: DetailedErrorInfo): string {
   if (errorInfo.stack) {
     formatted += `\n\nStack Trace:\n${errorInfo.stack}`;
   }
-
-  // Add raw error for debugging if available
-  if (errorInfo.rawError) {
-    formatted += `\n\nRaw Error Object:\n${errorInfo.rawError}`;
-  }
-
   return formatted;
 }
 

@@ -86,12 +86,15 @@ pub async fn llm_is_model_available(
     let api_keys = state.api_keys.lock().await;
     let api_map = api_keys.load_api_keys().await?;
     let custom_providers = api_keys.load_custom_providers().await?;
+    let models =
+        crate::llm::models::model_registry::ModelRegistry::load_models_config(&api_keys).await?;
     let (model_key, provider_id) =
         crate::llm::models::model_registry::ModelRegistry::get_model_provider(
             &model_identifier,
             &api_map,
             &registry,
             &custom_providers,
+            &models,
         )?;
     Ok(!model_key.is_empty() && !provider_id.is_empty())
 }

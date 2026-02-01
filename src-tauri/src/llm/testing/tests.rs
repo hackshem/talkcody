@@ -7,18 +7,58 @@ use crate::llm::protocols::{
 use serde_json::Value;
 use std::path::PathBuf;
 
-fn fixture_path(name: &str) -> PathBuf {
+fn recordings_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("llm")
         .join("testing")
         .join("recordings")
-        .join(format!("{}.json", name))
 }
 
-fn load_named_fixture(name: &str) -> ProviderFixture {
-    let path = fixture_path(name);
-    load_fixture(&path).unwrap_or_else(|err| panic!("Failed to load fixture: {}", err))
+fn load_fixtures_for_test(
+    provider_id: Option<&str>,
+    protocol: &str,
+    channel: &str,
+) -> Vec<ProviderFixture> {
+    let dir = recordings_dir();
+    let suffix = format!("__{}.json", channel);
+    let protocol_tag = format!("__{}__", protocol);
+    let mut matches = Vec::new();
+
+    let entries = std::fs::read_dir(&dir)
+        .unwrap_or_else(|err| panic!("Failed to read fixtures dir: {}", err));
+    for entry in entries {
+        let entry = entry.expect("read dir entry");
+        let file_name = entry.file_name();
+        let file_name = file_name.to_string_lossy();
+        if !file_name.ends_with(&suffix) || !file_name.contains(&protocol_tag) {
+            continue;
+        }
+        if let Some(provider_id) = provider_id {
+            let prefix = format!("{}__{}__", provider_id, protocol);
+            if !file_name.starts_with(&prefix) {
+                continue;
+            }
+        }
+        matches.push(entry.path());
+    }
+
+    matches.sort();
+    if matches.is_empty() {
+        let provider_hint = provider_id.unwrap_or("*");
+        panic!(
+            "No fixtures found for {} {} {}",
+            provider_hint, protocol, channel
+        );
+    }
+
+    matches
+        .into_iter()
+        .map(|path| {
+            load_fixture(&path)
+                .unwrap_or_else(|err| panic!("Failed to load fixture {}: {}", path.display(), err))
+        })
+        .collect()
 }
 
 fn protocol_for_fixture(fixture: &ProviderFixture) -> Box<dyn LlmProtocol> {
@@ -68,6 +108,23 @@ fn drain_events(result: Result<Option<crate::llm::types::StreamEvent>, String>) 
     Some(serde_json::to_value(parsed).expect("serialize event"))
 }
 
+/// Normalizes event arrays for comparison by replacing dynamic values (like UUIDs) with placeholders
+fn normalize_events(events: &mut [Value]) {
+    for event in events.iter_mut() {
+        if let Some(obj) = event.as_object_mut() {
+            // Normalize reasoning IDs - replace dynamic UUIDs with a placeholder
+            if let Some(id) = obj.get("id").and_then(|v| v.as_str()) {
+                if id.starts_with("reasoning_") {
+                    obj.insert(
+                        "id".to_string(),
+                        Value::String("reasoning_<normalized>".to_string()),
+                    );
+                }
+            }
+        }
+    }
+}
+
 fn assert_request_matches_fixture(protocol: &dyn LlmProtocol, fixture: &ProviderFixture) {
     let input = fixture
         .test_input
@@ -92,48 +149,91 @@ fn assert_request_matches_fixture(protocol: &dyn LlmProtocol, fixture: &Provider
 
 #[test]
 fn openai_fixture_roundtrip() {
-    let fixture = load_named_fixture("openai");
-    let protocol = protocol_for_fixture(&fixture);
-    assert_request_matches_fixture(protocol.as_ref(), &fixture);
+    let fixtures = load_fixtures_for_test(None, "openai", "api");
+    for fixture in fixtures {
+        let protocol = protocol_for_fixture(&fixture);
+        assert_request_matches_fixture(protocol.as_ref(), &fixture);
 
-    let expected = fixture.expected_events.clone().expect("expected events");
-    let expected_json = serde_json::to_value(expected).expect("serialize expected");
-    let actual = collect_events(protocol.as_ref(), &fixture);
-    let actual_json = Value::Array(actual);
-    assert_eq!(expected_json, actual_json);
+        let expected = fixture.expected_events.clone().expect("expected events");
+        let mut expected_json = serde_json::to_value(expected).expect("serialize expected");
+        let actual = collect_events(protocol.as_ref(), &fixture);
+        let mut actual_json = Value::Array(actual);
+
+        // Normalize both expected and actual events for comparison
+        if let Some(expected_arr) = expected_json.as_array_mut() {
+            normalize_events(expected_arr);
+        }
+        if let Some(actual_arr) = actual_json.as_array_mut() {
+            normalize_events(actual_arr);
+        }
+
+        assert_eq!(expected_json, actual_json);
+    }
 }
 
 #[test]
 fn claude_fixture_roundtrip() {
-    let fixture = load_named_fixture("claude");
-    let protocol = protocol_for_fixture(&fixture);
-    assert_request_matches_fixture(protocol.as_ref(), &fixture);
+    let fixtures = load_fixtures_for_test(None, "anthropic", "api");
+    for fixture in fixtures {
+        let protocol = protocol_for_fixture(&fixture);
+        assert_request_matches_fixture(protocol.as_ref(), &fixture);
 
-    let expected = fixture.expected_events.clone().expect("expected events");
-    let expected_json = serde_json::to_value(expected).expect("serialize expected");
-    let actual = collect_events(protocol.as_ref(), &fixture);
-    let actual_json = Value::Array(actual);
-    assert_eq!(expected_json, actual_json);
+        let expected = fixture.expected_events.clone().expect("expected events");
+        let mut expected_json = serde_json::to_value(expected).expect("serialize expected");
+        let actual = collect_events(protocol.as_ref(), &fixture);
+        let mut actual_json = Value::Array(actual);
+
+        // Normalize both expected and actual events for comparison
+        if let Some(expected_arr) = expected_json.as_array_mut() {
+            normalize_events(expected_arr);
+        }
+        if let Some(actual_arr) = actual_json.as_array_mut() {
+            normalize_events(actual_arr);
+        }
+
+        assert_eq!(expected_json, actual_json);
+    }
 }
 
 #[tokio::test]
 async fn mock_server_replays_openai_fixture() {
-    let fixture = load_named_fixture("openai");
-    let server = MockProviderServer::start(fixture.clone()).expect("mock server");
-    let url = format!("{}/{}", server.base_url(), fixture.endpoint_path);
+    let fixtures = load_fixtures_for_test(None, "openai", "api");
+    for fixture in fixtures {
+        let server = MockProviderServer::start(fixture.clone()).expect("mock server");
+        let url = format!("{}/{}", server.base_url(), fixture.endpoint_path);
 
-    let response = reqwest::Client::new()
-        .post(url)
-        .json(&fixture.request.body)
-        .send()
-        .await
-        .expect("mock response");
+        let response = reqwest::Client::new()
+            .post(url)
+            .json(&fixture.request.body)
+            .send()
+            .await
+            .expect("mock response");
 
-    let body = response.text().await.expect("response body");
-    let actual = parse_sse_body(&body);
+        let body = response.text().await.expect("response body");
+        let actual = parse_sse_body(&body);
 
-    let RecordedResponse::Stream { sse_events, .. } = &fixture.response else {
-        panic!("expected stream response");
-    };
-    assert_eq!(actual, *sse_events);
+        let RecordedResponse::Stream { sse_events, .. } = &fixture.response else {
+            panic!("expected stream response");
+        };
+        assert_eq!(actual, *sse_events);
+    }
+}
+
+#[test]
+fn github_copilot_base_url_avoids_duplicate_v1() {
+    use crate::llm::providers::provider_configs::builtin_providers;
+
+    let provider = builtin_providers()
+        .into_iter()
+        .find(|entry| entry.id == "github_copilot")
+        .expect("github_copilot provider");
+
+    let endpoint_path = "chat/completions";
+    let url = format!(
+        "{}/{}",
+        provider.base_url.trim_end_matches('/'),
+        endpoint_path
+    );
+
+    assert_eq!(url, "https://api.githubcopilot.com/chat/completions");
 }

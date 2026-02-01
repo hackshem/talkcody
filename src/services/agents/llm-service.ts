@@ -696,7 +696,6 @@ export class LLMService {
                 return toOpenAIToolDefinition(name, toolDef.description, toolDef.inputSchema);
               });
 
-              // Create trace context for this LLM call
               const traceContext = createLlmTraceContext(traceId, model);
 
               streamResult = await llmClient.streamText(

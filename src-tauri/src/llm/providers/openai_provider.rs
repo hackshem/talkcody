@@ -34,6 +34,27 @@ impl OpenAiProvider {
         }
     }
 
+    fn normalize_model_id(model: &str) -> String {
+        let model_id = model
+            .split('/')
+            .last()
+            .unwrap_or(model)
+            .split('@')
+            .next()
+            .unwrap_or(model);
+        model_id.to_lowercase()
+    }
+
+    fn is_responses_model(model: &str) -> bool {
+        let normalized = Self::normalize_model_id(model);
+        normalized.contains("gpt-5.1-codex")
+            || normalized.contains("gpt 5.1 codex")
+            || normalized.contains("gpt-51-codex")
+            || normalized.contains("gpt-5.2-codex")
+            || normalized.contains("gpt 5.2 codex")
+            || normalized.contains("gpt-52-codex")
+    }
+
     async fn is_oauth_mode(&self, api_key_manager: &ApiKeyManager) -> bool {
         // Check if OAuth token is available
         api_key_manager
@@ -93,6 +114,8 @@ impl Provider for OpenAiProvider {
     async fn resolve_endpoint_path(&self, ctx: &ProviderContext<'_>) -> String {
         if self.is_oauth_mode(ctx.api_key_manager).await {
             "codex/responses".to_string()
+        } else if Self::is_responses_model(ctx.model) {
+            "responses".to_string()
         } else {
             "chat/completions".to_string()
         }
@@ -162,6 +185,19 @@ impl Provider for OpenAiProvider {
                 extra_body: ctx.provider_config.extra_body.as_ref(),
             };
             self.responses_protocol.build_request(request_ctx)
+        } else if Self::is_responses_model(ctx.model) {
+            let request_ctx = RequestBuildContext {
+                model: ctx.model,
+                messages: ctx.messages,
+                tools: ctx.tools,
+                temperature: ctx.temperature,
+                max_tokens: ctx.max_tokens,
+                top_p: ctx.top_p,
+                top_k: ctx.top_k,
+                provider_options: ctx.provider_options,
+                extra_body: ctx.provider_config.extra_body.as_ref(),
+            };
+            self.responses_protocol.build_request(request_ctx)
         } else {
             // Use standard protocol request building
             let request_ctx = RequestBuildContext {
@@ -187,6 +223,9 @@ impl Provider for OpenAiProvider {
         state: &mut StreamParseState,
     ) -> Result<Option<StreamEvent>, String> {
         if self.is_oauth_mode(ctx.api_key_manager).await {
+            let parse_ctx = StreamParseContext { event_type, data };
+            self.responses_protocol.parse_stream_event(parse_ctx, state)
+        } else if Self::is_responses_model(ctx.model) {
             let parse_ctx = StreamParseContext { event_type, data };
             self.responses_protocol.parse_stream_event(parse_ctx, state)
         } else {

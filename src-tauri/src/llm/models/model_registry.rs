@@ -135,7 +135,7 @@ impl ModelRegistry {
             let providers = &model_cfg.providers;
             for provider_id in providers {
                 if let Some(custom) = custom_providers.providers.get(provider_id) {
-                    if custom.enabled {
+                    if custom.enabled && !custom.api_key.trim().is_empty() {
                         let key = format!("{}-{}", model_key, provider_id);
                         if !model_map.contains_key(&key) {
                             model_map.insert(
@@ -227,6 +227,17 @@ impl ModelRegistry {
         registry: &ProviderRegistry,
         custom_providers: &CustomProvidersConfiguration,
     ) -> bool {
+        if let Some(custom) = custom_providers.providers.get(provider_id) {
+            let has_key = !custom.api_key.trim().is_empty();
+            log::debug!(
+                "[ModelRegistry] Provider {} is custom, enabled={}, has_key={}",
+                provider_id,
+                custom.enabled,
+                has_key
+            );
+            return custom.enabled && has_key;
+        }
+
         if let Some(provider) = registry.provider(provider_id) {
             log::debug!(
                 "[ModelRegistry] Checking provider {}: auth_type={:?}, supports_oauth={}",
@@ -286,15 +297,6 @@ impl ModelRegistry {
             );
         }
 
-        if let Some(custom) = custom_providers.providers.get(provider_id) {
-            log::debug!(
-                "[ModelRegistry] Provider {} is custom, enabled={}",
-                provider_id,
-                custom.enabled
-            );
-            return custom.enabled;
-        }
-
         false
     }
 }
@@ -311,6 +313,7 @@ mod tests {
 
     struct TestContext {
         _dir: TempDir,
+        app_data_dir: std::path::PathBuf,
         api_keys: ApiKeyManager,
     }
 
@@ -325,9 +328,11 @@ mod tests {
         )
         .await
         .expect("create settings");
+        let app_data_dir = dir.path().join("app-data");
         TestContext {
             _dir: dir,
-            api_keys: ApiKeyManager::new(db, std::path::PathBuf::from("/tmp")),
+            app_data_dir: app_data_dir.clone(),
+            api_keys: ApiKeyManager::new(db, app_data_dir),
         }
     }
 
@@ -400,6 +405,53 @@ mod tests {
         assert!(loaded.models.contains_key("gpt-4o"));
     }
 
+    #[tokio::test]
+    async fn load_models_config_merges_custom_models() {
+        let ctx = setup_api_keys().await;
+
+        let mut base = build_models_config();
+        base.models.remove("gpt-4o");
+        let raw = serde_json::to_string(&base).expect("serialize config");
+        ctx.api_keys
+            .set_setting("models_config_json", &raw)
+            .await
+            .expect("set config");
+
+        let custom_model = ModelConfig {
+            name: "Custom Model".to_string(),
+            image_input: false,
+            image_output: false,
+            audio_input: false,
+            interleaved: false,
+            providers: vec!["custom".to_string()],
+            provider_mappings: None,
+            pricing: Some(ModelPricing {
+                input: "1".to_string(),
+                output: "2".to_string(),
+                cached_input: None,
+                cache_creation: None,
+            }),
+            context_length: None,
+        };
+        let custom_config = ModelsConfiguration {
+            version: "custom".to_string(),
+            models: HashMap::from([("custom-model".to_string(), custom_model)]),
+        };
+        let custom_path = ctx.app_data_dir.join("custom-models.json");
+        std::fs::create_dir_all(custom_path.parent().unwrap()).expect("create app dir");
+        std::fs::write(
+            &custom_path,
+            serde_json::to_string_pretty(&custom_config).expect("serialize custom config"),
+        )
+        .expect("write custom config");
+
+        let loaded = ModelRegistry::load_models_config(&ctx.api_keys)
+            .await
+            .expect("load config");
+        assert!(loaded.models.contains_key("custom-model"));
+        assert!(!loaded.models.contains_key("gpt-4o"));
+    }
+
     #[test]
     fn resolve_provider_model_name_uses_mapping() {
         let config = build_models_config();
@@ -452,7 +504,7 @@ mod tests {
             name: "Custom".to_string(),
             provider_type: CustomProviderType::OpenAiCompatible,
             base_url: "https://custom".to_string(),
-            api_key: "key".to_string(),
+            api_key: "custom-key".to_string(),
             enabled: true,
             description: None,
         };
@@ -469,6 +521,37 @@ mod tests {
         );
         assert!(available.iter().any(|model| model.provider == "openai"));
         assert!(available.iter().any(|model| model.provider == "custom"));
+    }
+
+    #[test]
+    fn compute_available_models_excludes_custom_provider_without_key() {
+        let config = build_models_config();
+        let registry = ProviderRegistry::new(vec![provider_config(
+            "openai",
+            crate::llm::types::AuthType::Bearer,
+        )]);
+        let api_keys = HashMap::from([("openai".to_string(), "key".to_string())]);
+        let custom_provider = CustomProviderConfig {
+            id: "custom".to_string(),
+            name: "Custom".to_string(),
+            provider_type: CustomProviderType::OpenAiCompatible,
+            base_url: "https://custom".to_string(),
+            api_key: "".to_string(),
+            enabled: true,
+            description: None,
+        };
+        let custom_providers = CustomProvidersConfiguration {
+            version: "1".to_string(),
+            providers: HashMap::from([(custom_provider.id.clone(), custom_provider)]),
+        };
+
+        let available = ModelRegistry::compute_available_models_internal(
+            &config,
+            &api_keys,
+            &registry,
+            &custom_providers,
+        );
+        assert!(available.iter().all(|model| model.provider != "custom"));
     }
 
     #[test]

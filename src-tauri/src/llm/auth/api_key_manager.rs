@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 use tauri::State;
 use tokio::sync::{Mutex, RwLock};
 
@@ -15,6 +15,7 @@ const MODELS_CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
 
 const SETTINGS_SELECT: &str = "SELECT value FROM settings WHERE key = $1";
 const CUSTOM_PROVIDERS_FILENAME: &str = "custom-providers.json";
+const CUSTOM_MODELS_FILENAME: &str = "custom-models.json";
 
 const GITHUB_COPILOT_ACCESS_TOKEN_KEY: &str = "github_copilot_oauth_access_token";
 const GITHUB_COPILOT_COPILOT_TOKEN_KEY: &str = "github_copilot_oauth_copilot_token";
@@ -29,7 +30,13 @@ const GITHUB_COPILOT_TOKEN_BUFFER_SECONDS: i64 = 60;
 pub struct ApiKeyManager {
     db: Arc<Database>,
     app_data_dir: PathBuf,
-    models_cache: RwLock<Option<(ModelsConfiguration, Instant)>>,
+    models_cache: RwLock<Option<ModelsCacheEntry>>,
+}
+
+struct ModelsCacheEntry {
+    config: ModelsConfiguration,
+    timestamp: Instant,
+    custom_models_mtime: Option<SystemTime>,
 }
 
 impl Clone for ApiKeyManager {
@@ -53,12 +60,15 @@ impl ApiKeyManager {
 
     /// Load models configuration with caching (5 minutes TTL)
     pub async fn load_models_config(&self) -> Result<ModelsConfiguration, String> {
+        let custom_models_mtime = self.custom_models_modified_time().await?;
         // Check cache first
         {
             let cache = self.models_cache.read().await;
-            if let Some((config, timestamp)) = cache.as_ref() {
-                if timestamp.elapsed() < MODELS_CACHE_TTL {
-                    return Ok(config.clone());
+            if let Some(entry) = cache.as_ref() {
+                if entry.timestamp.elapsed() < MODELS_CACHE_TTL
+                    && entry.custom_models_mtime == custom_models_mtime
+                {
+                    return Ok(entry.config.clone());
                 }
             }
         }
@@ -68,23 +78,28 @@ impl ApiKeyManager {
 
         // Update cache
         let mut cache = self.models_cache.write().await;
-        *cache = Some((config.clone(), Instant::now()));
+        *cache = Some(ModelsCacheEntry {
+            config: config.clone(),
+            timestamp: Instant::now(),
+            custom_models_mtime,
+        });
 
         Ok(config)
     }
 
     async fn load_models_config_from_source(&self) -> Result<ModelsConfiguration, String> {
-        if let Some(raw) = self.get_setting("models_config_json").await? {
-            let parsed: ModelsConfiguration = serde_json::from_str(&raw)
-                .map_err(|e| format!("Failed to parse models config: {}", e))?;
-            return Ok(parsed);
-        }
+        let base_config = if let Some(raw) = self.get_setting("models_config_json").await? {
+            serde_json::from_str::<ModelsConfiguration>(&raw)
+                .map_err(|e| format!("Failed to parse models config: {}", e))?
+        } else {
+            let default_config =
+                include_str!("../../../../packages/shared/src/data/models-config.json");
+            serde_json::from_str::<ModelsConfiguration>(default_config)
+                .map_err(|e| format!("Failed to parse bundled models config: {}", e))?
+        };
 
-        let default_config =
-            include_str!("../../../../packages/shared/src/data/models-config.json");
-        let parsed: ModelsConfiguration = serde_json::from_str(default_config)
-            .map_err(|e| format!("Failed to parse bundled models config: {}", e))?;
-        Ok(parsed)
+        let custom_config = self.load_custom_models().await?;
+        Ok(Self::merge_models_config(base_config, custom_config))
     }
 
     /// Clear the models configuration cache
@@ -95,6 +110,53 @@ impl ApiKeyManager {
 
     fn custom_providers_path(&self) -> PathBuf {
         self.app_data_dir.join(CUSTOM_PROVIDERS_FILENAME)
+    }
+
+    fn custom_models_path(&self) -> PathBuf {
+        self.app_data_dir.join(CUSTOM_MODELS_FILENAME)
+    }
+
+    async fn custom_models_modified_time(&self) -> Result<Option<SystemTime>, String> {
+        let path = self.custom_models_path();
+        match tokio::fs::metadata(&path).await {
+            Ok(metadata) => Ok(metadata.modified().ok()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(format!("Failed to read custom models metadata: {}", error)),
+        }
+    }
+
+    async fn load_custom_models(&self) -> Result<ModelsConfiguration, String> {
+        let path = self.custom_models_path();
+        if !path.exists() {
+            return Ok(ModelsConfiguration {
+                version: "custom".to_string(),
+                models: HashMap::new(),
+            });
+        }
+
+        let content = tokio::fs::read_to_string(&path)
+            .await
+            .map_err(|e| format!("Failed to read custom models file: {}", e))?;
+
+        if content.trim().is_empty() {
+            return Ok(ModelsConfiguration {
+                version: "custom".to_string(),
+                models: HashMap::new(),
+            });
+        }
+
+        serde_json::from_str::<ModelsConfiguration>(&content)
+            .map_err(|e| format!("Failed to parse custom models: {}", e))
+    }
+
+    fn merge_models_config(
+        mut base: ModelsConfiguration,
+        custom: ModelsConfiguration,
+    ) -> ModelsConfiguration {
+        for (model_key, model) in custom.models {
+            base.models.insert(model_key, model);
+        }
+        base
     }
 
     pub async fn get_setting(&self, key: &str) -> Result<Option<String>, String> {
@@ -241,6 +303,14 @@ impl ApiKeyManager {
                     .unwrap_or_default();
                 if !api_key.is_empty() {
                     return Ok(ProviderCredentials::Token(api_key));
+                }
+
+                if let Ok(custom) = self.load_custom_providers().await {
+                    if let Some(custom_provider) = custom.providers.get(&provider.id) {
+                        if !custom_provider.api_key.trim().is_empty() {
+                            return Ok(ProviderCredentials::Token(custom_provider.api_key.clone()));
+                        }
+                    }
                 }
 
                 Err(format!(

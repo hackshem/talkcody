@@ -5,7 +5,6 @@ import { create } from 'zustand';
 import { logger } from '@/lib/logger';
 import { llmClient } from '@/services/llm/llm-client';
 import {
-  type GitHubCopilotOAuthTokens,
   isCopilotTokenExpired,
   pollForAccessToken,
   startDeviceCodeFlow,

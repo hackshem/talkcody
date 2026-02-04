@@ -915,6 +915,140 @@ mod tests {
     use tempfile::TempDir;
 
     #[tokio::test]
+    async fn openai_responses_model_routes_to_responses_endpoint() {
+        let dir = TempDir::new().expect("temp dir");
+        let db_path = dir.path().join("talkcody-test.db");
+        let db = Arc::new(Database::new(db_path.to_string_lossy().to_string()));
+        db.connect().await.expect("db connect");
+        let api_keys = ApiKeyManager::new(db, std::path::PathBuf::from("/tmp"));
+
+        let provider = OpenAiProvider::new(ProviderConfig {
+            id: "openai".to_string(),
+            name: "OpenAI".to_string(),
+            protocol: ProtocolType::OpenAiCompatible,
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key_name: "OPENAI_API_KEY".to_string(),
+            supports_oauth: true,
+            supports_coding_plan: false,
+            supports_international: false,
+            coding_plan_base_url: None,
+            international_base_url: None,
+            headers: None,
+            extra_body: None,
+            auth_type: crate::llm::types::AuthType::Bearer,
+        });
+
+        let request = StreamTextRequest {
+            model: "gpt-5.1-codex-max@openai".to_string(),
+            messages: vec![Message::User {
+                content: MessageContent::Text("hi".to_string()),
+                provider_options: None,
+            }],
+            tools: None,
+            stream: Some(true),
+            temperature: None,
+            max_tokens: None,
+            top_p: None,
+            top_k: None,
+            provider_options: None,
+            request_id: None,
+            trace_context: None,
+        };
+
+        let ctx = ProviderContext {
+            provider_config: provider.config(),
+            api_key_manager: &api_keys,
+            model: &request.model,
+            messages: &request.messages,
+            tools: request.tools.as_deref(),
+            temperature: request.temperature,
+            max_tokens: request.max_tokens,
+            top_p: request.top_p,
+            top_k: request.top_k,
+            provider_options: request.provider_options.as_ref(),
+            trace_context: request.trace_context.as_ref(),
+        };
+
+        let endpoint = provider.resolve_endpoint_path(&ctx).await;
+        assert_eq!(endpoint, "responses");
+
+        let body = provider.build_request(&ctx).await.expect("build request");
+        assert!(body.get("input").is_some());
+        assert!(body.get("messages").is_none());
+        assert_eq!(
+            body.get("model").and_then(|value| value.as_str()),
+            Some("gpt-5.1-codex-max")
+        );
+    }
+
+    #[tokio::test]
+    async fn openai_chat_model_routes_to_chat_completions() {
+        let dir = TempDir::new().expect("temp dir");
+        let db_path = dir.path().join("talkcody-test.db");
+        let db = Arc::new(Database::new(db_path.to_string_lossy().to_string()));
+        db.connect().await.expect("db connect");
+        let api_keys = ApiKeyManager::new(db, std::path::PathBuf::from("/tmp"));
+
+        let provider = OpenAiProvider::new(ProviderConfig {
+            id: "openai".to_string(),
+            name: "OpenAI".to_string(),
+            protocol: ProtocolType::OpenAiCompatible,
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key_name: "OPENAI_API_KEY".to_string(),
+            supports_oauth: true,
+            supports_coding_plan: false,
+            supports_international: false,
+            coding_plan_base_url: None,
+            international_base_url: None,
+            headers: None,
+            extra_body: None,
+            auth_type: crate::llm::types::AuthType::Bearer,
+        });
+
+        let request = StreamTextRequest {
+            model: "gpt-4o@openai".to_string(),
+            messages: vec![Message::User {
+                content: MessageContent::Text("hi".to_string()),
+                provider_options: None,
+            }],
+            tools: None,
+            stream: Some(true),
+            temperature: None,
+            max_tokens: None,
+            top_p: None,
+            top_k: None,
+            provider_options: None,
+            request_id: None,
+            trace_context: None,
+        };
+
+        let ctx = ProviderContext {
+            provider_config: provider.config(),
+            api_key_manager: &api_keys,
+            model: &request.model,
+            messages: &request.messages,
+            tools: request.tools.as_deref(),
+            temperature: request.temperature,
+            max_tokens: request.max_tokens,
+            top_p: request.top_p,
+            top_k: request.top_k,
+            provider_options: request.provider_options.as_ref(),
+            trace_context: request.trace_context.as_ref(),
+        };
+
+        let endpoint = provider.resolve_endpoint_path(&ctx).await;
+        assert_eq!(endpoint, "chat/completions");
+
+        let body = provider.build_request(&ctx).await.expect("build request");
+        assert!(body.get("messages").is_some());
+        assert!(body.get("input").is_none());
+        assert_eq!(
+            body.get("model").and_then(|value| value.as_str()),
+            Some("gpt-4o@openai")
+        );
+    }
+
+    #[tokio::test]
     async fn build_openai_oauth_request_maps_tool_results() {
         let dir = TempDir::new().expect("temp dir");
         let db_path = dir.path().join("talkcody-test.db");

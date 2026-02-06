@@ -135,6 +135,75 @@ sign_dmg() {
     fi
 }
 
+# Parse a field from notarytool output
+# Args: $1 = output, $2 = field name (id/status)
+notarytool_get_field() {
+    local output="$1"
+    local field="$2"
+    echo "$output" | sed -n "s/^[[:space:]]*${field}:[[:space:]]*//p" | head -n 1
+}
+
+# Print standard invalid response guidance
+# Args: $1 = submission id (optional)
+print_notarization_invalid() {
+    local submission_id="$1"
+    echo -e "${RED}Error: Notarization failed - Status: Invalid${NC}"
+    echo ""
+    echo "The notarization was rejected by Apple. Common reasons:"
+    echo "  - App not properly signed"
+    echo "  - Missing or invalid entitlements"
+    echo "  - Hardened runtime issues"
+    echo ""
+    echo "Get detailed log with:"
+    if [ -n "$submission_id" ]; then
+        echo "xcrun notarytool log $submission_id --keychain-profile \"talkcody-notary\""
+    else
+        echo "xcrun notarytool history --keychain-profile \"talkcody-notary\""
+    fi
+}
+
+# Poll notarization status until completion
+# Args: $1 = submission id
+wait_for_notarization() {
+    local submission_id="$1"
+    local poll_interval="${NOTARIZE_POLL_INTERVAL:-60}"
+
+    echo "Waiting for notarization to complete (polling every ${poll_interval}s)..."
+
+    while true; do
+        local info_output
+        if ! info_output=$(xcrun notarytool info "$submission_id" --keychain-profile "talkcody-notary" 2>&1); then
+            echo -e "${YELLOW}Warning${NC} Failed to fetch status, retrying in ${poll_interval}s"
+            echo "$info_output"
+            sleep "$poll_interval"
+            continue
+        fi
+
+        local status
+        status=$(notarytool_get_field "$info_output" "status")
+
+        if [ -z "$status" ]; then
+            echo -e "${YELLOW}Warning${NC} Unable to parse status, retrying in ${poll_interval}s"
+            echo "$info_output"
+            sleep "$poll_interval"
+            continue
+        fi
+
+        echo "  [$(date +"%H:%M:%S")] status: $status"
+
+        if [ "$status" = "Accepted" ]; then
+            return 0
+        fi
+
+        if [ "$status" = "Invalid" ]; then
+            print_notarization_invalid "$submission_id"
+            return 1
+        fi
+
+        sleep "$poll_interval"
+    done
+}
+
 # Notarize a DMG file
 # Args: $1 = DMG file path
 notarize_dmg() {
@@ -151,33 +220,33 @@ notarize_dmg() {
 
     # Submit and capture output
     local notarize_output
-    notarize_output=$(xcrun notarytool submit \
+    if ! notarize_output=$(xcrun notarytool submit \
         --keychain-profile "talkcody-notary" \
-        --wait \
-        "$dmg_file" 2>&1)
+        "$dmg_file" 2>&1); then
+        echo -e "${RED}Error: Notarization submission failed${NC}"
+        echo "$notarize_output"
+        return 1
+    fi
 
     echo "$notarize_output"
     echo ""
 
-    # Check if status is "Accepted"
-    if echo "$notarize_output" | grep -q "status: Accepted"; then
+    local submission_id
+    submission_id=$(notarytool_get_field "$notarize_output" "id")
+
+    local status
+    status=$(notarytool_get_field "$notarize_output" "status")
+
+    if [ "$status" = "Accepted" ]; then
         echo -e "${GREEN}OK${NC} Notarization successful!"
-    elif echo "$notarize_output" | grep -q "status: Invalid"; then
-        echo -e "${RED}Error: Notarization failed - Status: Invalid${NC}"
-        echo ""
-        echo "The notarization was rejected by Apple. Common reasons:"
-        echo "  - App not properly signed"
-        echo "  - Missing or invalid entitlements"
-        echo "  - Hardened runtime issues"
-        echo ""
-        echo "Get detailed log with:"
-        local submission_id=$(echo "$notarize_output" | grep "id:" | head -1 | awk '{print $2}')
-        if [ -n "$submission_id" ]; then
-            echo "xcrun notarytool log $submission_id --keychain-profile \"talkcody-notary\""
-        else
-            echo "xcrun notarytool history --keychain-profile \"talkcody-notary\""
-        fi
+    elif [ "$status" = "Invalid" ]; then
+        print_notarization_invalid "$submission_id"
         return 1
+    elif [ -n "$submission_id" ]; then
+        if ! wait_for_notarization "$submission_id"; then
+            return 1
+        fi
+        echo -e "${GREEN}OK${NC} Notarization successful!"
     else
         echo -e "${RED}Error: Notarization submission failed${NC}"
         echo ""

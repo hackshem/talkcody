@@ -1044,6 +1044,13 @@ export interface LocaleDefinition {
     selectTrace: string;
     noSpans: string;
     noEvents: string;
+    toggleLabel: string;
+    enabledLabel: string;
+    disabledLabel: string;
+    disabledTitle: string;
+    disabledBody: string;
+    disabledListHint: string;
+    disabledTraceCountLabel: string;
   };
 
   Toast: {

@@ -51,13 +51,6 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 
-vi.mock('@/providers/models/model-sync-service', () => ({
-  modelSyncService: {
-    initialize: vi.fn().mockResolvedValue(undefined),
-    manualRefresh: vi.fn().mockResolvedValue(undefined),
-  },
-}));
-
 vi.mock('@/providers/models/model-type-service', () => ({
   modelTypeService: {
     resolveModelType: vi.fn(),

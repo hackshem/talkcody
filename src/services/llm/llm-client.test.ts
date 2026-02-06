@@ -41,4 +41,25 @@ describe('llmClient', () => {
     expect(result.finishReason).toBe('stop');
   });
 
+  it('wraps OpenAI OAuth complete payload for Rust command', async () => {
+    const params = {
+      code: 'code-123',
+      verifier: 'verifier-123',
+      expectedState: 'state-123',
+      redirectUri: 'http://localhost:1455/auth/callback',
+    };
+
+    (invoke as any).mockResolvedValue({
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: 123,
+    });
+
+    await llmClient.completeOpenAIOAuth(params);
+
+    expect(invoke).toHaveBeenCalledWith('llm_openai_oauth_complete', {
+      payload: { request: params },
+    });
+  });
+
 });

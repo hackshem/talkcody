@@ -87,7 +87,7 @@ impl ApiKeyManager {
         Ok(config)
     }
 
-    async fn load_models_config_from_source(&self) -> Result<ModelsConfiguration, String> {
+    pub async fn load_models_config_from_source(&self) -> Result<ModelsConfiguration, String> {
         let base_config = if let Some(raw) = self.get_setting("models_config_json").await? {
             serde_json::from_str::<ModelsConfiguration>(&raw)
                 .map_err(|e| format!("Failed to parse models config: {}", e))?

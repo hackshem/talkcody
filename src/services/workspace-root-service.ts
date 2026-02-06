@@ -5,6 +5,16 @@ import { databaseService } from '@/services/database-service';
 import { settingsManager } from '@/stores/settings-store';
 import { worktreeStore } from '@/stores/worktree-store';
 
+const WINDOWS_ROOT_REGEX = /^[A-Za-z]:\/$/;
+
+function normalizeRootPathForCompare(rootPath: string): string {
+  const normalized = rootPath.replace(/\\/g, '/');
+  if (normalized === '/' || WINDOWS_ROOT_REGEX.test(normalized)) {
+    return normalized;
+  }
+  return normalized.replace(/\/+$/, '');
+}
+
 /**
  * Returns the workspace root path after validating it against the current project.
  * Throws if the value stored in settings does not match the project's recorded root path.
@@ -25,9 +35,13 @@ export async function getValidatedWorkspaceRoot(): Promise<string> {
   }
 
   if (!rootPath || projectRoot !== rootPath) {
-    throw new Error(
-      `Workspace root path mismatch: settings="${rootPath || ''}", project="${projectRoot}"`
-    );
+    const normalizedRootPath = rootPath ? normalizeRootPathForCompare(rootPath) : '';
+    const normalizedProjectRoot = normalizeRootPathForCompare(projectRoot);
+    if (!normalizedRootPath || normalizedProjectRoot !== normalizedRootPath) {
+      throw new Error(
+        `Workspace root path mismatch: settings="${rootPath || ''}", project="${projectRoot}"`
+      );
+    }
   }
 
   return rootPath;

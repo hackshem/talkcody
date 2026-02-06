@@ -1,10 +1,10 @@
+// src/providers/models/model-loader.ts
+
 import modelsDefault from '@talkcody/shared/data/models-config.json';
-import { BaseDirectory, exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 import { logger } from '@/lib/logger';
 import { customModelService } from '@/providers/custom/custom-model-service';
 import type { ModelsConfiguration } from '@/types/models';
-
-const MODELS_CACHE_FILENAME = 'models-cache.json';
 
 /**
  * ModelLoader handles loading and caching of model configurations
@@ -12,11 +12,10 @@ const MODELS_CACHE_FILENAME = 'models-cache.json';
  */
 class ModelLoader {
   private memoryCache: ModelsConfiguration | null = null;
-  private cacheFilePath: string | null = null;
 
   /**
    * Load models configuration with fallback chain
-   * Merges server/cached config with user's custom models
+   * Merges server config with user's custom models
    */
   async load(): Promise<ModelsConfiguration> {
     // Return memory cache if available
@@ -24,12 +23,12 @@ class ModelLoader {
       return this.memoryCache;
     }
 
-    // Load server/cached config
+    // Load server config from Rust
     let serverConfig: ModelsConfiguration;
     try {
-      serverConfig = await this.loadFromFile();
+      serverConfig = await this.loadFromRust();
     } catch (error) {
-      logger.warn('Failed to load models cache file, using default:', error);
+      logger.warn('Failed to load models from Rust, using default:', error);
       serverConfig = modelsDefault as ModelsConfiguration;
     }
 
@@ -56,18 +55,10 @@ class ModelLoader {
   }
 
   /**
-   * Load models configuration from cache file
+   * Load models configuration from Rust backend
    */
-  private async loadFromFile(): Promise<ModelsConfiguration> {
-    const filePath = await this.getCacheFilePath();
-
-    const fileExists = await exists(filePath, { baseDir: BaseDirectory.AppData });
-    if (!fileExists) {
-      throw new Error('Cache file does not exist');
-    }
-
-    const content = await readTextFile(filePath, { baseDir: BaseDirectory.AppData });
-    const config = JSON.parse(content) as ModelsConfiguration;
+  private async loadFromRust(): Promise<ModelsConfiguration> {
+    const config = await invoke<ModelsConfiguration>('llm_get_models_config');
 
     // Validate structure
     if (!this.validateConfig(config)) {
@@ -96,47 +87,30 @@ class ModelLoader {
   }
 
   /**
-   * Update models configuration (save to file and memory)
+   * Update models configuration (no-op on Rust source)
    */
   async update(config: ModelsConfiguration): Promise<void> {
-    // Validate before saving
     if (!this.validateConfig(config)) {
       throw new Error('Invalid models configuration structure');
     }
 
-    const filePath = await this.getCacheFilePath();
-    const content = JSON.stringify(config, null, 2);
-
-    try {
-      await writeTextFile(filePath, content, { baseDir: BaseDirectory.AppData });
-
-      // Clear memory cache to ensure fresh load next time
-      // This is important for hot-reload: the caller should use refreshModelConfigs()
-      this.memoryCache = null;
-
-      logger.info('Model configuration updated successfully');
-    } catch (error) {
-      logger.error('Failed to write models cache:', error);
-      throw error;
-    }
+    this.memoryCache = null;
+    logger.info('Model configuration update requested; cache cleared');
   }
 
   /**
    * Get current version from loaded configuration
-   * Falls back to file cache or default config if memory cache is empty
+   * Falls back to default config if Rust load fails
    */
   async getVersion(): Promise<string | null> {
-    // Return from memory cache if available
     if (this.memoryCache?.version) {
       return this.memoryCache.version;
     }
 
-    // Try to load from file cache
     try {
-      const config = await this.loadFromFile();
+      const config = await this.loadFromRust();
       return config.version;
     } catch {
-      // Fall back to bundled default version
       return (modelsDefault as ModelsConfiguration).version;
     }
   }
@@ -146,19 +120,6 @@ class ModelLoader {
    */
   clearCache(): void {
     this.memoryCache = null;
-  }
-
-  /**
-   * Get the cache file path
-   */
-  private async getCacheFilePath(): Promise<string> {
-    if (this.cacheFilePath) {
-      return this.cacheFilePath;
-    }
-
-    // Cache file is stored in app data directory
-    this.cacheFilePath = MODELS_CACHE_FILENAME;
-    return this.cacheFilePath;
   }
 
   /**

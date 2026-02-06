@@ -740,11 +740,10 @@ export class LLMService {
                 });
               });
 
-              const traceContext = createLlmTraceContext(
-                traceId,
-                model,
-                loopState.currentIteration
-              );
+              const traceEnabled = useSettingsStore.getState().getTraceEnabled?.() ?? true;
+              const traceContext = traceEnabled
+                ? createLlmTraceContext(traceId, model, loopState.currentIteration)
+                : null;
 
               streamResult = await llmClient.streamText(
                 {

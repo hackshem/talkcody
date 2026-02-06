@@ -327,8 +327,6 @@ pub(crate) fn parse_openai_oauth_event_legacy(
     data: &str,
     state: &mut ProtocolStreamState,
 ) -> Result<Option<StreamEvent>, String> {
-    let payload: Value = serde_json::from_str(data).map_err(|e| e.to_string())?;
-
     let emit_tool_calls = |state: &mut ProtocolStreamState, force: bool| {
         for key in state.tool_call_order.clone() {
             if state.emitted_tool_calls.contains(&key) {

@@ -22,7 +22,6 @@
 //     └── models/           - Model services
 //         ├── model-loader.ts
 //         ├── model-service.ts
-//         ├── model-sync-service.ts
 //         └── model-type-service.ts
 
 // Types

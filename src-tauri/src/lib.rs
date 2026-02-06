@@ -796,6 +796,24 @@ pub fn run() {
             );
             app.manage(llm_state);
 
+            let model_sync_handle = app.handle().clone();
+            let model_sync_data_dir = app_data_dir.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Some(state) = model_sync_handle
+                    .try_state::<llm::auth::api_key_manager::LlmState>()
+                {
+                    let api_keys = {
+                        let guard = state.api_keys.lock().await;
+                        guard.clone()
+                    };
+                    llm::models::model_sync::start_background_sync(
+                        model_sync_handle.clone(),
+                        api_keys,
+                        model_sync_data_dir,
+                    );
+                }
+            });
+
             // Load custom providers from filesystem and register them asynchronously
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -1000,7 +1018,9 @@ pub fn run() {
             llm::commands::llm_stream_text,
             llm::commands::llm_list_available_models,
             llm::commands::llm_register_custom_provider,
+            llm::commands::llm_check_model_updates,
             llm::commands::llm_get_provider_configs,
+            llm::commands::llm_get_models_config,
             llm::commands::llm_is_model_available,
             llm::auth::api_key_manager::llm_set_setting,
             llm::auth::oauth::llm_openai_oauth_start,

@@ -143,6 +143,10 @@ export class LlmClient {
     return { text, finishReason };
   }
 
+  async checkModelUpdates(): Promise<boolean> {
+    return invoke<boolean>('llm_check_model_updates');
+  }
+
   async listAvailableModels(): Promise<AvailableModel[]> {
     return invoke<AvailableModel[]>('llm_list_available_models');
   }
@@ -213,7 +217,7 @@ export class LlmClient {
     if (!params.expectedState) {
       throw new Error('Missing expectedState for OpenAI OAuth');
     }
-    return invoke('llm_openai_oauth_complete', { request: params });
+    return invoke('llm_openai_oauth_complete', { payload: { request: params } });
   }
 
   async refreshOpenAIOAuth(params: { refreshToken: string }): Promise<{

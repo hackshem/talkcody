@@ -1,8 +1,27 @@
 use crate::llm::auth::api_key_manager::LlmState;
 use crate::llm::models::model_registry::ModelRegistry;
+use crate::llm::models::model_sync;
 use crate::llm::streaming::stream_handler::StreamHandler;
-use crate::llm::types::{AvailableModel, CustomProviderConfig, StreamResponse, StreamTextRequest};
-use tauri::{State, Window};
+use crate::llm::types::{
+    AvailableModel, CustomProviderConfig, ModelsConfiguration, StreamResponse, StreamTextRequest,
+};
+use tauri::{Manager, State, Window};
+
+#[tauri::command]
+pub async fn llm_get_provider_configs(
+    state: State<'_, LlmState>,
+) -> Result<Vec<crate::llm::types::ProviderConfig>, String> {
+    let registry = state.registry.lock().await;
+    Ok(registry.providers())
+}
+
+#[tauri::command]
+pub async fn llm_get_models_config(
+    state: State<'_, LlmState>,
+) -> Result<ModelsConfiguration, String> {
+    let api_keys = state.api_keys.lock().await;
+    api_keys.load_models_config().await
+}
 
 #[tauri::command]
 pub async fn llm_stream_text(
@@ -91,11 +110,13 @@ pub async fn llm_register_custom_provider(
 }
 
 #[tauri::command]
-pub async fn llm_get_provider_configs(
+pub async fn llm_check_model_updates(
+    app: tauri::AppHandle,
     state: State<'_, LlmState>,
-) -> Result<Vec<crate::llm::types::ProviderConfig>, String> {
-    let registry = state.registry.lock().await;
-    Ok(registry.providers())
+) -> Result<bool, String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let api_keys = state.api_keys.lock().await;
+    model_sync::check_for_updates(&app, &api_keys, &app_data_dir).await
 }
 
 #[tauri::command]

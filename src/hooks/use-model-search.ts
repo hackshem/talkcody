@@ -51,7 +51,12 @@ export function useModelSearch({
     // Filter models that match all search terms
     return filteredByType.filter((model) => {
       // Create searchable text from model properties
-      const searchableFields = [model.name || '', model.key || ''];
+      const searchableFields = [
+        model.name ?? '',
+        model.key ?? '',
+        model.providerName ?? '',
+        model.provider ?? '',
+      ];
       const searchableText = searchableFields.join(' ').toLowerCase();
 
       // All search terms must be present (AND logic)

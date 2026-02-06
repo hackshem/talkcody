@@ -126,21 +126,15 @@ export function useToolbarState(): ToolbarState {
     taskModel,
   ]);
 
-  // Also listen for other events (modelsUpdated, settingsChanged)
+  // Also listen for other events (settingsChanged)
   useEffect(() => {
-    const handleModelsUpdate = () => {
-      updateModelName();
-    };
-
     const handleSettingsChange = () => {
       updateModelName();
     };
 
-    window.addEventListener('modelsUpdated', handleModelsUpdate);
     window.addEventListener('settingsChanged', handleSettingsChange);
 
     return () => {
-      window.removeEventListener('modelsUpdated', handleModelsUpdate);
       window.removeEventListener('settingsChanged', handleSettingsChange);
     };
   }, [updateModelName]);

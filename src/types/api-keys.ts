@@ -1,7 +1,6 @@
 // src/types/api-keys.ts
 import type { ProviderDefinition } from '@/providers';
 import type { ProviderIds } from '@/providers/config/provider-config';
-import type { CustomProviderConfig } from '@/types/custom-provider';
 
 // Re-export ProviderDefinition as ProviderConfig for backward compatibility
 export type ProviderConfig = ProviderDefinition;

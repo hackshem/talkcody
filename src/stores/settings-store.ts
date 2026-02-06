@@ -41,6 +41,7 @@ interface SettingsState {
   auto_approve_plan_global: boolean;
   auto_code_review_global: boolean;
   hooks_enabled: boolean;
+  trace_enabled: boolean;
 
   // Project Settings
   project: string;
@@ -126,9 +127,11 @@ interface SettingsActions {
   setAutoApprovePlanGlobal: (enabled: boolean) => Promise<void>;
   setAutoCodeReviewGlobal: (enabled: boolean) => Promise<void>;
   setHooksEnabled: (enabled: boolean) => Promise<void>;
+  setTraceEnabled: (enabled: boolean) => Promise<void>;
   getAutoApproveEditsGlobal: () => boolean;
   getAutoApprovePlanGlobal: () => boolean;
   getAutoCodeReviewGlobal: () => boolean;
+  getTraceEnabled: () => boolean;
 
   // Project Settings
   setProject: (project: string) => Promise<void>;
@@ -249,6 +252,7 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'loading' | 'error' | 'isInitialized
   auto_approve_plan_global: false,
   auto_code_review_global: false,
   hooks_enabled: false,
+  trace_enabled: true,
   project: DEFAULT_PROJECT,
   current_root_path: '',
   custom_tools_dir: '',
@@ -327,6 +331,7 @@ class SettingsDatabase {
       auto_approve_plan_global: 'false',
       auto_code_review_global: 'false',
       hooks_enabled: 'false',
+      trace_enabled: 'true',
       model_type_main: '',
       model_type_small: '',
       model_type_image_generator: '',
@@ -462,6 +467,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         'auto_approve_plan_global',
         'auto_code_review_global',
         'hooks_enabled',
+        'trace_enabled',
         'reasoning_effort',
         'project',
         'current_root_path',
@@ -547,6 +553,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         auto_approve_plan_global: rawSettings.auto_approve_plan_global === 'true',
         auto_code_review_global: rawSettings.auto_code_review_global === 'true',
         hooks_enabled: rawSettings.hooks_enabled === 'true',
+        trace_enabled: rawSettings.trace_enabled !== 'false',
         project: rawSettings.project || DEFAULT_PROJECT,
         current_root_path: rawSettings.current_root_path || '',
         custom_tools_dir: rawSettings.custom_tools_dir || '',
@@ -699,6 +706,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   setHooksEnabled: async (enabled: boolean) => {
     await settingsDb.set('hooks_enabled', enabled.toString());
     set({ hooks_enabled: enabled });
+  },
+
+  setTraceEnabled: async (enabled: boolean) => {
+    await settingsDb.set('trace_enabled', enabled.toString());
+    set({ trace_enabled: enabled });
   },
 
   // Project Settings
@@ -1136,6 +1148,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   getHooksEnabled: () => {
     return get().hooks_enabled;
   },
+
+  getTraceEnabled: () => {
+    return get().trace_enabled;
+  },
 }));
 
 // Export singleton for non-React usage (backward compatibility)
@@ -1174,6 +1190,7 @@ export const settingsManager = {
   setAutoCodeReviewGlobal: (enabled: boolean) =>
     useSettingsStore.getState().setAutoCodeReviewGlobal(enabled),
   setHooksEnabled: (enabled: boolean) => useSettingsStore.getState().setHooksEnabled(enabled),
+  setTraceEnabled: (enabled: boolean) => useSettingsStore.getState().setTraceEnabled(enabled),
   setCustomToolsDir: (path: string) => useSettingsStore.getState().setCustomToolsDir(path),
 
   getModel: () => useSettingsStore.getState().getModel(),
@@ -1190,6 +1207,7 @@ export const settingsManager = {
   getAutoApprovePlanGlobal: () => useSettingsStore.getState().getAutoApprovePlanGlobal(),
   getAutoCodeReviewGlobal: () => useSettingsStore.getState().getAutoCodeReviewGlobal(),
   getHooksEnabled: () => useSettingsStore.getState().getHooksEnabled(),
+  getTraceEnabled: () => useSettingsStore.getState().getTraceEnabled(),
 
   // API Keys
   setApiKeys: (apiKeys: ApiKeySettings) => useSettingsStore.getState().setApiKeys(apiKeys),

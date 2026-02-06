@@ -39,7 +39,7 @@ vi.mock('@/services/database-service', () => ({
 }));
 
 // Import after vi.unmock
-import { getEffectiveWorkspaceRoot } from './workspace-root-service';
+import { getEffectiveWorkspaceRoot, getValidatedWorkspaceRoot } from './workspace-root-service';
 
 // Helper to create mock WorktreeInfo
 function createMockWorktreeInfo(
@@ -58,6 +58,46 @@ function createMockWorktreeInfo(
     createdAt: new Date().toISOString(),
   };
 }
+
+describe('WorkspaceRootService - getValidatedWorkspaceRoot', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should accept equivalent Windows paths with different separators', async () => {
+    const { settingsManager } = await import('@/stores/settings-store');
+    const { databaseService } = await import('@/services/database-service');
+
+    vi.mocked(settingsManager.getCurrentRootPath).mockReturnValueOnce('D:\\Code\\GraphCoder-main');
+    vi.mocked(settingsManager.getProject).mockResolvedValueOnce('project-1');
+    vi.mocked(databaseService.getProject).mockResolvedValueOnce({
+      id: 'project-1',
+      root_path: 'D:/Code/GraphCoder-main',
+      name: 'Test Project',
+    });
+
+    const root = await getValidatedWorkspaceRoot();
+
+    expect(root).toBe('D:\\Code\\GraphCoder-main');
+  });
+
+  it('should throw when Windows paths differ beyond separators', async () => {
+    const { settingsManager } = await import('@/stores/settings-store');
+    const { databaseService } = await import('@/services/database-service');
+
+    vi.mocked(settingsManager.getCurrentRootPath).mockReturnValueOnce('D:\\Code\\GraphCoder-main');
+    vi.mocked(settingsManager.getProject).mockResolvedValueOnce('project-1');
+    vi.mocked(databaseService.getProject).mockResolvedValueOnce({
+      id: 'project-1',
+      root_path: 'D:/Code/Other',
+      name: 'Test Project',
+    });
+
+    await expect(getValidatedWorkspaceRoot()).rejects.toThrow(
+      'Workspace root path mismatch: settings="D:\\Code\\GraphCoder-main", project="D:/Code/Other"'
+    );
+  });
+});
 
 describe('WorkspaceRootService - getEffectiveWorkspaceRoot', () => {
   beforeEach(() => {

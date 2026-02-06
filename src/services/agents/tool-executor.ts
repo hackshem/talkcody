@@ -6,6 +6,7 @@ import type { Tracer } from '@/lib/tracer';
 import { decodeObjectHtmlEntities, generateId } from '@/lib/utils';
 import { databaseService } from '@/services/database-service';
 import { hookService } from '@/services/hooks/hook-service';
+import { useSettingsStore } from '@/stores/settings-store';
 import type { AgentLoopState, AgentToolSet, UIMessage } from '@/types/agent';
 import type { ToolExecuteContext, ToolInput, ToolOutput, ToolWithUI } from '@/types/tool';
 import type { AgentExecutionGroup, AgentExecutionStage } from './agent-dependency-analyzer';
@@ -246,32 +247,35 @@ export class ToolExecutor {
     const spanId = generateId();
     const stepNumber = loopState.currentIteration > 0 ? loopState.currentIteration : 1;
 
+    const traceEnabled = useSettingsStore.getState().getTraceEnabled?.() ?? true;
     const traceId = options.taskId;
     const normalizedSpanToolName = isValidToolName(toolCall.toolName)
       ? toolCall.toolName
       : normalizeToolName(toolCall.toolName) || toolCall.toolName;
     const spanName = `Step${stepNumber}-tool-${normalizedSpanToolName}`;
 
-    databaseService
-      .startSpan({
-        spanId,
-        traceId,
-        parentSpanId: null,
-        name: spanName,
-        startedAt: toolStartTime,
-        attributes: {
-          toolCallId: toolCall.toolCallId,
-          toolName: normalizedSpanToolName,
-          stepNumber,
-        },
-      })
-      .catch((error) => {
-        logger.warn('[ToolExecutor] Failed to start tool span', {
-          toolCallId: toolCall.toolCallId,
-          toolName: normalizedSpanToolName,
-          error: error instanceof Error ? error.message : 'Unknown error',
+    if (traceEnabled) {
+      databaseService
+        .startSpan({
+          spanId,
+          traceId,
+          parentSpanId: null,
+          name: spanName,
+          startedAt: toolStartTime,
+          attributes: {
+            toolCallId: toolCall.toolCallId,
+            toolName: normalizedSpanToolName,
+            stepNumber,
+          },
+        })
+        .catch((error) => {
+          logger.warn('[ToolExecutor] Failed to start tool span', {
+            toolCallId: toolCall.toolCallId,
+            toolName: normalizedSpanToolName,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
         });
-      });
+    }
 
     try {
       // Validate and normalize tool name to prevent API errors
@@ -431,13 +435,15 @@ export class ToolExecutor {
         hookService.applyHookSummary(postToolSummary);
 
         const toolEndedAt = Date.now();
-        databaseService.endSpan(spanId, toolEndedAt).catch((error) => {
-          logger.warn('[ToolExecutor] Failed to end tool span', {
-            toolCallId: toolCall.toolCallId,
-            spanId,
-            error: error instanceof Error ? error.message : 'Unknown error',
+        if (traceEnabled) {
+          databaseService.endSpan(spanId, toolEndedAt).catch((error) => {
+            logger.warn('[ToolExecutor] Failed to end tool span', {
+              toolCallId: toolCall.toolCallId,
+              spanId,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
           });
-        });
+        }
 
         // Create tool-result message after execution
         if (onToolMessage) {
@@ -488,13 +494,15 @@ export class ToolExecutor {
       });
 
       const toolEndedAt = Date.now();
-      databaseService.endSpan(spanId, toolEndedAt).catch((endError) => {
-        logger.warn('[ToolExecutor] Failed to end tool span after error', {
-          toolCallId: toolCall.toolCallId,
-          spanId,
-          error: endError instanceof Error ? endError.message : 'Unknown error',
+      if (traceEnabled) {
+        databaseService.endSpan(spanId, toolEndedAt).catch((endError) => {
+          logger.warn('[ToolExecutor] Failed to end tool span after error', {
+            toolCallId: toolCall.toolCallId,
+            spanId,
+            error: endError instanceof Error ? endError.message : 'Unknown error',
+          });
         });
-      });
+      }
       const result = this.handleToolExecutionError(error, toolCall, model, loopState);
       return result;
     }

@@ -1075,6 +1075,13 @@ const en: LocaleDefinition = {
     selectTrace: 'Select a trace to view details.',
     noSpans: 'No spans found for this trace.',
     noEvents: 'No events recorded.',
+    toggleLabel: 'Toggle tracing',
+    enabledLabel: 'Tracing on',
+    disabledLabel: 'Tracing off',
+    disabledTitle: 'Tracing is disabled',
+    disabledBody: 'Turn tracing back on to capture new spans and events.',
+    disabledListHint: 'Tracing is disabled. Enable it to capture new traces.',
+    disabledTraceCountLabel: 'Tracing disabled',
   },
 
   Initialization: {

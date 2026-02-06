@@ -1039,6 +1039,13 @@ const zh: LocaleDefinition = {
     selectTrace: '请选择一个 Trace 查看详情。',
     noSpans: '该 Trace 暂无 Span。',
     noEvents: '暂无事件记录。',
+    toggleLabel: '切换 Trace 记录',
+    enabledLabel: 'Tracing 已开启',
+    disabledLabel: 'Tracing 已关闭',
+    disabledTitle: 'Tracing 已关闭',
+    disabledBody: '开启后将记录新的 Trace、Span 和事件。',
+    disabledListHint: 'Tracing 已关闭，开启后才会记录新的 Trace。',
+    disabledTraceCountLabel: 'Tracing 已关闭',
   },
 
   Initialization: {

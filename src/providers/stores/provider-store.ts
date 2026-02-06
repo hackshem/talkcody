@@ -1,9 +1,10 @@
 // src/providers/stores/provider-store.ts
 // Unified state management for providers and models
 
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { create } from 'zustand';
 import { logger } from '@/lib/logger';
-import { ensureModelsInitialized } from '@/providers/config/model-config';
+import { ensureModelsInitialized, refreshModelConfigs } from '@/providers/config/model-config';
 import {
   PROVIDERS_WITH_CODING_PLAN,
   PROVIDERS_WITH_INTERNATIONAL,
@@ -13,7 +14,6 @@ import {
   type ProviderFactory,
   parseModelIdentifier,
 } from '@/providers/core/provider-utils';
-import { modelSyncService } from '@/providers/models/model-sync-service';
 import { remoteAgentsSyncService } from '@/providers/remote-agents/remote-agents-sync-service';
 import { remoteSkillsSyncService } from '@/providers/remote-skills/remote-skills-sync-service';
 import { llmClient } from '@/services/llm/llm-client';
@@ -21,8 +21,10 @@ import type { ProviderConfig as RustProviderConfig } from '@/services/llm/types'
 import type { ProviderDefinition } from '@/types';
 import type { AvailableModel } from '@/types/api-keys';
 import type { CustomProviderConfig } from '@/types/custom-provider';
-import { isValidModelType, type ModelType } from '@/types/model-types';
 import type { ModelConfig } from '@/types/models';
+
+let modelsUpdateListener: Promise<UnlistenFn> | null = null;
+let modelsUpdateReady = false;
 
 // ===== Types =====
 
@@ -244,6 +246,7 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
 
     if (isInitialized || isLoading) {
       logger.debug('[ProviderStore] Already initialized or loading, skipping');
+      modelsUpdateReady = true;
       return;
     }
 
@@ -255,10 +258,14 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
       // Ensure models are loaded first
       await ensureModelsInitialized();
 
-      // Initialize model sync service (non-blocking, for hot-reload)
-      modelSyncService.initialize().catch((err) => {
-        logger.warn('[ProviderStore] Model sync initialization failed:', err);
-      });
+      if (!modelsUpdateListener) {
+        modelsUpdateListener = listen('modelsUpdated', async () => {
+          if (modelsUpdateReady) {
+            await refreshModelConfigs();
+            await get().refresh();
+          }
+        });
+      }
 
       // Initialize remote skills sync service (non-blocking, for hot-reload)
       remoteSkillsSyncService.initialize().catch((err) => {
@@ -328,6 +335,8 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
         isInitialized: true,
         isLoading: false,
       });
+
+      modelsUpdateReady = true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('[ProviderStore] Initialization failed:', error);
@@ -336,6 +345,7 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
         isLoading: false,
         isInitialized: true, // Mark as initialized even on error to avoid infinite retries
       });
+      modelsUpdateReady = true;
     }
   },
 

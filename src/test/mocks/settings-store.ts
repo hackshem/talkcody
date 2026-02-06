@@ -31,10 +31,12 @@ export const createMockSettingsManager = (
   getAutoApprovePlanGlobal: vi.fn(() => false),
   getAutoCodeReviewGlobal: vi.fn(() => false),
   getRalphLoopEnabled: vi.fn(() => false),
+  getTraceEnabled: vi.fn(() => true),
   setAutoApproveEditsGlobal: vi.fn().mockResolvedValue(undefined),
   setAutoApprovePlanGlobal: vi.fn().mockResolvedValue(undefined),
   setAutoCodeReviewGlobal: vi.fn().mockResolvedValue(undefined),
   setRalphLoopEnabled: vi.fn().mockResolvedValue(undefined),
+  setTraceEnabled: vi.fn().mockResolvedValue(undefined),
   db: {
     select: vi.fn().mockResolvedValue(overrides.db?.select ?? []),
     execute: vi.fn().mockResolvedValue(overrides.db?.execute ?? { rowsAffected: 0 }),
@@ -56,11 +58,13 @@ export const createMockUseSettingsStore = (
     getAutoApprovePlanGlobal: vi.fn(() => false),
     getAutoCodeReviewGlobal: vi.fn(() => false),
     getRalphLoopEnabled: vi.fn(() => false),
+    getTraceEnabled: vi.fn(() => true),
     setLanguage: vi.fn().mockResolvedValue(undefined),
     setAutoApproveEditsGlobal: vi.fn(),
     setAutoApprovePlanGlobal: vi.fn(),
     setAutoCodeReviewGlobal: vi.fn(),
     setRalphLoopEnabled: vi.fn(),
+    setTraceEnabled: vi.fn(),
     ...overrides.settings,
   };
 

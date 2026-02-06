@@ -98,16 +98,16 @@ impl StreamHandler {
         let mut trace_ttft_emitted = false;
         let mut done_emitted = false;
 
-        log::info!(
-            "[LLM Stream {}] Request trace_context: {:?}",
-            request_id,
-            request.trace_context
-        );
+        // log::info!(
+        //     "[LLM Stream {}] Request trace_context: {:?}",
+        //     request_id,
+        //     request.trace_context
+        // );
 
         if let Some(ref trace_context) = request.trace_context {
             let trace_writer = window.app_handle().state::<Arc<TraceWriter>>();
-            log::info!("[LLM Stream {}] Received trace_context - trace_id: {:?}, span_name: {:?}, parent_span_id: {:?}", 
-                request_id, trace_context.trace_id, trace_context.span_name, trace_context.parent_span_id);
+            // log::info!("[LLM Stream {}] Received trace_context - trace_id: {:?}, span_name: {:?}, parent_span_id: {:?}",
+            //     request_id, trace_context.trace_id, trace_context.span_name, trace_context.parent_span_id);
             let trace_id = trace_context.trace_id.clone().unwrap_or_else(|| {
                 let new_id = trace_writer.start_trace();
                 log::info!(
@@ -117,7 +117,7 @@ impl StreamHandler {
                 );
                 new_id
             });
-            log::info!("[LLM Stream {}] Using trace_id: {}", request_id, trace_id);
+            // log::info!("[LLM Stream {}] Using trace_id: {}", request_id, trace_id);
 
             let span_name = trace_context
                 .span_name
@@ -173,18 +173,18 @@ impl StreamHandler {
             );
             trace_span_id = Some(span_id.clone());
 
-            let parent_exists = trace_context
-                .parent_span_id
-                .as_deref()
-                .map(|id| trace_writer.has_span_id(id))
-                .unwrap_or(true);
-            log::info!(
-                "[LLM Stream {}] Tracing span created: span_id={}, parent_span_id={:?}, parent_exists={}",
-                request_id,
-                span_id,
-                trace_context.parent_span_id,
-                parent_exists
-            );
+            // let _parent_exists = trace_context
+            //     .parent_span_id
+            //     .as_deref()
+            //     .map(|id| trace_writer.has_span_id(id))
+            //     .unwrap_or(true);
+            // log::info!(
+            //     "[LLM Stream {}] Tracing span created: span_id={}, parent_span_id={:?}, parent_exists={}",
+            //     request_id,
+            //     span_id,
+            //     trace_context.parent_span_id,
+            //     parent_exists
+            // );
         }
 
         let headers = built_request.headers.clone();
@@ -279,7 +279,7 @@ impl StreamHandler {
             .header("Accept", "text/event-stream")
             .json(&body);
 
-        log::info!("[LLM Stream {}] Sending HTTP request...", request_id);
+        // log::info!("[LLM Stream {}] Sending HTTP request...", request_id);
 
         // Retry configuration: exponential backoff with max 3 retries
         const MAX_RETRIES: u32 = 3;
@@ -393,8 +393,6 @@ impl StreamHandler {
         const STREAM_MAX_RETRIES: u32 = 3;
         const STREAM_BASE_DELAY_MS: u64 = 1000;
         let mut stream_error_retries: u32 = 0;
-
-        log::info!("[LLM Stream {}] Starting to read stream...", request_id);
 
         'stream_loop: loop {
             // Use timeout to prevent hanging on stream.next().await
@@ -854,10 +852,10 @@ impl StreamHandler {
         &self,
         window: &tauri::Window,
         event_name: &str,
-        request_id: &str,
+        _request_id: &str,
         event: &StreamEvent,
     ) {
-        log::info!("[LLM Stream {}] Emitting event: {:?}", request_id, event);
+        // log::info!("[LLM Stream {}] Emitting event: {:?}", request_id, event);
         let _ = window.emit(event_name, event);
     }
 

@@ -34,6 +34,10 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }));
 
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn(async () => () => {}),
+}));
+
 vi.mock('@libsql/client', () => {
   const mockClient = {
     execute: vi.fn().mockResolvedValue({ rows: [], rowsAffected: 0 }),

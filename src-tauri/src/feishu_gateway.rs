@@ -375,10 +375,20 @@ async fn run_ws_loop(
         }
 
         if !config.enabled || config.app_id.is_empty() || config.app_secret.is_empty() {
+            log::debug!(
+                "[FeishuGateway] Skipping ws loop tick (enabled={}, app_id_set={}, app_secret_set={})",
+                config.enabled,
+                !config.app_id.is_empty(),
+                !config.app_secret.is_empty()
+            );
             sleep(Duration::from_millis(DEFAULT_ERROR_BACKOFF_MS)).await;
             continue;
         }
 
+        log::info!(
+            "[FeishuGateway] Starting ws connection (allowed_open_ids={})",
+            config.allowed_open_ids.len()
+        );
         let result = start_ws_connection(app_handle.clone(), state.clone(), config.clone()).await;
         if let Err(error) = result {
             let backoff = {
@@ -417,18 +427,38 @@ async fn start_ws_connection(
             tokio::spawn(async move {
                 let sender = event.event.sender;
                 if sender_kind(&sender.sender_type) != FeishuSenderKind::User {
+                    log::debug!(
+                        "[FeishuGateway] Ignoring non-user sender type={}",
+                        sender.sender_type
+                    );
                     return;
                 }
 
                 let message = event.event.message;
                 if chat_kind(&message.chat_type) != FeishuChatKind::P2p {
+                    log::debug!(
+                        "[FeishuGateway] Ignoring non-p2p chat type={}",
+                        message.chat_type
+                    );
                     return;
                 }
 
                 let open_id = sender.sender_id.open_id;
                 if !is_open_id_allowed(&open_id_allowlist, &open_id) {
+                    log::debug!(
+                        "[FeishuGateway] Open id not in allowlist open_id={} count={}",
+                        open_id,
+                        open_id_allowlist.len()
+                    );
                     return;
                 }
+
+                log::debug!(
+                    "[FeishuGateway] Processing inbound message open_id={} message_id={} type={}",
+                    open_id,
+                    message.message_id,
+                    message.message_type
+                );
 
                 let (text, attachments) = match build_message_payload(
                     &app_handle,
@@ -447,19 +477,33 @@ async fn start_ws_connection(
                 };
 
                 if text.trim().is_empty() && attachments.is_empty() {
+                    log::debug!(
+                        "[FeishuGateway] Ignoring empty message open_id={} message_id={}",
+                        open_id,
+                        message.message_id
+                    );
                     return;
                 }
+
+                log::debug!(
+                    "[FeishuGateway] Inbound message open_id={} message_id={} text_len={} attachments={}",
+                    open_id,
+                    message.message_id,
+                    text.len(),
+                    attachments.len()
+                );
 
                 let date = message
                     .create_time
                     .parse::<i64>()
                     .unwrap_or_else(|_| now_ms());
 
+                let message_id = message.message_id.clone();
                 let payload = FeishuInboundMessage {
                     chat_id: open_id.clone(),
-                    message_id: message.message_id,
+                    message_id: message_id.clone(),
                     text,
-                    open_id,
+                    open_id: open_id.clone(),
                     date,
                     attachments: if attachments.is_empty() {
                         None
@@ -468,8 +512,17 @@ async fn start_ws_connection(
                     },
                 };
 
-                if let Err(error) = app_handle.emit("feishu-inbound-message", payload) {
-                    log::error!("[FeishuGateway] Failed to emit message: {}", error);
+                match app_handle.emit("feishu-inbound-message", payload) {
+                    Ok(_) => {
+                        log::debug!(
+                            "[FeishuGateway] Emitted inbound message open_id={} message_id={}",
+                            open_id,
+                            message_id
+                        );
+                    }
+                    Err(error) => {
+                        log::error!("[FeishuGateway] Failed to emit message: {}", error);
+                    }
                 }
 
                 let mut gateway = state.lock().await;
@@ -512,6 +565,11 @@ pub async fn feishu_set_config(
     }
 
     if config.enabled && !config.app_id.is_empty() && !config.app_secret.is_empty() {
+        log::info!(
+            "[FeishuGateway] Config updated (enabled={}, allowed_open_ids={})",
+            config.enabled,
+            config.allowed_open_ids.len()
+        );
         let _ = start_gateway(app_handle, state.inner().clone()).await;
     }
 
@@ -525,12 +583,18 @@ pub async fn start_gateway(app_handle: AppHandle, state: FeishuGatewayState) -> 
     };
 
     if running {
+        log::info!("[FeishuGateway] Start requested but already running");
         return Ok(());
     }
 
     if config.app_id.is_empty() || config.app_secret.is_empty() {
         return Err("Feishu app_id/app_secret not configured".to_string());
     }
+
+    log::info!(
+        "[FeishuGateway] Starting gateway (allowed_open_ids={})",
+        config.allowed_open_ids.len()
+    );
 
     let (stop_tx, stop_rx) = watch::channel(false);
 
@@ -573,6 +637,7 @@ pub async fn feishu_stop(state: State<'_, FeishuGatewayState>) -> Result<(), Str
         let _ = stop_tx.send(true);
     }
     gateway.running = false;
+    log::info!("[FeishuGateway] Stop requested");
     Ok(())
 }
 
@@ -617,6 +682,11 @@ pub async fn feishu_send_message(
     };
 
     let client = build_client(&config)?;
+    log::debug!(
+        "[FeishuGateway] sendMessage open_id={} text_len={}",
+        request.open_id,
+        request.text.len()
+    );
     let body = CreateMessageRequestBody::builder()
         .receive_id(request.open_id.clone())
         .msg_type("text")
@@ -651,6 +721,11 @@ pub async fn feishu_edit_message(
     };
 
     let client = build_client(&config)?;
+    log::debug!(
+        "[FeishuGateway] editMessage message_id={} text_len={}",
+        request.message_id,
+        request.text.len()
+    );
     let update_request = UpdateMessageRequest::builder()
         .content(serde_json::json!({ "text": request.text }).to_string())
         .build();

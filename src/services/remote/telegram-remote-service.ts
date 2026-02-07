@@ -228,7 +228,7 @@ class TelegramRemoteService {
       model,
       systemPrompt,
       tools: agent?.tools,
-      agentId: agent?.id ?? agentId,
+      agentId,
       isNewTask: false,
       userMessage: text,
     });
@@ -521,7 +521,7 @@ class TelegramRemoteService {
     return raw
       .split(',')
       .map((id) => Number(id.trim()))
-      .filter((id) => !Number.isNaN(id));
+      .filter((id) => !Number.isNaN(id) && id !== 0);
   }
 
   private toRustConfig(config: TelegramRemoteConfig) {

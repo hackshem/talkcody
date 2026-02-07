@@ -292,6 +292,11 @@ async fn poll_loop(
         }
     };
 
+    log::info!(
+        "[TelegramGateway] Polling loop started (attachments_dir={:?})",
+        attachments_dir
+    );
+
     loop {
         if *stop_rx.borrow() {
             break;
@@ -317,6 +322,12 @@ async fn poll_loop(
             timeout: Some(config.poll_timeout_secs as i64),
             allowed_updates: Some(vec!["message".to_string()]),
         };
+
+        log::debug!(
+            "[TelegramGateway] Polling getUpdates (offset={:?}, timeout_secs={})",
+            last_update_id.map(|id| id + 1),
+            config.poll_timeout_secs
+        );
 
         let url = format!("https://api.telegram.org/bot{}/getUpdates", config.token);
         let response = client.post(&url).json(&request).send().await;
@@ -356,6 +367,11 @@ async fn poll_loop(
                             continue;
                         }
 
+                        log::debug!(
+                            "[TelegramGateway] getUpdates returned {} updates",
+                            payload.result.len()
+                        );
+
                         let mut max_update_id = last_update_id.unwrap_or(0);
                         for update in payload.result {
                             if update.update_id > max_update_id {
@@ -363,11 +379,27 @@ async fn poll_loop(
                             }
 
                             if let Some(message) = update.message {
+                                log::debug!(
+                                    "[TelegramGateway] Processing update {} for chat_id={}",
+                                    update.update_id,
+                                    message.chat.id
+                                );
+
                                 if is_group_chat(&message.chat.chat_type, message.chat.id) {
+                                    log::debug!(
+                                        "[TelegramGateway] Ignoring group chat message chat_id={} chat_type={:?}",
+                                        message.chat.id,
+                                        message.chat.chat_type
+                                    );
                                     continue;
                                 }
 
                                 if !is_chat_allowed(&config, message.chat.id) {
+                                    log::debug!(
+                                        "[TelegramGateway] Chat id {} not in allowlist (count={})",
+                                        message.chat.id,
+                                        config.allowed_chat_ids.len()
+                                    );
                                     continue;
                                 }
 
@@ -390,8 +422,21 @@ async fn poll_loop(
                                 };
 
                                 if text.trim().is_empty() && attachments.is_empty() {
+                                    log::debug!(
+                                        "[TelegramGateway] Ignoring empty message chat_id={} message_id={}",
+                                        message.chat.id,
+                                        message.message_id
+                                    );
                                     continue;
                                 }
+
+                                log::debug!(
+                                    "[TelegramGateway] Inbound message chat_id={} message_id={} text_len={} attachments={}",
+                                    message.chat.id,
+                                    message.message_id,
+                                    text.len(),
+                                    attachments.len()
+                                );
 
                                 let payload = TelegramInboundMessage {
                                     chat_id: message.chat.id,
@@ -417,13 +462,20 @@ async fn poll_loop(
                                     },
                                 };
 
-                                if let Err(error) =
-                                    app_handle.emit("telegram-inbound-message", payload)
-                                {
-                                    log::error!(
-                                        "[TelegramGateway] Failed to emit message: {}",
-                                        error
-                                    );
+                                match app_handle.emit("telegram-inbound-message", payload) {
+                                    Ok(_) => {
+                                        log::debug!(
+                                            "[TelegramGateway] Emitted inbound message chat_id={} message_id={}",
+                                            message.chat.id,
+                                            message.message_id
+                                        );
+                                    }
+                                    Err(error) => {
+                                        log::error!(
+                                            "[TelegramGateway] Failed to emit message: {}",
+                                            error
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -908,6 +960,12 @@ pub async fn telegram_set_config(
     drop(gateway);
 
     if config.enabled && !config.token.is_empty() {
+        log::info!(
+            "[TelegramGateway] Config updated (enabled={}, allowed_chat_ids={}, poll_timeout_secs={})",
+            config.enabled,
+            config.allowed_chat_ids.len(),
+            config.poll_timeout_secs
+        );
         let _ = start_gateway(app_handle, state.inner().clone()).await;
     }
 
@@ -928,12 +986,19 @@ pub async fn start_gateway(
     };
 
     if running {
+        log::info!("[TelegramGateway] Start requested but already running");
         return Ok(());
     }
 
     if config.token.is_empty() {
         return Err("Telegram bot token is not configured".to_string());
     }
+
+    log::info!(
+        "[TelegramGateway] Starting gateway (allowed_chat_ids={}, poll_timeout_secs={})",
+        config.allowed_chat_ids.len(),
+        config.poll_timeout_secs
+    );
 
     let (stop_tx, stop_rx) = watch::channel(false);
     let state_snapshot = load_state(&app_handle)
@@ -977,6 +1042,7 @@ pub async fn telegram_stop(state: State<'_, TelegramGatewayState>) -> Result<(),
         let _ = stop_tx.send(true);
     }
     gateway.running = false;
+    log::info!("[TelegramGateway] Stop requested");
     Ok(())
 }
 
@@ -1032,6 +1098,12 @@ pub async fn telegram_send_message(
         .map_err(|e| format!("Failed to build http client: {}", e))?;
 
     let url = format!("https://api.telegram.org/bot{}/sendMessage", config.token);
+    log::debug!(
+        "[TelegramGateway] sendMessage chat_id={} text_len={} reply_to={:?}",
+        request.chat_id,
+        request.text.len(),
+        request.reply_to_message_id
+    );
     let response = client
         .post(&url)
         .json(&serde_json::json!({
@@ -1083,6 +1155,12 @@ pub async fn telegram_edit_message(
     let url = format!(
         "https://api.telegram.org/bot{}/editMessageText",
         config.token
+    );
+    log::debug!(
+        "[TelegramGateway] editMessage chat_id={} message_id={} text_len={}",
+        request.chat_id,
+        request.message_id,
+        request.text.len()
     );
     let response = client
         .post(&url)

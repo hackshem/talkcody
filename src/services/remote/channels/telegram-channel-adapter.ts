@@ -79,16 +79,19 @@ export class TelegramChannelAdapter implements RemoteChannelAdapter {
       return;
     }
 
+    logger.info('[TelegramChannelAdapter] Starting gateway');
     await invoke('telegram_set_config', { config: this.toRustConfig(settings) });
     await invoke('telegram_start');
   }
 
   async stop(): Promise<void> {
+    logger.info('[TelegramChannelAdapter] Stopping gateway');
     await invoke('telegram_stop');
   }
 
   onInbound(handler: (message: RemoteInboundMessage) => void): () => void {
     const listenPromise = listen<TelegramInboundMessage>('telegram-inbound-message', (event) => {
+      logger.debug('[TelegramChannelAdapter] Inbound event received', event.payload);
       handler(toRemoteInboundMessage(event.payload));
     });
 
@@ -109,6 +112,11 @@ export class TelegramChannelAdapter implements RemoteChannelAdapter {
   }
 
   async sendMessage(request: RemoteSendMessageRequest): Promise<RemoteSendMessageResponse> {
+    logger.debug('[TelegramChannelAdapter] sendMessage', {
+      chatId: request.chatId,
+      textLen: request.text.length,
+      replyToMessageId: request.replyToMessageId,
+    });
     const response = await invoke<TelegramSendMessageResponse>('telegram_send_message', {
       request: toTelegramSendMessageRequest(request),
     });
@@ -116,6 +124,11 @@ export class TelegramChannelAdapter implements RemoteChannelAdapter {
   }
 
   async editMessage(request: RemoteEditMessageRequest): Promise<void> {
+    logger.debug('[TelegramChannelAdapter] editMessage', {
+      chatId: request.chatId,
+      messageId: request.messageId,
+      textLen: request.text.length,
+    });
     await invoke('telegram_edit_message', {
       request: toTelegramEditMessageRequest(request),
     });

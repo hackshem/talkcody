@@ -71,16 +71,19 @@ export class FeishuChannelAdapter implements RemoteChannelAdapter {
       return;
     }
 
+    logger.info('[FeishuChannelAdapter] Starting gateway');
     await invoke('feishu_set_config', { config: this.toRustConfig(settings) });
     await invoke('feishu_start');
   }
 
   async stop(): Promise<void> {
+    logger.info('[FeishuChannelAdapter] Stopping gateway');
     await invoke('feishu_stop');
   }
 
   onInbound(handler: (message: RemoteInboundMessage) => void): () => void {
     const listenPromise = listen<FeishuInboundMessage>('feishu-inbound-message', (event) => {
+      logger.debug('[FeishuChannelAdapter] Inbound event received', event.payload);
       handler(toRemoteInboundMessage(event.payload));
     });
 
@@ -101,6 +104,10 @@ export class FeishuChannelAdapter implements RemoteChannelAdapter {
   }
 
   async sendMessage(request: RemoteSendMessageRequest): Promise<RemoteSendMessageResponse> {
+    logger.debug('[FeishuChannelAdapter] sendMessage', {
+      chatId: request.chatId,
+      textLen: request.text.length,
+    });
     const response = await invoke<FeishuSendMessageResponse>('feishu_send_message', {
       request: toFeishuSendMessageRequest(request),
     });
@@ -108,6 +115,11 @@ export class FeishuChannelAdapter implements RemoteChannelAdapter {
   }
 
   async editMessage(request: RemoteEditMessageRequest): Promise<void> {
+    logger.debug('[FeishuChannelAdapter] editMessage', {
+      chatId: request.chatId,
+      messageId: request.messageId,
+      textLen: request.text.length,
+    });
     await invoke('feishu_edit_message', {
       request: toFeishuEditMessageRequest(request),
     });

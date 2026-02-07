@@ -194,6 +194,68 @@ describe('telegram-remote-service', () => {
     });
   });
 
+  describe('parseAllowedChats', () => {
+    it('should return empty array for empty string', () => {
+      // @ts-expect-error - accessing private method for testing
+      const result = telegramRemoteService.parseAllowedChats('');
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array for null/undefined', () => {
+      // @ts-expect-error - accessing private method for testing
+      const result = telegramRemoteService.parseAllowedChats(null as unknown as string);
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array for string with only whitespace', () => {
+      // @ts-expect-error - accessing private method for testing
+      const result = telegramRemoteService.parseAllowedChats('   ');
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array for comma-only string (empty string split bug)', () => {
+      // @ts-expect-error - accessing private method for testing
+      const result = telegramRemoteService.parseAllowedChats(',');
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array for string with only zeros', () => {
+      // @ts-expect-error - accessing private method for testing
+      const result = telegramRemoteService.parseAllowedChats('0, 0, 0');
+      expect(result).toEqual([]);
+    });
+
+    it('should parse single chat id correctly', () => {
+      // @ts-expect-error - accessing private method for testing
+      const result = telegramRemoteService.parseAllowedChats('123456');
+      expect(result).toEqual([123456]);
+    });
+
+    it('should parse multiple chat ids correctly', () => {
+      // @ts-expect-error - accessing private method for testing
+      const result = telegramRemoteService.parseAllowedChats('123456, 789012, 345678');
+      expect(result).toEqual([123456, 789012, 345678]);
+    });
+
+    it('should filter out invalid values and keep valid ones', () => {
+      // @ts-expect-error - accessing private method for testing
+      const result = telegramRemoteService.parseAllowedChats('123456, abc, 0, 789012');
+      expect(result).toEqual([123456, 789012]);
+    });
+
+    it('should handle mixed valid and invalid inputs including zero', () => {
+      // @ts-expect-error - accessing private method for testing
+      const result = telegramRemoteService.parseAllowedChats('8136227891, 0, , abc, 123456');
+      expect(result).toEqual([8136227891, 123456]);
+    });
+
+    it('should handle empty string in the middle', () => {
+      // @ts-expect-error - accessing private method for testing
+      const result = telegramRemoteService.parseAllowedChats('123,,456');
+      expect(result).toEqual([123, 456]);
+    });
+  });
+
   describe('flushFinalStream', () => {
     it('should send final message content even when streamingContent is cleared', async () => {
       const chatId = 12345;

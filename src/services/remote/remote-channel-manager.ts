@@ -16,12 +16,14 @@ class RemoteChannelManager {
   private unlistenMap = new Map<RemoteChannelId, () => void>();
 
   registerAdapter(adapter: RemoteChannelAdapter): void {
+    logger.info('[RemoteChannelManager] Register adapter', adapter.channelId);
     this.adapters.set(adapter.channelId, adapter);
   }
 
   unregisterAdapter(channelId: RemoteChannelId): void {
     const existing = this.adapters.get(channelId);
     if (!existing) return;
+    logger.info('[RemoteChannelManager] Unregister adapter', channelId);
     const unlisten = this.unlistenMap.get(channelId);
     if (unlisten) {
       unlisten();
@@ -38,27 +40,37 @@ class RemoteChannelManager {
   }
 
   async startAll(): Promise<void> {
+    logger.info('[RemoteChannelManager] Starting all adapters');
     const startOps = Array.from(this.adapters.values()).map(async (adapter) => {
-      await adapter.start();
-      if (this.unlistenMap.has(adapter.channelId)) {
-        return;
+      try {
+        await adapter.start();
+        if (this.unlistenMap.has(adapter.channelId)) {
+          return;
+        }
+        const unlisten = adapter.onInbound((message) => {
+          this.emitInbound(message);
+        });
+        this.unlistenMap.set(adapter.channelId, unlisten);
+      } catch (error) {
+        logger.error(`[RemoteChannelManager] Failed to start adapter ${adapter.channelId}`, error);
       }
-      const unlisten = adapter.onInbound((message) => {
-        this.emitInbound(message);
-      });
-      this.unlistenMap.set(adapter.channelId, unlisten);
     });
     await Promise.all(startOps);
   }
 
   async stopAll(): Promise<void> {
+    logger.info('[RemoteChannelManager] Stopping all adapters');
     const stopOps = Array.from(this.adapters.values()).map(async (adapter) => {
-      const unlisten = this.unlistenMap.get(adapter.channelId);
-      if (unlisten) {
-        unlisten();
-        this.unlistenMap.delete(adapter.channelId);
+      try {
+        await adapter.stop();
+        const unlisten = this.unlistenMap.get(adapter.channelId);
+        if (unlisten) {
+          unlisten();
+          this.unlistenMap.delete(adapter.channelId);
+        }
+      } catch (error) {
+        logger.error(`[RemoteChannelManager] Failed to stop adapter ${adapter.channelId}`, error);
       }
-      await adapter.stop();
     });
     await Promise.all(stopOps);
   }
@@ -68,6 +80,11 @@ class RemoteChannelManager {
     if (!adapter) {
       throw new Error(`Remote channel ${request.channelId} not registered`);
     }
+    logger.debug('[RemoteChannelManager] sendMessage', {
+      channelId: request.channelId,
+      chatId: request.chatId,
+      textLen: request.text.length,
+    });
     return adapter.sendMessage(request);
   }
 
@@ -76,6 +93,12 @@ class RemoteChannelManager {
     if (!adapter) {
       throw new Error(`Remote channel ${request.channelId} not registered`);
     }
+    logger.debug('[RemoteChannelManager] editMessage', {
+      channelId: request.channelId,
+      chatId: request.chatId,
+      messageId: request.messageId,
+      textLen: request.text.length,
+    });
     await adapter.editMessage(request);
   }
 
@@ -84,6 +107,13 @@ class RemoteChannelManager {
   }
 
   private emitInbound(message: RemoteInboundMessage): void {
+    logger.debug('[RemoteChannelManager] Inbound dispatch', {
+      channelId: message.channelId,
+      chatId: message.chatId,
+      messageId: message.messageId,
+      textLen: message.text.length,
+      attachments: message.attachments?.length ?? 0,
+    });
     for (const handler of this.inboundHandlers) {
       try {
         handler(message);

@@ -69,9 +69,10 @@ class RemoteChatService {
 
   async start(): Promise<void> {
     if (this.running) return;
-    this.running = true;
 
+    logger.info('[RemoteChatService] Start');
     await remoteChannelManager.startAll();
+    this.running = true;
 
     if (!this.inboundUnsubscribe) {
       this.inboundUnsubscribe = remoteChannelManager.onInbound((message) => {
@@ -87,6 +88,7 @@ class RemoteChatService {
     if (!this.running) return;
     this.running = false;
 
+    logger.info('[RemoteChatService] Stop');
     if (this.inboundUnsubscribe) {
       this.inboundUnsubscribe();
       this.inboundUnsubscribe = null;
@@ -111,6 +113,13 @@ class RemoteChatService {
   }
 
   async handleInboundMessage(message: RemoteInboundMessage): Promise<void> {
+    logger.debug('[RemoteChatService] Inbound message', {
+      channelId: message.channelId,
+      chatId: message.chatId,
+      messageId: message.messageId,
+      textLen: message.text.length,
+      attachments: message.attachments?.length ?? 0,
+    });
     if (
       isDuplicateRemoteMessage(
         message.channelId,
@@ -119,11 +128,17 @@ class RemoteChatService {
         TELEGRAM_DEDUP_TTL_MS
       )
     ) {
+      logger.debug('[RemoteChatService] Duplicate message ignored', {
+        channelId: message.channelId,
+        chatId: message.chatId,
+        messageId: message.messageId,
+      });
       return;
     }
 
     const trimmedText = message.text.trim();
     if (trimmedText.startsWith('/')) {
+      logger.debug('[RemoteChatService] Command detected', { command: trimmedText });
       await this.handleCommand(message, trimmedText);
       return;
     }
@@ -137,32 +152,38 @@ class RemoteChatService {
     const args = rest.join(' ').trim();
 
     if (command === '/approve') {
+      logger.info('[RemoteChatService] Approve command');
       await this.handleApprove(message, true, args);
       return;
     }
 
     if (command === '/reject') {
+      logger.info('[RemoteChatService] Reject command');
       await this.handleApprove(message, false, args);
       return;
     }
 
     if (command === '/new') {
+      logger.info('[RemoteChatService] New task command');
       await this.resetSession(message.channelId, message.chatId, args || 'Remote task');
       await this.handlePrompt({ ...message, text: args || '' });
       return;
     }
 
     if (command === '/status') {
+      logger.info('[RemoteChatService] Status command');
       await this.handleStatus(message);
       return;
     }
 
     if (command === '/stop') {
+      logger.info('[RemoteChatService] Stop command');
       await this.handleStop(message);
       return;
     }
 
     if (command === '/help') {
+      logger.info('[RemoteChatService] Help command');
       await this.sendMessage(message, this.getLocaleText().RemoteControl.help);
       return;
     }
@@ -187,6 +208,10 @@ class RemoteChatService {
     message: RemoteInboundMessage
   ): Promise<void> {
     const session = await this.getOrCreateSession(message.channelId, message.chatId, message.text);
+    logger.info('[RemoteChatService] Executing command', {
+      commandName,
+      taskId: session.taskId,
+    });
     const parsed = commandExecutor.parseCommand(`/${commandName} ${rawArgs}`);
     if (!parsed.command) {
       await this.sendMessage(message, this.getLocaleText().RemoteControl.unknownCommand);
@@ -211,6 +236,12 @@ class RemoteChatService {
   private async handlePrompt(message: RemoteInboundMessage): Promise<void> {
     const session = await this.getOrCreateSession(message.channelId, message.chatId, message.text);
 
+    logger.info('[RemoteChatService] Handling prompt', {
+      channelId: message.channelId,
+      chatId: message.chatId,
+      taskId: session.taskId,
+    });
+
     const taskSettings: TaskSettings = { autoApprovePlan: true };
     await taskService.updateTaskSettings(session.taskId, taskSettings);
 
@@ -218,6 +249,10 @@ class RemoteChatService {
     const promptText = mediaResult.text.trim();
 
     if (!promptText && mediaResult.attachments.length === 0) {
+      logger.debug('[RemoteChatService] Empty prompt after media processing', {
+        channelId: message.channelId,
+        chatId: message.chatId,
+      });
       return;
     }
 
@@ -242,13 +277,23 @@ class RemoteChatService {
       model,
       systemPrompt,
       tools: agent?.tools,
-      agentId: agent?.id ?? agentId,
+      agentId,
       isNewTask: false,
       userMessage: promptText,
     });
 
+    logger.info('[RemoteChatService] Execution started', {
+      taskId: session.taskId,
+      model,
+    });
+
     const statusText = this.getLocaleText().RemoteControl.processing;
     const statusMessage = await this.sendMessage(message, statusText);
+    logger.debug('[RemoteChatService] Sent processing message', {
+      channelId: message.channelId,
+      chatId: message.chatId,
+      messageId: statusMessage.messageId,
+    });
     session.streamingMessageId = statusMessage.messageId;
     session.lastMessageId = statusMessage.messageId;
     session.sentChunks = [statusText];
@@ -261,6 +306,10 @@ class RemoteChatService {
       ? useExecutionStore.getState().getExecution(session.taskId)
       : undefined;
     if (!execution) {
+      logger.debug('[RemoteChatService] Status requested with no active task', {
+        channelId: message.channelId,
+        chatId: message.chatId,
+      });
       await this.sendMessage(message, this.getLocaleText().RemoteControl.noActiveTask);
       return;
     }
@@ -282,6 +331,10 @@ class RemoteChatService {
   ): Promise<void> {
     const approval = this.approvals.get(buildSessionKey(message.channelId, message.chatId));
     if (!approval) {
+      logger.debug('[RemoteChatService] Approve/reject with no pending approval', {
+        channelId: message.channelId,
+        chatId: message.chatId,
+      });
       await this.sendMessage(message, this.getLocaleText().RemoteControl.noPendingApproval);
       return;
     }
@@ -295,11 +348,19 @@ class RemoteChatService {
     }
 
     this.approvals.delete(buildSessionKey(message.channelId, message.chatId));
+    logger.info('[RemoteChatService] Approval handled', {
+      approved,
+      taskId: approval.taskId,
+    });
   }
 
   private async handleStop(message: RemoteInboundMessage): Promise<void> {
     const session = this.sessions.get(buildSessionKey(message.channelId, message.chatId));
     if (!session) {
+      logger.debug('[RemoteChatService] Stop requested without active session', {
+        channelId: message.channelId,
+        chatId: message.chatId,
+      });
       await this.sendMessage(message, this.getLocaleText().RemoteControl.noActiveTask);
       return;
     }
@@ -318,6 +379,11 @@ class RemoteChatService {
     if (session) return session;
 
     const taskId = await taskService.createTask(firstMessage || 'Remote task');
+    logger.info('[RemoteChatService] Created session', {
+      channelId,
+      chatId,
+      taskId,
+    });
     session = {
       channelId,
       chatId,
@@ -339,6 +405,12 @@ class RemoteChatService {
     if (!session) {
       return;
     }
+
+    logger.info('[RemoteChatService] Reset session', {
+      channelId,
+      chatId,
+      taskId: session.taskId,
+    });
 
     this.lastStreamContent.delete(session.taskId);
     session.streamingMessageId = undefined;
@@ -524,6 +596,11 @@ class RemoteChatService {
     if (!this.running) {
       return { messageId: '' };
     }
+    logger.debug('[RemoteChatService] sendMessage', {
+      channelId: message.channelId,
+      chatId: message.chatId,
+      textLen: text.length,
+    });
     const request: RemoteSendMessageRequest = {
       channelId: message.channelId,
       chatId: message.chatId,
@@ -540,6 +617,12 @@ class RemoteChatService {
     if (!text.trim() || !session.streamingMessageId) {
       return;
     }
+    logger.debug('[RemoteChatService] editMessage', {
+      channelId: session.channelId,
+      chatId: session.chatId,
+      messageId: session.streamingMessageId,
+      textLen: text.length,
+    });
     try {
       await remoteChannelManager.editMessage({
         channelId: session.channelId,

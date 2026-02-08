@@ -10,11 +10,21 @@ import {
 } from './llm-event-stream';
 import type {
   AvailableModel,
+  CalculateCostRequest,
+  CalculateCostResult,
+  CompletionContext,
+  CompletionResult,
+  ContextCompactionRequest,
+  ContextCompactionResult,
+  GitMessageContext,
+  GitMessageResult,
   Message,
   ProviderConfig,
   StreamEvent,
   StreamResponse,
   StreamTextRequest,
+  TitleGenerationRequest,
+  TitleGenerationResult,
   TranscriptionRequest,
   TranscriptionResponse,
 } from './types';
@@ -163,6 +173,28 @@ export class LlmClient {
 
   async transcribeAudio(request: TranscriptionRequest): Promise<TranscriptionResponse> {
     return invoke<TranscriptionResponse>('llm_transcribe_audio', { request });
+  }
+
+  // AI Services Commands
+
+  async calculateCost(request: CalculateCostRequest): Promise<CalculateCostResult> {
+    return invoke<CalculateCostResult>('llm_calculate_cost', { request });
+  }
+
+  async getCompletion(context: CompletionContext): Promise<CompletionResult> {
+    return invoke<CompletionResult>('llm_get_completion', { context });
+  }
+
+  async generateCommitMessage(context: GitMessageContext): Promise<GitMessageResult> {
+    return invoke<GitMessageResult>('llm_generate_commit_message', { context });
+  }
+
+  async generateTitle(request: TitleGenerationRequest): Promise<TitleGenerationResult> {
+    return invoke<TitleGenerationResult>('llm_generate_title', { request });
+  }
+
+  async compactContext(request: ContextCompactionRequest): Promise<ContextCompactionResult> {
+    return invoke<ContextCompactionResult>('llm_compact_context', { request });
   }
 
   async registerCustomProvider(config: {

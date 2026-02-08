@@ -163,3 +163,89 @@ export type TranscriptionResponse = {
   language?: string | null;
   duration?: number | null;
 };
+
+// AI Services Types
+
+export type CompletionContext = {
+  fileContent: string;
+  cursorPosition: number;
+  fileName: string;
+  language: string;
+};
+
+export type CompletionRange = {
+  startLineNumber: number;
+  startColumn: number;
+  endLineNumber: number;
+  endColumn: number;
+};
+
+export type CompletionResult = {
+  completion: string;
+  range?: CompletionRange | null;
+};
+
+export type GitMessageContext = {
+  userInput?: string | null;
+  diffText: string;
+};
+
+export type GitMessageResult = {
+  message: string;
+  suggestions?: string[] | null;
+};
+
+export type TokenUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens?: number | null;
+  cacheCreationInputTokens?: number | null;
+};
+
+export type CalculateCostRequest = {
+  modelId: string;
+  usage: TokenUsage;
+  modelConfigs: Record<string, ModelConfig>;
+};
+
+export type CalculateCostResult = {
+  cost: number;
+};
+
+export type TitleGenerationRequest = {
+  userInput: string;
+  language?: string | null;
+  model?: string | null;
+};
+
+export type TitleGenerationResult = {
+  title: string;
+};
+
+export type ContextCompactionRequest = {
+  conversationHistory: string;
+  model?: string | null;
+};
+
+export type ContextCompactionResult = {
+  compressedSummary: string;
+};
+
+export type ModelConfig = {
+  name: string;
+  imageInput: boolean;
+  imageOutput: boolean;
+  audioInput: boolean;
+  interleaved: boolean;
+  providers: string[];
+  providerMappings?: Record<string, string> | null;
+  pricing?: ModelPricing | null;
+  contextLength?: number | null;
+};
+
+export type ModelPricing = {
+  input: string;
+  output: string;
+  cachedInput?: string | null;
+  cacheCreation?: string | null;
+};

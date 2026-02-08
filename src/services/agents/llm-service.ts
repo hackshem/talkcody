@@ -845,7 +845,7 @@ export class LLMService {
                         cachedInputTokens,
                         cacheCreationInputTokens,
                       } = normalizedUsage;
-                      const cost = aiPricingService.calculateCost(model, {
+                      const cost = await aiPricingService.calculateCost(model, {
                         inputTokens,
                         outputTokens,
                         cachedInputTokens,

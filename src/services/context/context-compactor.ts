@@ -383,8 +383,7 @@ export class ContextCompactor {
     try {
       compressedSummary = await aiContextCompactionService.compactContext(
         conversationHistory,
-        config.compressionModel,
-        abortController?.signal
+        config.compressionModel
       );
     } catch (error) {
       logger.warn('AI compression failed, falling back to tree-sitter rewriting:', error);

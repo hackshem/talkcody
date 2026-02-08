@@ -1,3 +1,4 @@
+pub mod ai_services;
 pub mod auth;
 pub mod commands;
 pub mod models;

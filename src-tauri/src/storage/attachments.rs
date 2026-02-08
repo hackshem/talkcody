@@ -261,6 +261,25 @@ mod tests {
         runner.init().await.expect("Failed to init migrations");
         runner.migrate().await.expect("Failed to run migrations");
 
+        // Create test sessions to satisfy foreign key constraints
+        let now = chrono::Utc::now().timestamp();
+        let sessions = vec!["session-1", "session-list", "session-del"];
+        for session_id in sessions {
+            db.execute(
+                "INSERT INTO sessions (id, project_id, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                vec![
+                    serde_json::json!(session_id),
+                    serde_json::json!(None::<String>),
+                    serde_json::json!("Test Session"),
+                    serde_json::json!("created"),
+                    serde_json::json!(now),
+                    serde_json::json!(now),
+                ],
+            )
+            .await
+            .expect("Failed to create test session");
+        }
+
         let storage_root = temp_dir.path().join("attachments");
         let repo = AttachmentsRepository::new(db, storage_root);
 

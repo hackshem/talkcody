@@ -151,7 +151,7 @@ impl OpenRouterTranscriptionClient {
     fn detect_audio_format(mime_type: &str) -> String {
         if mime_type.contains("wav") {
             "wav"
-        } else if mime_type.contains("mp3") {
+        } else if mime_type.contains("mp3") || mime_type.contains("mpeg") {
             "mp3"
         } else if mime_type.contains("webm") {
             "webm"

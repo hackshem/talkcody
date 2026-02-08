@@ -37,6 +37,60 @@ impl FileSystemPlatform {
         Ok(canonical_path)
     }
 
+    /// Validate that a path for writing is within the workspace root
+    /// For write operations, the file may not exist yet, so we validate the parent directory
+    fn validate_write_path(&self, path: &Path, ctx: &PlatformContext) -> Result<PathBuf, String> {
+        // Get absolute path (without requiring file to exist)
+        let absolute_path = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            ctx.workspace_root.join(path)
+        };
+
+        // Get canonical workspace root
+        let canonical_root = ctx
+            .workspace_root
+            .canonicalize()
+            .map_err(|e| format!("Invalid workspace root: {}", e))?;
+
+        // For new files, validate that the parent directory is within workspace
+        let parent = absolute_path
+            .parent()
+            .ok_or_else(|| "Invalid path: no parent directory".to_string())?;
+
+        // Create parent if it doesn't exist for validation purposes
+        if !parent.exists() {
+            // Parent doesn't exist yet, check if it would be within workspace
+            let parent_absolute = if parent.is_absolute() {
+                parent.to_path_buf()
+            } else {
+                ctx.workspace_root.join(parent)
+            };
+
+            if !parent_absolute.starts_with(&canonical_root) {
+                return Err(format!(
+                    "Path '{}' is outside workspace root '{}'",
+                    absolute_path.display(),
+                    canonical_root.display()
+                ));
+            }
+        } else {
+            let canonical_parent = parent
+                .canonicalize()
+                .map_err(|e| format!("Invalid parent directory: {}", e))?;
+
+            if !canonical_parent.starts_with(&canonical_root) {
+                return Err(format!(
+                    "Path '{}' is outside workspace root '{}'",
+                    absolute_path.display(),
+                    canonical_root.display()
+                ));
+            }
+        }
+
+        Ok(absolute_path)
+    }
+
     /// Read file contents
     pub async fn read_file(&self, path: &str, ctx: &PlatformContext) -> PlatformResult<String> {
         let path = Path::new(path);
@@ -75,7 +129,7 @@ impl FileSystemPlatform {
     ) -> PlatformResult<()> {
         let path = Path::new(path);
 
-        match self.validate_path(path, ctx) {
+        match self.validate_write_path(path, ctx) {
             Ok(validated_path) => {
                 // Ensure parent directory exists
                 if let Some(parent) = validated_path.parent() {

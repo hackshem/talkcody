@@ -400,15 +400,7 @@ mod tests {
 
         let session = manager.create_session(None, None, None).await.unwrap();
 
-        // Initially not active (in memory)
-        assert!(!manager.is_session_active(&session.id).await);
-
-        // Activate
-        let state = manager
-            .activate_session(&session.id)
-            .await
-            .expect("Failed to activate");
-        assert!(state.is_active);
+        // Session is active immediately after creation
         assert!(manager.is_session_active(&session.id).await);
 
         // Deactivate
@@ -417,6 +409,14 @@ mod tests {
             .await
             .expect("Failed to deactivate");
         assert!(!manager.is_session_active(&session.id).await);
+
+        // Reactivate
+        let state = manager
+            .activate_session(&session.id)
+            .await
+            .expect("Failed to activate");
+        assert!(state.is_active);
+        assert!(manager.is_session_active(&session.id).await);
     }
 
     #[tokio::test]

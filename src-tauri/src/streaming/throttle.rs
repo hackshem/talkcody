@@ -187,16 +187,16 @@ mod tests {
     async fn test_token_accumulation() {
         let throttler = EventThrottler::default();
 
-        // Accumulate tokens
-        let result1 = throttler.accumulate_token("sess-1", "Hello ").await;
+        // Accumulate tokens (total 9 chars, under 10 char threshold)
+        let result1 = throttler.accumulate_token("sess-1", "Hi ").await;
         assert!(result1.is_none());
 
-        let result2 = throttler.accumulate_token("sess-1", "World").await;
-        assert!(result2.is_none()); // Not enough tokens yet
+        let result2 = throttler.accumulate_token("sess-1", "there").await;
+        assert!(result2.is_none()); // Not enough tokens yet (8 chars total)
 
         // Flush manually
         let flushed = throttler.flush_tokens("sess-1").await;
-        assert_eq!(flushed, Some("Hello World".to_string()));
+        assert_eq!(flushed, Some("Hi there".to_string()));
     }
 
     #[test]

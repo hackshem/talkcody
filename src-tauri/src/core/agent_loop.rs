@@ -217,7 +217,7 @@ impl AgentLoopFactory {
 mod tests {
     use super::*;
 
-    fn create_test_loop() -> (AgentLoop, mpsc::UnboundedReceiver<RuntimeEvent>) {
+    async fn create_test_loop() -> (AgentLoop, mpsc::UnboundedReceiver<RuntimeEvent>) {
         let (tx, rx) = mpsc::unbounded_channel();
         let registry = Arc::new(ToolRegistry::create_default().await);
         let dispatcher = Arc::new(ToolDispatcher::new(registry));
@@ -229,7 +229,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_loop_placeholder() {
-        let (agent_loop, _rx) = create_test_loop();
+        let (agent_loop, _rx) = create_test_loop().await;
 
         let ctx = AgentLoopContext {
             session_id: "test-session".to_string(),
@@ -253,7 +253,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_build_prompt() {
-        let (agent_loop, _rx) = create_test_loop();
+        let (agent_loop, _rx) = create_test_loop().await;
 
         let messages = vec![
             Message {

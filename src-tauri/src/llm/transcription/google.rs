@@ -46,9 +46,8 @@ struct GeminiCandidateContent {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(untagged)]
 enum GeminiResponsePart {
-    #[serde(rename = "text")]
     Text { text: String },
 }
 

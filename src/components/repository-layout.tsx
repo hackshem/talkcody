@@ -69,7 +69,7 @@ export const RepositoryLayout = memo(function RepositoryLayout() {
 
   useRepositoryShortcuts(
     openFileSearch,
-    state.toggleTerminalVisible,
+    state.setTerminalVisible,
     state.selectNextSession,
     state.selectPreviousSession,
     state.rootPath,
@@ -107,7 +107,7 @@ export const RepositoryLayout = memo(function RepositoryLayout() {
     currentProjectId,
     isDefaultProject,
     isTerminalVisible,
-    toggleTerminalVisible,
+    setTerminalVisible,
     pendingDeletion,
     setPendingDeletion,
     refreshProjects,
@@ -378,7 +378,9 @@ export const RepositoryLayout = memo(function RepositoryLayout() {
                 }}
                 isLoadingProject={isLoading}
                 isTerminalVisible={hasRepository ? isTerminalVisible : undefined}
-                onToggleTerminal={hasRepository ? toggleTerminalVisible : undefined}
+                onToggleTerminal={
+                  hasRepository ? () => setTerminalVisible(!isTerminalVisible) : undefined
+                }
                 onOpenFileSearch={hasRepository ? openFileSearch : undefined}
                 onOpenContentSearch={
                   hasRepository ? () => setIsContentSearchVisible(true) : undefined
@@ -434,7 +436,7 @@ export const RepositoryLayout = memo(function RepositoryLayout() {
                     chatBoxRef.current.appendToInput(`\n\n${content}`);
                   }
                 }}
-                onCloseTerminal={toggleTerminalVisible}
+                onCloseTerminal={() => setTerminalVisible(false)}
                 onToggleTerminalFullscreen={() => toggleFullscreen('terminal')}
               />
             )}

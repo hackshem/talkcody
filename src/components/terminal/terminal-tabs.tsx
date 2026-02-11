@@ -10,8 +10,8 @@ export function TerminalTabs() {
   const sessions = useTerminalStore((state) => state.sessions);
   const activeSessionId = useTerminalStore((state) => state.activeSessionId);
   const setActiveSession = useTerminalStore((state) => state.setActiveSession);
-  const rootPath = useRepositoryStore((state) => state.rootPath);
   const setTerminalVisible = useTerminalStore((state) => state.setTerminalVisible);
+  const rootPath = useRepositoryStore((state) => state.rootPath);
 
   // Convert Map to Array for rendering
   const sessionArray = Array.from(sessions.values());

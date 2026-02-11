@@ -450,6 +450,23 @@
       },
       "context_length": 196608
     },
+    "minimax-m25": {
+      "name": "MiniMax M2.5",
+      "imageInput": true,
+      "interleaved": true,
+      "providers": [
+        "MiniMax"
+      ],
+      "providerMappings": {
+        "MiniMax": "MiniMax-M2.5"
+      },
+      "pricing": {
+        "input": "0.00000028",
+        "output": "0.0000012",
+        "cachedInput": "0.00000014"
+      },
+      "context_length": 196608
+    },
     "gpt-oss:20b": {
       "name": "GPT-OSS 20B (Local)",
       "providers": [

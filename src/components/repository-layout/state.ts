@@ -87,7 +87,7 @@ export interface RepositoryLayoutActions {
 
   refreshProjects: () => Promise<void>;
 
-  toggleTerminalVisible: () => void;
+  setTerminalVisible: (visible: boolean) => void;
   selectNextSession: () => void;
   selectPreviousSession: () => void;
 

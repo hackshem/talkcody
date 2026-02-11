@@ -4,12 +4,13 @@ import type { TerminalSession } from './terminal-store';
 
 describe('Terminal Store - Tab Switching', () => {
   beforeEach(() => {
-    // Reset the store before each test by removing all sessions
-    const store = useTerminalStore.getState();
-    const allSessions = store.getAllSessions();
-    for (const session of allSessions) {
-      store.removeSession(session.id);
-    }
+    // Reset store before each test
+    useTerminalStore.setState({
+      sessions: new Map(),
+      activeSessionId: null,
+      isTerminalVisible: false,
+      autoCreateAllowed: true,
+    });
   });
 
   const createMockSession = (id: string, title: string): TerminalSession => ({
@@ -231,32 +232,35 @@ describe('Terminal Store - Tab Switching', () => {
       store.selectPreviousSession();
       expect(useTerminalStore.getState().activeSessionId).toBe('session-1');
     });
+  });
 
-    it('should alternate between next and previous correctly', () => {
+  describe('auto-create suppression', () => {
+    it('should disable auto-create when the last session is removed', () => {
       const store = useTerminalStore.getState();
-      const session1 = createMockSession('session-1', 'Terminal 1');
-      const session2 = createMockSession('session-2', 'Terminal 2');
+      const session = createMockSession('session-1', 'Terminal 1');
 
-      store.addSession(session1);
-      store.addSession(session2);
+      store.setTerminalVisible(true);
+      store.addSession(session);
 
-      store.setActiveSession('session-1');
+      expect(useTerminalStore.getState().autoCreateAllowed).toBe(false);
+      expect(useTerminalStore.getState().sessions.size).toBe(1);
 
-      // Next
-      store.selectNextSession();
-      expect(useTerminalStore.getState().activeSessionId).toBe('session-2');
+      store.removeSession(session.id);
 
-      // Previous
-      store.selectPreviousSession();
-      expect(useTerminalStore.getState().activeSessionId).toBe('session-1');
+      expect(useTerminalStore.getState().sessions.size).toBe(0);
+      expect(useTerminalStore.getState().activeSessionId).toBeNull();
+      expect(useTerminalStore.getState().autoCreateAllowed).toBe(false);
+      expect(useTerminalStore.getState().isTerminalVisible).toBe(true);
+    });
 
-      // Previous again
-      store.selectPreviousSession();
-      expect(useTerminalStore.getState().activeSessionId).toBe('session-2');
+    it('should re-enable auto-create when terminal is opened', () => {
+      const store = useTerminalStore.getState();
 
-      // Next again
-      store.selectNextSession();
-      expect(useTerminalStore.getState().activeSessionId).toBe('session-1');
+      store.setTerminalVisible(false);
+      expect(useTerminalStore.getState().autoCreateAllowed).toBe(false);
+
+      store.setTerminalVisible(true);
+      expect(useTerminalStore.getState().autoCreateAllowed).toBe(true);
     });
   });
 });

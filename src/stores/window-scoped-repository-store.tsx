@@ -885,7 +885,22 @@ function createRepositoryStore() {
 }
 
 // Create context for repository store
-const RepositoryStoreContext = createContext<ReturnType<typeof createRepositoryStore> | null>(null);
+const repositoryStoreContextKey = Symbol.for('talkcody.RepositoryStoreContext');
+type RepositoryStoreContextValue = ReturnType<typeof createRepositoryStore> | null;
+type RepositoryStoreContextRegistry = {
+  [key: symbol]: React.Context<RepositoryStoreContextValue> | undefined;
+};
+
+const globalRepositoryStoreContext = globalThis as typeof globalThis &
+  RepositoryStoreContextRegistry;
+
+const RepositoryStoreContext =
+  globalRepositoryStoreContext[repositoryStoreContextKey] ??
+  createContext<RepositoryStoreContextValue>(null);
+
+if (!globalRepositoryStoreContext[repositoryStoreContextKey]) {
+  globalRepositoryStoreContext[repositoryStoreContextKey] = RepositoryStoreContext;
+}
 
 // Provider component
 export function RepositoryStoreProvider({ children }: { children: React.ReactNode }) {

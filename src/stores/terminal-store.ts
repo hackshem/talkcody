@@ -69,7 +69,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       return {
         sessions: newSessions,
         activeSessionId: newActiveId,
-        isTerminalVisible: isEmpty ? false : state.isTerminalVisible,
         autoCreateAllowed: isEmpty ? false : state.autoCreateAllowed,
       };
     }),

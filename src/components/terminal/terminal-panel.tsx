@@ -16,12 +16,7 @@ interface TerminalPanelProps {
   isFullscreen?: boolean;
 }
 
-export function TerminalPanel({
-  onCopyToChat,
-  onClose,
-  onToggleFullscreen,
-  isFullscreen,
-}: TerminalPanelProps) {
+export function TerminalPanel({ onClose, onToggleFullscreen, isFullscreen }: TerminalPanelProps) {
   const activeSessionId = useTerminalStore((state) => state.activeSessionId);
   const sessions = useTerminalStore((state) => state.sessions);
   const autoCreateAllowed = useTerminalStore((state) => state.autoCreateAllowed);

@@ -390,7 +390,7 @@ vi.mock('@/stores/terminal-store', () => ({
   useTerminalStore: vi.fn((selector: any) => {
     const state = {
       isTerminalVisible: false,
-      toggleTerminalVisible: vi.fn(),
+      setTerminalVisible: vi.fn(),
       selectNextSession: vi.fn(),
       selectPreviousSession: vi.fn(),
     };

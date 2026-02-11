@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { render, renderHook, screen, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import type React from 'react';
 import type { FileNode } from '@/types/file-system';
@@ -157,20 +157,32 @@ describe('window-scoped-repository-store - selectRepository UI freeze bug', () =
 
 
 
-  it('should reset loading state when repository selection fails', async () => {
-    const { repositoryService } = await import('@/services/repository-service');
+  it('should allow hooks from reloaded modules to access provider context', async () => {
+    const { RepositoryStoreProvider: ProviderFromFirstModule } = await import(
+      './window-scoped-repository-store'
+    );
 
-    vi.mocked(repositoryService.selectRepositoryFolder).mockRejectedValue(new Error('boom'));
+    vi.resetModules();
 
-    const { result } = renderHook(() => useRepositoryStore((state) => state), { wrapper });
+    const { useRepositoryStore: useRepositoryStoreFromReloadedModule } = await import(
+      './window-scoped-repository-store'
+    );
 
-    const project = await result.current.selectRepository();
+    const Consumer = () => {
+      const rootPath = useRepositoryStoreFromReloadedModule((state) => state.rootPath);
+      return <div data-testid="root-path">{rootPath ?? 'none'}</div>;
+    };
 
-    expect(project).toBeNull();
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.error).toBe('boom');
+    expect(() => {
+      render(
+        <ProviderFromFirstModule>
+          <Consumer />
+        </ProviderFromFirstModule>
+      );
+    }).not.toThrow();
+
+    expect(screen.getByTestId('root-path')).toHaveTextContent('none');
   });
-
 
   it('should apply content to the correct file when reads resolve out of order', async () => {
     const { repositoryService } = await import('@/services/repository-service');

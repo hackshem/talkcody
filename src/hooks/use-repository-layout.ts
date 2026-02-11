@@ -62,7 +62,7 @@ export function useRepositoryLayout() {
   const terminalState = useTerminalStore(
     useShallow((state) => ({
       isTerminalVisible: state.isTerminalVisible,
-      toggleTerminalVisible: state.toggleTerminalVisible,
+      setTerminalVisible: state.setTerminalVisible,
       selectNextSession: state.selectNextSession,
       selectPreviousSession: state.selectPreviousSession,
     }))

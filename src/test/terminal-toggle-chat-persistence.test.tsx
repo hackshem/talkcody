@@ -16,31 +16,33 @@ import { useTerminalStore } from '@/stores/terminal-store';
 describe('Integration: Terminal Toggle Does Not Clear Chat', () => {
   beforeEach(() => {
     // Reset stores
-    useTerminalStore.setState({ isTerminalVisible: false });
+    useTerminalStore.setState({ isTerminalVisible: false, autoCreateAllowed: false });
   });
 
-  describe('terminal store toggleTerminalVisible', () => {
+  describe('terminal store setTerminalVisible', () => {
     it('should toggle isTerminalVisible state', () => {
       const store = useTerminalStore.getState();
 
       expect(store.isTerminalVisible).toBe(false);
 
       act(() => {
-        store.toggleTerminalVisible();
+        store.setTerminalVisible(true);
       });
 
       expect(useTerminalStore.getState().isTerminalVisible).toBe(true);
+      expect(useTerminalStore.getState().autoCreateAllowed).toBe(true);
 
       act(() => {
-        store.toggleTerminalVisible();
+        store.setTerminalVisible(false);
       });
 
       expect(useTerminalStore.getState().isTerminalVisible).toBe(false);
+      expect(useTerminalStore.getState().autoCreateAllowed).toBe(false);
     });
 
     it('should start with terminal hidden by default', () => {
       // Reset to default state
-      useTerminalStore.setState({ isTerminalVisible: false });
+      useTerminalStore.setState({ isTerminalVisible: false, autoCreateAllowed: false });
 
       const state = useTerminalStore.getState();
       expect(state.isTerminalVisible).toBe(false);
@@ -54,7 +56,7 @@ describe('Integration: Terminal Toggle Does Not Clear Chat', () => {
 
       // Toggle terminal
       act(() => {
-        store.toggleTerminalVisible();
+        store.setTerminalVisible(true);
       });
 
       // Other state should be preserved
@@ -145,7 +147,7 @@ describe('Integration: Terminal Toggle Does Not Clear Chat', () => {
 
       // Toggle terminal (simulated)
       act(() => {
-        useTerminalStore.getState().toggleTerminalVisible();
+        useTerminalStore.getState().setTerminalVisible(true);
       });
 
       const keyAfter = generateKey(hasOpenFiles, fullscreenPanel);
@@ -156,7 +158,7 @@ describe('Integration: Terminal Toggle Does Not Clear Chat', () => {
 
     it('key should be stable when closing terminal with files open', () => {
       // Start with terminal visible
-      useTerminalStore.setState({ isTerminalVisible: true });
+      useTerminalStore.setState({ isTerminalVisible: true, autoCreateAllowed: true });
 
       const generateKey = (hasOpenFiles: boolean, fullscreenPanel: string) => {
         return `layout-${hasOpenFiles}-${fullscreenPanel}`;
@@ -169,7 +171,7 @@ describe('Integration: Terminal Toggle Does Not Clear Chat', () => {
 
       // Toggle terminal off
       act(() => {
-        useTerminalStore.getState().toggleTerminalVisible();
+        useTerminalStore.getState().setTerminalVisible(false);
       });
 
       const keyAfter = generateKey(hasOpenFiles, fullscreenPanel);
@@ -191,7 +193,7 @@ describe('Integration: Terminal Toggle Does Not Clear Chat', () => {
       // Rapidly toggle terminal 10 times
       for (let i = 0; i < 10; i++) {
         act(() => {
-          useTerminalStore.getState().toggleTerminalVisible();
+          useTerminalStore.getState().setTerminalVisible(i % 2 === 0);
         });
 
         const currentKey = generateKey(hasOpenFiles, fullscreenPanel);

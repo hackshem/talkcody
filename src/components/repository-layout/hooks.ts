@@ -142,7 +142,7 @@ export function useRepositoryTasks(currentTaskId: string | null) {
 // Dedicated hook: for handling global shortcuts
 export function useRepositoryShortcuts(
   openFileSearch: () => void,
-  toggleTerminalVisible: () => void,
+  setTerminalVisible: (visible: boolean) => void,
   selectNextSession: () => void,
   selectPreviousSession: () => void,
   rootPath: string | null,
@@ -165,7 +165,7 @@ export function useRepositoryShortcuts(
       logger.debug('File search shortcut triggered');
     },
     toggleTerminal: () => {
-      toggleTerminalVisible();
+      setTerminalVisible(!isTerminalVisible);
     },
     nextTerminalTab: () => {
       if (isTerminalVisible) {

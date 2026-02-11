@@ -1,7 +1,7 @@
 // src/components/chat/chat-input.tsx
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { ExternalLink, FileIcon, Image, Plus } from 'lucide-react';
+import { ExternalLink, FileIcon, Image, Plus, Video } from 'lucide-react';
 import {
   type ChangeEventHandler,
   forwardRef,
@@ -51,6 +51,7 @@ import { CommandPicker } from './command-picker';
 import { FilePicker } from './file-picker';
 import { FilePreview } from './file-preview';
 import { ImageSupportAlert } from './image-support-alert';
+import { VideoSupportAlert } from './video-support-alert';
 import { VoiceInputButton } from './voice-input-button';
 import { VoiceRecordingModal } from './voice-recording-modal';
 
@@ -95,7 +96,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     const { isWorktreeEnabled, toggleWorktreeMode } = useWorktreeStore();
 
     const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
-    const { uploadImage, uploadFile, isUploading } = useFileUpload();
+    const { uploadImage, uploadVideo, uploadFile, isUploading } = useFileUpload();
 
     // Voice input hook
     const {
@@ -136,6 +137,11 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     const [showImageAlert, setShowImageAlert] = useState(false);
     const [pendingImageAttachments, setPendingImageAttachments] = useState<MessageAttachment[]>([]);
     const isShowingAlertRef = useRef(false); // Guard flag to prevent double-triggering alert
+
+    // Video support alert state
+    const [showVideoAlert, setShowVideoAlert] = useState(false);
+    const [pendingVideoAttachments, setPendingVideoAttachments] = useState<MessageAttachment[]>([]);
+    const isShowingVideoAlertRef = useRef(false);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const isComposingRef = useRef(false); // Track IME composition state
@@ -428,6 +434,24 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       []
     );
 
+    const checkModelVideoSupport = useCallback(
+      async (modelIdentifier: string): Promise<boolean> => {
+        try {
+          const { availableModels } = useProviderStore.getState();
+
+          // Parse model identifier (format: "modelKey@provider" or just "modelKey")
+          const modelKey = modelIdentifier.split('@')[0];
+
+          const model = availableModels.find((m) => m.key === modelKey);
+          return model?.videoInput ?? false;
+        } catch (error) {
+          logger.error('Failed to check model video support:', error);
+          return false;
+        }
+      },
+      []
+    );
+
     const showImageSupportAlert = useCallback((attachments: MessageAttachment[]) => {
       // Prevent double-triggering of the alert
       if (isShowingAlertRef.current) {
@@ -439,6 +463,16 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       setShowImageAlert(true);
     }, []);
 
+    const showVideoSupportAlert = useCallback((attachments: MessageAttachment[]) => {
+      if (isShowingVideoAlertRef.current) {
+        logger.info('Video alert already showing, ignoring duplicate call');
+        return;
+      }
+      isShowingVideoAlertRef.current = true;
+      setPendingVideoAttachments(attachments);
+      setShowVideoAlert(true);
+    }, []);
+
     const handleImageAlertChange = useCallback((open: boolean) => {
       setShowImageAlert(open);
       // Reset guard flag when alert is closed
@@ -447,9 +481,20 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       }
     }, []);
 
+    const handleVideoAlertChange = useCallback((open: boolean) => {
+      setShowVideoAlert(open);
+      if (!open) {
+        isShowingVideoAlertRef.current = false;
+      }
+    }, []);
+
     const handleImageAlertCancel = useCallback(() => {
       // User cancelled without selecting a model, clear pending attachments
       setPendingImageAttachments([]);
+    }, []);
+
+    const handleVideoAlertCancel = useCallback(() => {
+      setPendingVideoAttachments([]);
     }, []);
 
     const handleModelSelect = useCallback(
@@ -465,13 +510,19 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
             setPendingImageAttachments([]);
           }
 
-          logger.info(`Successfully switched model to ${modelKey} and added pending images`);
+          // Add pending video attachments if any
+          if (pendingVideoAttachments.length > 0) {
+            setAttachments((prev) => [...prev, ...pendingVideoAttachments]);
+            setPendingVideoAttachments([]);
+          }
+
+          logger.info(`Successfully switched model to ${modelKey} and added pending media`);
         } catch (error) {
           logger.error('Failed to switch model:', error);
           toast.error(t.Chat.model.switchFailed);
         }
       },
-      [pendingImageAttachments, t]
+      [pendingImageAttachments, pendingVideoAttachments, t]
     );
 
     const handleImageUpload = async () => {
@@ -490,6 +541,25 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         }
 
         // If model supports images or no model is selected, add attachments
+        setAttachments((prev) => [...prev, ...newAttachments]);
+      }
+    };
+
+    const handleVideoUpload = async () => {
+      const newAttachments = await uploadVideo();
+      if (newAttachments.length > 0) {
+        logger.debug(`Uploaded ${newAttachments.length} video(s):`, newAttachments);
+
+        const currentModel = await modelService.getCurrentModel();
+        if (currentModel) {
+          const supportsVideos = await checkModelVideoSupport(currentModel);
+
+          if (!supportsVideos) {
+            showVideoSupportAlert(newAttachments);
+            return;
+          }
+        }
+
         setAttachments((prev) => [...prev, ...newAttachments]);
       }
     };
@@ -515,18 +585,29 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         if (newAttachments.length > 0) {
           // Prevent default paste behavior
           e.preventDefault();
-          // Check if any of the pasted items are images
+          // Check if any of the pasted items are images/videos
           const imageAttachments = newAttachments.filter((att) => att.type === 'image');
+          const videoAttachments = newAttachments.filter((att) => att.type === 'video');
 
-          if (imageAttachments.length > 0) {
-            // Check if current model supports images
+          if (imageAttachments.length > 0 || videoAttachments.length > 0) {
+            // Check if current model supports images/videos
             const currentModel = await modelService.getCurrentModel();
 
             if (currentModel) {
-              const supportsImages = await checkModelImageSupport(currentModel);
-              if (!supportsImages) {
-                showImageSupportAlert(imageAttachments);
-                return;
+              if (imageAttachments.length > 0) {
+                const supportsImages = await checkModelImageSupport(currentModel);
+                if (!supportsImages) {
+                  showImageSupportAlert(imageAttachments);
+                  return;
+                }
+              }
+
+              if (videoAttachments.length > 0) {
+                const supportsVideos = await checkModelVideoSupport(currentModel);
+                if (!supportsVideos) {
+                  showVideoSupportAlert(videoAttachments);
+                  return;
+                }
               }
             }
           }
@@ -534,12 +615,29 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
           // Add to attachments state
           setAttachments((prev) => [...prev, ...newAttachments]);
 
+          const imageCount = newAttachments.filter((att) => att.type === 'image').length;
+          const videoCount = newAttachments.filter((att) => att.type === 'video').length;
+
           // Show success message
-          const message =
-            newAttachments.length === 1
-              ? t.Chat.image.pasteSuccess(newAttachments[0]?.filename ?? 'unknown')
-              : t.Chat.image.pasteMultipleSuccess(newAttachments.length);
-          toast.success(message);
+          if (imageCount > 0) {
+            const message =
+              imageCount === 1
+                ? t.Chat.image.pasteSuccess(
+                    newAttachments.find((att) => att.type === 'image')?.filename ?? 'unknown'
+                  )
+                : t.Chat.image.pasteMultipleSuccess(imageCount);
+            toast.success(message);
+          }
+
+          if (videoCount > 0) {
+            const message =
+              videoCount === 1
+                ? t.Chat.video.pasteSuccess(
+                    newAttachments.find((att) => att.type === 'video')?.filename ?? 'unknown'
+                  )
+                : t.Chat.video.pasteMultipleSuccess(videoCount);
+            toast.success(message);
+          }
 
           logger.info('✅ Paste completed successfully, attachments:', newAttachments.length);
         }
@@ -667,7 +765,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     );
 
     // Listen for Tauri file drop events
-    // biome-ignore lint/correctness/useExhaustiveDependencies: showImageSupportAlert is stable (useCallback with [])
+    // biome-ignore lint/correctness/useExhaustiveDependencies: showImageSupportAlert/showVideoSupportAlert are stable (useCallback with [])
     useEffect(() => {
       logger.info('[INIT] Setting up Tauri drag-drop listener...');
       let mounted = true;
@@ -716,28 +814,55 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
 
               // Delegate to file upload service
               try {
-                const attachments = await fileUploadService.uploadImagesFromPaths(filePaths);
+                const attachments = await fileUploadService.uploadFilesFromPaths(filePaths);
 
                 if (attachments.length > 0) {
-                  // Check if current model supports images
+                  const imageAttachments = attachments.filter((att) => att.type === 'image');
+                  const videoAttachments = attachments.filter((att) => att.type === 'video');
+
+                  // Check if current model supports images/videos
                   const currentModel = await modelService.getCurrentModel();
 
                   if (currentModel) {
-                    const supportsImages = await checkModelImageSupport(currentModel);
+                    if (imageAttachments.length > 0) {
+                      const supportsImages = await checkModelImageSupport(currentModel);
 
-                    if (!supportsImages) {
-                      showImageSupportAlert(attachments);
-                      return;
+                      if (!supportsImages) {
+                        showImageSupportAlert(imageAttachments);
+                        return;
+                      }
+                    }
+
+                    if (videoAttachments.length > 0) {
+                      const supportsVideos = await checkModelVideoSupport(currentModel);
+
+                      if (!supportsVideos) {
+                        showVideoSupportAlert(videoAttachments);
+                        return;
+                      }
                     }
                   }
 
                   setAttachments((prev) => [...prev, ...attachments]);
 
-                  const message =
-                    attachments.length === 1
-                      ? t.Chat.image.pasteSuccess(attachments[0]?.filename ?? 'unknown')
-                      : t.Chat.image.pasteMultipleSuccess(attachments.length);
-                  toast.success(message);
+                  const imageCount = imageAttachments.length;
+                  const videoCount = videoAttachments.length;
+
+                  if (imageCount > 0) {
+                    const message =
+                      imageCount === 1
+                        ? t.Chat.image.pasteSuccess(imageAttachments[0]?.filename ?? 'unknown')
+                        : t.Chat.image.pasteMultipleSuccess(imageCount);
+                    toast.success(message);
+                  }
+
+                  if (videoCount > 0) {
+                    const message =
+                      videoCount === 1
+                        ? t.Chat.video.pasteSuccess(videoAttachments[0]?.filename ?? 'unknown')
+                        : t.Chat.video.pasteMultipleSuccess(videoCount);
+                    toast.success(message);
+                  }
 
                   logger.info('✅ Drag-drop completed successfully:', attachments.length);
                 }
@@ -788,7 +913,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
           logger.info('File drop listeners unregistered');
         }
       };
-    }, [checkModelImageSupport]);
+    }, [checkModelImageSupport, checkModelVideoSupport]);
 
     useImperativeHandle(
       ref,
@@ -896,6 +1021,10 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
                         <DropdownMenuItem onClick={handleImageUpload}>
                           <Image size={16} className="mr-2" />
                           <span>{t.Chat.files.uploadImage}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleVideoUpload}>
+                          <Video size={16} className="mr-2" />
+                          <span>{t.Chat.files.uploadVideo}</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={handleFileUpload}>
                           <FileIcon size={16} className="mr-2" />
@@ -1042,6 +1171,13 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
           onOpenChange={handleImageAlertChange}
           onModelSelect={handleModelSelect}
           onCancel={handleImageAlertCancel}
+        />
+
+        <VideoSupportAlert
+          open={showVideoAlert}
+          onOpenChange={handleVideoAlertChange}
+          onModelSelect={handleModelSelect}
+          onCancel={handleVideoAlertCancel}
         />
 
         <VoiceRecordingModal

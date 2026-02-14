@@ -11,7 +11,7 @@ test.describe('Onboarding Wizard UI', () => {
 
   test('should display welcome screen', async ({ page }) => {
     // The onboarding wizard should be visible
-    await expect(page.getByText('Welcome to TalkCody')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Welcome to BXcOda')).toBeVisible({ timeout: 10000 });
   });
 
   test('should display language selection step', async ({ page }) => {
@@ -99,7 +99,7 @@ test.describe('Static UI Elements', () => {
   });
 
   test('page should have correct title', async ({ page }) => {
-    await expect(page).toHaveTitle(/TalkCody/);
+    await expect(page).toHaveTitle(/BXcOda/);
   });
 
   test('page should load without critical errors', async ({ page }) => {

@@ -295,7 +295,6 @@ describe('AuthStore - OAuth Deep Link Flow', () => {
       expect(toast.success).toHaveBeenCalledWith('Signed in successfully');
     });
 
-
     it('should accept legacy talkcody deep links for backward compatibility', async () => {
       const mockToken = 'legacy-token-789';
       const mockUser = {

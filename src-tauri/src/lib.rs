@@ -46,6 +46,8 @@ use llm::tracing::writer::TraceWriter;
 use script_executor::{ScriptExecutionRequest, ScriptExecutionResult, ScriptExecutor};
 use serde::{Deserialize, Serialize};
 use server::{config::ServerConfig, state::ServerState};
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::OnceLock;
 use std::sync::{Arc, Mutex, RwLock};
@@ -780,6 +782,55 @@ where
     trace_writer
 }
 
+fn legacy_app_data_dir(current_app_data_dir: &Path) -> Option<PathBuf> {
+    let current_dir_name = current_app_data_dir.file_name()?.to_string_lossy();
+    if current_dir_name == "com.talkcody" {
+        return None;
+    }
+
+    let parent = current_app_data_dir.parent()?;
+    Some(parent.join("com.talkcody"))
+}
+
+fn copy_missing_files_recursively(src: &Path, dest: &Path) -> Result<(), String> {
+    for entry in fs::read_dir(src).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let source_path = entry.path();
+        let destination_path = dest.join(entry.file_name());
+
+        if source_path.is_dir() {
+            fs::create_dir_all(&destination_path).map_err(|e| e.to_string())?;
+            copy_missing_files_recursively(&source_path, &destination_path)?;
+            continue;
+        }
+
+        if !destination_path.exists() {
+            fs::copy(&source_path, &destination_path).map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
+fn migrate_legacy_app_data_if_needed(app_data_dir: &Path) -> Result<(), String> {
+    let Some(legacy_dir) = legacy_app_data_dir(app_data_dir) else {
+        return Ok(());
+    };
+
+    if !legacy_dir.exists() {
+        return Ok(());
+    }
+
+    fs::create_dir_all(app_data_dir).map_err(|e| e.to_string())?;
+    copy_missing_files_recursively(&legacy_dir, app_data_dir)?;
+    log::info!(
+        "Migrated legacy app data from '{}' to '{}'",
+        legacy_dir.display(),
+        app_data_dir.display()
+    );
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState {
@@ -812,6 +863,7 @@ pub fn run() {
                 cleanup_old_logs(&log_dir, 3);
             }
             let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+            migrate_legacy_app_data_if_needed(&app_data_dir)?;
             let db_path = app_data_dir.join("talkcody.db");
             let db_path_str = db_path.to_string_lossy().to_string();
             let database = Arc::new(Database::new(db_path_str));
@@ -1194,9 +1246,14 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::close_action_for_window;
+    use super::copy_missing_files_recursively;
     use super::init_trace_writer_state;
+    use super::legacy_app_data_dir;
+    use super::migrate_legacy_app_data_if_needed;
     use crate::database::Database;
     use crate::llm::tracing::writer::TraceWriter;
+    use std::fs;
+    use std::path::Path;
     use std::sync::Arc;
     use tauri::Manager;
     use tempfile::TempDir;
@@ -1211,6 +1268,60 @@ mod tests {
         assert_eq!(
             close_action_for_window("settings"),
             super::CloseAction::Allow
+        );
+    }
+
+    #[test]
+    fn legacy_app_data_dir_points_to_com_talkcody() {
+        let current = Path::new("/tmp/com.bxcoda");
+        let legacy = legacy_app_data_dir(current).expect("legacy directory should exist");
+        assert_eq!(legacy, Path::new("/tmp/com.talkcody"));
+    }
+
+    #[test]
+    fn copy_missing_files_recursively_does_not_overwrite_existing_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("source");
+        let destination = temp_dir.path().join("destination");
+
+        fs::create_dir_all(source.join("nested")).unwrap();
+        fs::create_dir_all(destination.join("nested")).unwrap();
+
+        fs::write(source.join("nested/data.txt"), "legacy").unwrap();
+        fs::write(destination.join("nested/data.txt"), "current").unwrap();
+        fs::write(source.join("root.txt"), "root-value").unwrap();
+
+        copy_missing_files_recursively(&source, &destination).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(destination.join("nested/data.txt")).unwrap(),
+            "current"
+        );
+        assert_eq!(
+            fs::read_to_string(destination.join("root.txt")).unwrap(),
+            "root-value"
+        );
+    }
+
+    #[test]
+    fn migrate_legacy_app_data_if_needed_copies_talkcody_data() {
+        let temp_dir = TempDir::new().unwrap();
+        let legacy_dir = temp_dir.path().join("com.talkcody");
+        let current_dir = temp_dir.path().join("com.bxcoda");
+
+        fs::create_dir_all(legacy_dir.join("settings")).unwrap();
+        fs::write(legacy_dir.join("talkcody.db"), "legacy-db").unwrap();
+        fs::write(legacy_dir.join("settings/config.json"), "legacy-config").unwrap();
+
+        migrate_legacy_app_data_if_needed(&current_dir).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(current_dir.join("talkcody.db")).unwrap(),
+            "legacy-db"
+        );
+        assert_eq!(
+            fs::read_to_string(current_dir.join("settings/config.json")).unwrap(),
+            "legacy-config"
         );
     }
 

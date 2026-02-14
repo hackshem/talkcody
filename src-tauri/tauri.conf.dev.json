@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "TalkCody Dev",
+  "productName": "BXcOda Dev",
   "version": "0.4.0",
-  "identifier": "com.talkcody.dev",
+  "identifier": "com.bxcoda.dev",
   "build": {
     "beforeDevCommand": "bun run dev --port 1421",
     "devUrl": "http://localhost:1421",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "TalkCody Dev",
+        "title": "BXcOda Dev",
         "width": 1200,
         "height": 800,
         "dragDropEnabled": true,
@@ -35,7 +35,7 @@
     "deep-link": {
       "mobile": [],
       "desktop": {
-        "schemes": ["talkcody"]
+        "schemes": ["bxcoda", "talkcody"]
       }
     },
     "updater": {

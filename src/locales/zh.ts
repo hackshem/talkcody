@@ -290,7 +290,7 @@ const zh: LocaleDefinition = {
       invalidFileType: '无效的文件类型。仅支持 JPEG、PNG、GIF 和 WebP 格式',
       fileTooLarge: '文件过大。最大支持 5MB',
       signOut: '退出登录',
-      signInDescription: '登录以将 Agent 发布到 TalkCody 市场并管理您发布的 Agent。',
+      signInDescription: '登录以将 Agent 发布到 BXcOda 市场并管理您发布的 Agent。',
       signInWithGitHub: '使用 GitHub 登录',
       signInWithGoogle: '使用 Google 登录',
       authRequired: '需要认证。请重新登录。',
@@ -534,7 +534,7 @@ const zh: LocaleDefinition = {
     },
     remoteControl: {
       title: 'Telegram 远程控制',
-      description: '在应用后台运行时通过 Telegram 控制 TalkCody',
+      description: '在应用后台运行时通过 Telegram 控制 BXcOda',
       enabled: '启用 Telegram 远程控制',
       tokenLabel: 'Bot Token',
       tokenPlaceholder: '输入 Telegram bot token',
@@ -556,7 +556,7 @@ const zh: LocaleDefinition = {
       },
       feishu: {
         title: '飞书远程控制',
-        description: '通过飞书 WebSocket 长连接控制 TalkCody',
+        description: '通过飞书 WebSocket 长连接控制 BXcOda',
         enabled: '启用飞书远程控制',
         appIdLabel: 'App ID',
         appIdPlaceholder: '输入飞书 App ID',
@@ -632,7 +632,7 @@ const zh: LocaleDefinition = {
       recentFilesHint: '您最近打开的文件将显示在这里',
     },
     about: {
-      title: '关于 TalkCody',
+      title: '关于 BXcOda',
       description: '应用程序信息和更新',
       version: '版本',
       checkForUpdates: '检查更新',
@@ -648,7 +648,7 @@ const zh: LocaleDefinition = {
       platform: '平台',
       macos: 'macOS',
       softwareUpdates: '软件更新',
-      softwareUpdatesDescription: 'TalkCody 每天自动检查更新。您也可以手动检查更新。',
+      softwareUpdatesDescription: 'BXcOda 每天自动检查更新。您也可以手动检查更新。',
       lastChecked: '上次检查：',
       resources: '资源',
       githubRepository: 'GitHub 仓库',
@@ -844,7 +844,7 @@ const zh: LocaleDefinition = {
       description: '管理您的代码仓库',
       importRepository: '导入仓库',
       emptyTitle: '还没有项目',
-      emptyDescription: '导入您的第一个仓库以开始使用 TalkCody',
+      emptyDescription: '导入您的第一个仓库以开始使用 BXcOda',
       openInNewWindow: '在新窗口中打开',
       noRepositoryPath: '此项目没有关联的仓库路径',
       openedInNewWindow: (name) => `已在新窗口中打开 ${name}`,
@@ -1047,7 +1047,7 @@ const zh: LocaleDefinition = {
     settings: '设置',
     settingsTooltip: '应用程序设置',
     switchTheme: (theme) => `切换到${theme === 'light' ? '浅色' : '深色'}模式`,
-    githubTooltip: '在 GitHub 上为 TalkCody 点赞',
+    githubTooltip: '在 GitHub 上为 BXcOda 点赞',
   },
 
   PptViewer: {
@@ -1107,7 +1107,7 @@ const zh: LocaleDefinition = {
   },
 
   Initialization: {
-    title: '正在初始化 TalkCody...',
+    title: '正在初始化 BXcOda...',
     description: '请稍候，正在设置您的工作区',
     failed: '初始化失败',
     reload: '重新加载应用',
@@ -1268,7 +1268,7 @@ const zh: LocaleDefinition = {
   },
 
   Onboarding: {
-    title: '欢迎使用 TalkCody',
+    title: '欢迎使用 BXcOda',
     subtitle: '让我们设置您的偏好',
     skip: '跳过',
     getStarted: '开始使用',
@@ -1340,7 +1340,7 @@ const zh: LocaleDefinition = {
   },
 
   Auth: {
-    loginRequired: '使用 TalkCody Free 需要登录',
+    loginRequired: '使用 BXcOda Free 需要登录',
     signIn: '登录',
     success: {
       signedIn: '登录成功',
@@ -1351,12 +1351,12 @@ const zh: LocaleDefinition = {
       signOutFailed: (message) => `退出登录失败：${message}`,
       completionFailed: '无法完成登录',
       completionFailedWithMessage: (message) => `无法完成登录：${message}`,
-      invalidCallback: '请粘贴有效的 TalkCody 回调链接或令牌。',
+      invalidCallback: '请粘贴有效的 BXcOda 回调链接或令牌。',
     },
   },
 
   TalkCodyFreeDialog: {
-    title: 'TalkCody Free',
+    title: 'BXcOda Free',
     description: '为防止免费 API 被滥用，我们需要验证您的 GitHub 或 Google 身份。这有助于我们：',
     signInWithGitHub: '使用 GitHub 登录',
     signInWithGoogle: '使用 Google 登录',
@@ -1368,7 +1368,7 @@ const zh: LocaleDefinition = {
     manual: {
       title: '手动登录（Linux 备用）',
       description: '如果浏览器提示“认证成功”但应用未打开，请粘贴浏览器页面的链接或令牌。',
-      placeholder: '粘贴 talkcody://auth/callback?token=... 或 token',
+      placeholder: '粘贴 bxcoda://auth/callback?token=... 或 token',
       copyLink: '复制',
       copySuccess: '已复制到剪贴板',
       copyFailed: '复制到剪贴板失败',
@@ -1624,7 +1624,7 @@ const zh: LocaleDefinition = {
   },
 
   WhatsNew: {
-    title: 'TalkCody 更新内容',
+    title: 'BXcOda 更新内容',
     viewFullChangelog: '查看完整更新日志',
     gotIt: '知道了！',
     added: '新增',

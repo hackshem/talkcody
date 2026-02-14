@@ -115,7 +115,7 @@ function AppContent() {
         logger.info('[Deep Link] URL search params:', parsedUrl.search);
 
         // Extract token from query params
-        // Expected format: talkcody://auth/callback?token=xxx
+        // Expected format: bxcoda://auth/callback?token=xxx
         const token = parsedUrl.searchParams.get('token');
 
         if (token) {

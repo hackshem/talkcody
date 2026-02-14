@@ -287,6 +287,34 @@ describe('AuthStore - OAuth Deep Link Flow', () => {
 
       const { handleOAuthCallbackFromInput } = useAuthStore.getState();
       const ok = await handleOAuthCallbackFromInput(
+        `bxcoda://auth/callback?token=${mockToken}`
+      );
+
+      expect(ok).toBe(true);
+      expect(authService.storeAuthToken).toHaveBeenCalledWith(mockToken);
+      expect(toast.success).toHaveBeenCalledWith('Signed in successfully');
+    });
+
+
+    it('should accept legacy talkcody deep links for backward compatibility', async () => {
+      const mockToken = 'legacy-token-789';
+      const mockUser = {
+        id: 'user-123',
+        username: 'testuser',
+        email: 'test@example.com',
+        avatarUrl: 'https://example.com/avatar.jpg',
+        displayName: 'Test User',
+        oauthProvider: 'github' as const,
+        oauthId: 'github-123',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      mockStoreAuthToken.mockResolvedValueOnce(undefined);
+      mockFetchUserProfile.mockResolvedValueOnce(mockUser);
+
+      const { handleOAuthCallbackFromInput } = useAuthStore.getState();
+      const ok = await handleOAuthCallbackFromInput(
         `talkcody://auth/callback?token=${mockToken}`
       );
 
@@ -325,7 +353,7 @@ describe('AuthStore - OAuth Deep Link Flow', () => {
       const ok = await handleOAuthCallbackFromInput('   ');
 
       expect(ok).toBe(false);
-      expect(toast.error).toHaveBeenCalledWith('Please paste a valid TalkCody callback link or token.');
+      expect(toast.error).toHaveBeenCalledWith('Please paste a valid BXcOda callback link or token.');
       expect(authService.storeAuthToken).not.toHaveBeenCalled();
     });
   });

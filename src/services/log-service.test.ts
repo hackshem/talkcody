@@ -33,7 +33,7 @@ describe('LogService', () => {
       vi.mocked(os.platform).mockReturnValue('macos');
 
       const result = await logService.getLogDirectoryPath();
-      expect(result).toBe('/Users/test/Library/Logs/com.talkcody');
+      expect(result).toBe('/Users/test/Library/Logs/com.bxcoda');
     });
 
     it('should return correct path for Windows', async () => {
@@ -45,7 +45,7 @@ describe('LogService', () => {
       vi.mocked(path.join).mockImplementation((...paths: string[]) => paths.join('\\'));
 
       const result = await logService.getLogDirectoryPath();
-      expect(result).toBe('C:\\Users\\test\\AppData\\Local\\com.talkcody\\logs');
+      expect(result).toBe('C:\\Users\\test\\AppData\\Local\\com.bxcoda\\logs');
     });
 
     it('should return correct path for Linux', async () => {
@@ -57,7 +57,7 @@ describe('LogService', () => {
       vi.mocked(path.join).mockImplementation((...paths: string[]) => paths.join('/'));
 
       const result = await logService.getLogDirectoryPath();
-      expect(result).toBe('/home/test/.local/share/com.talkcody/logs');
+      expect(result).toBe('/home/test/.local/share/com.bxcoda/logs');
     });
   });
 
@@ -70,7 +70,7 @@ describe('LogService', () => {
       vi.mocked(path.join).mockImplementation((...paths: string[]) => paths.join('/'));
 
       const result = await logService.getLogFilePath();
-      expect(result).toContain('TalkCody.log');
+      expect(result).toContain('BXcOda.log');
     });
   });
 
@@ -105,7 +105,7 @@ describe('LogService', () => {
       vi.mocked(path.join).mockImplementation((...paths: string[]) => paths.join('/'));
 
       const result = await logService.getDisplayLogFilePath();
-      expect(result).toContain('~/Library/Logs/com.talkcody/TalkCody.log');
+      expect(result).toContain('~/Library/Logs/com.bxcoda/BXcOda.log');
     });
   });
 });

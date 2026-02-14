@@ -176,8 +176,8 @@ fn build_window_title(root_path: Option<&String>) -> String {
     root_path
         .and_then(|p| std::path::Path::new(p).file_name())
         .and_then(|n| n.to_str())
-        .map(|s| format!("{} - TalkCody", s))
-        .unwrap_or_else(|| "TalkCody".to_string())
+        .map(|s| format!("{} - BXcOda", s))
+        .unwrap_or_else(|| "BXcOda".to_string())
 }
 
 /// Register window in registry and set up cleanup handler
@@ -498,14 +498,14 @@ mod tests {
             label: "window-1".to_string(),
             project_id: Some("project-1".to_string()),
             root_path: Some("/path/to/project".to_string()),
-            title: "Project - TalkCody".to_string(),
+            title: "Project - BXcOda".to_string(),
         };
 
         let json = serde_json::to_string(&info).unwrap();
         assert!(json.contains("\"label\":\"window-1\""));
         assert!(json.contains("\"project_id\":\"project-1\""));
         assert!(json.contains("\"root_path\":\"/path/to/project\""));
-        assert!(json.contains("\"title\":\"Project - TalkCody\""));
+        assert!(json.contains("\"title\":\"Project - BXcOda\""));
 
         let parsed: WindowInfo = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.label, "window-1");
@@ -518,7 +518,7 @@ mod tests {
             label: "window-1".to_string(),
             project_id: None,
             root_path: None,
-            title: "TalkCody".to_string(),
+            title: "BXcOda".to_string(),
         };
 
         let json = serde_json::to_string(&info).unwrap();
@@ -544,7 +544,7 @@ mod tests {
             .register_window("window-1".to_string(), state_with_path)
             .unwrap();
 
-        // Window without root_path - should use "TalkCody" as title
+        // Window without root_path - should use "BXcOda" as title
         let state_without_path = WindowState {
             project_id: None,
             root_path: None,
@@ -560,9 +560,9 @@ mod tests {
         // Find each window and check title
         for window in &windows {
             if window.label == "window-1" {
-                assert_eq!(window.title, "project - TalkCody");
+                assert_eq!(window.title, "project - BXcOda");
             } else if window.label == "window-2" {
-                assert_eq!(window.title, "TalkCody");
+                assert_eq!(window.title, "BXcOda");
             }
         }
     }
@@ -572,26 +572,26 @@ mod tests {
         // Test with normal path - should extract project name
         assert_eq!(
             build_window_title(Some(&"/path/to/myproject".to_string())),
-            "myproject - TalkCody"
+            "myproject - BXcOda"
         );
 
-        // Test with None - should return "TalkCody"
-        assert_eq!(build_window_title(None), "TalkCody");
+        // Test with None - should return "BXcOda"
+        assert_eq!(build_window_title(None), "BXcOda");
 
         // Test with deeply nested path
         assert_eq!(
             build_window_title(Some(&"/Users/kks/mygit/talkcody".to_string())),
-            "talkcody - TalkCody"
+            "talkcody - BXcOda"
         );
 
         // Test with single directory name
         assert_eq!(
             build_window_title(Some(&"project".to_string())),
-            "project - TalkCody"
+            "project - BXcOda"
         );
 
         // Test with root path only
-        assert_eq!(build_window_title(Some(&"/".to_string())), "TalkCody");
+        assert_eq!(build_window_title(Some(&"/".to_string())), "BXcOda");
     }
 
     #[test]
@@ -934,7 +934,7 @@ mod tests {
         // Simulate real-world scenario: multiple windows open with different projects
         let registry = WindowRegistry::new();
 
-        // Window 1: TalkCody project
+        // Window 1: BXcOda project
         let state1 = WindowState {
             project_id: Some("talkcody".to_string()),
             root_path: Some("/Users/kks/mygit/talkcody".to_string()),

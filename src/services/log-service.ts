@@ -1,9 +1,10 @@
-import { appDataDir, homeDir, join, sep } from '@tauri-apps/api/path';
+import { homeDir, join, sep } from '@tauri-apps/api/path';
 import { exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { logger } from '@/lib/logger';
 
 export class LogService {
-  private logFileName = 'TalkCody.log';
+  private logFileName = 'BXcOda.log';
+  private legacyLogFileNames = ['TalkCody.log', 'talkcody.log'];
 
   /**
    * Get platform-specific log directory path
@@ -14,13 +15,28 @@ export class LogService {
 
     switch (platform) {
       case 'macos': // macOS
-        return join(home, 'Library', 'Logs', 'com.talkcody');
-      case 'windows': {
+        return join(home, 'Library', 'Logs', 'com.bxcoda');
+      case 'windows':
         // Windows
-        // const appData = await appDataDir();
-        return join(home, 'AppData', 'Local', 'com.talkcody', 'logs');
-      }
+        return join(home, 'AppData', 'Local', 'com.bxcoda', 'logs');
       default: // Linux and others
+        return join(home, '.local', 'share', 'com.bxcoda', 'logs');
+    }
+  }
+
+  /**
+   * Get TalkCody legacy log directory path for migration fallback
+   */
+  private async getLegacyLogDirectoryPath(): Promise<string> {
+    const platform = await import('@tauri-apps/plugin-os').then((os) => os.platform());
+    const home = await homeDir();
+
+    switch (platform) {
+      case 'macos':
+        return join(home, 'Library', 'Logs', 'com.talkcody');
+      case 'windows':
+        return join(home, 'AppData', 'Local', 'com.talkcody', 'logs');
+      default:
         return join(home, '.local', 'share', 'com.talkcody', 'logs');
     }
   }
@@ -34,14 +50,41 @@ export class LogService {
   }
 
   /**
+   * Get candidate log file paths in lookup order
+   */
+  private async getLogFileCandidates(): Promise<string[]> {
+    const primaryDir = await this.getLogDirectoryPath();
+    const legacyDir = await this.getLegacyLogDirectoryPath();
+
+    const candidates = [
+      await join(primaryDir, this.logFileName),
+      await join(legacyDir, this.logFileName),
+    ];
+
+    for (const name of this.legacyLogFileNames) {
+      candidates.push(await join(legacyDir, name));
+    }
+
+    return candidates;
+  }
+
+  /**
    * Read latest N lines from log file
    */
   async getLatestLogs(limit: number): Promise<string[]> {
     try {
-      const logPath = await this.getLogFilePath();
-      const fileExists = await exists(logPath);
-      if (!fileExists) {
-        logger.warn(`Log file does not exist: ${logPath}`);
+      const candidates = await this.getLogFileCandidates();
+      let logPath: string | null = null;
+
+      for (const candidate of candidates) {
+        if (await exists(candidate)) {
+          logPath = candidate;
+          break;
+        }
+      }
+
+      if (!logPath) {
+        logger.warn(`Log file does not exist. Checked paths: ${candidates.join(', ')}`);
         return [];
       }
 

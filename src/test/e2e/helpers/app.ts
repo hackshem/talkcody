@@ -7,7 +7,7 @@ import { selectors } from './selectors';
 
 /**
  * Inject Tauri API mocks into the page before loading
- * This is necessary because TalkCody is a Tauri app and requires Tauri APIs
+ * This is necessary because BXcOda is a Tauri app and requires Tauri APIs
  */
 export async function injectTauriMocks(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -56,9 +56,9 @@ export async function completeSetupWizard(page: Page): Promise<void> {
 
   // Try clicking through the wizard steps (up to 10 iterations)
   for (let i = 0; i < 10; i++) {
-    // Check if we're still on the wizard (Welcome to TalkCody visible)
+    // Check if we're still on the wizard (Welcome to BXcOda visible)
     const welcomeVisible = await page
-      .getByText('Welcome to TalkCody')
+      .getByText('Welcome to BXcOda')
       .isVisible({ timeout: 500 })
       .catch(() => false);
     if (!welcomeVisible) {

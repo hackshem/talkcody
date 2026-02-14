@@ -1,7 +1,7 @@
 
 <div align="center">
 
-<h1 style="border-bottom: none;">TalkCody</h1>
+<h1 style="border-bottom: none;">BXcOda</h1>
 
 **Free, Open-Source AI Coding Agent**
 
@@ -10,15 +10,15 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 
-[![TalkCody](public/talkcody.png)](https://talkcody.com)
+[![BXcOda](public/talkcody.png)](https://talkcody.com)
 
 </div>
 
 ## Overview
 
-TalkCody is an **AI Coding Agent** that actually works the way you do—**in parallel, with control, and privately**.
+BXcOda is an **AI Coding Agent** that actually works the way you do—**in parallel, with control, and privately**.
 
-Unlike cloud-only AI tools that lock you into a single model or upload your code to remote servers, TalkCody gives you:
+Unlike cloud-only AI tools that lock you into a single model or upload your code to remote servers, BXcOda gives you:
 - **True Freedom** - Use any AI model (OpenAI, Anthropic, Google, local models) without vendor lock-in
 - **Maximum Speed** - Unique four-level parallelism runs multiple tasks simultaneously
 - **Your Privacy** - Everything runs locally, your code never leaves your machine
@@ -26,7 +26,7 @@ Unlike cloud-only AI tools that lock you into a single model or upload your code
 
 **Built by developers, for developers who value speed, cost, control, and privacy.**
 
-### Why TalkCody
+### Why BXcOda
 
 #### 🚀 Blazing Fast Development
 - **[Four-Level Parallelism](https://www.talkcody.com/blog/four-level-parallelism)** - Project, task, agent, and tool levels run simultaneously—complete complex projects in a fraction of the time
@@ -53,19 +53,19 @@ Unlike cloud-only AI tools that lock you into a single model or upload your code
 
 ## Installation
 
-Download TalkCody for your platform:
+Download BXcOda for your platform:
 
 - **macOS** (Apple Silicon / Intel)
 - **Windows** (x64)
 - **Linux** (x86_64 AppImage)
 
-📥 **[Download TalkCody](https://www.talkcody.com/docs/introduction/client-downloads)**
+📥 **[Download BXcOda](https://www.talkcody.com/docs/introduction/client-downloads)**
 
 
 
 ## Quick Start
 
-1. Download and install TalkCody
+1. Download and install BXcOda
 2. Configure your API keys (OpenAI, Anthropic, Google, etc.)
 3. Select your preferred AI model
 4. Import your project
@@ -83,14 +83,14 @@ Want to build from source or contribute?
 
 ## Architecture
 
-TalkCody uses a two-tier architecture with React 19 + TypeScript frontend and Tauri 2 + Rust backend.
+BXcOda uses a two-tier architecture with React 19 + TypeScript frontend and Tauri 2 + Rust backend.
 
 📖 **[Architecture Overview](https://talkcody.com/docs/open-source/architecture)**
 
 
 ## Roadmap
 
-Check out our **[ROADMAP](https://talkcody.com/docs/open-source/roadmap)** to see what we are working on and the future direction of TalkCody.
+Check out our **[ROADMAP](https://talkcody.com/docs/open-source/roadmap)** to see what we are working on and the future direction of BXcOda.
 
 ## Changelog
 
@@ -104,12 +104,12 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 
 - **Issues**: [GitHub Issues](https://github.com/talkcody/talkcody/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/talkcody/talkcody/discussions)
-- **X**: [TalkCody](https://x.com/TalkCody)
+- **X**: [BXcOda](https://x.com/BXcOda)
 
 
 ## License
 
-TalkCody is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+BXcOda is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 
 ## Acknowledgments

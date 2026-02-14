@@ -17,7 +17,7 @@ function parseOAuthTokenFromInput(input: string): string | null {
     return null;
   }
 
-  if (trimmed.startsWith('talkcody://')) {
+  if (trimmed.startsWith('talkcody://') || trimmed.startsWith('bxcoda://')) {
     try {
       const parsedUrl = new URL(trimmed);
       return parsedUrl.searchParams.get('token')?.trim() || null;

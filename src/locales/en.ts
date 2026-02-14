@@ -300,7 +300,7 @@ const en: LocaleDefinition = {
       fileTooLarge: 'File too large. Maximum size is 5MB',
       signOut: 'Sign Out',
       signInDescription:
-        'Sign in to publish agents to the TalkCody marketplace and manage your published agents.',
+        'Sign in to publish agents to the BXcOda marketplace and manage your published agents.',
       signInWithGitHub: 'Sign in with GitHub',
       signInWithGoogle: 'Sign in with Google',
       authRequired: 'Authentication required. Please sign in again.',
@@ -555,7 +555,7 @@ const en: LocaleDefinition = {
     },
     remoteControl: {
       title: 'Telegram Remote Control',
-      description: 'Control TalkCody from Telegram while the app runs in background',
+      description: 'Control BXcOda from Telegram while the app runs in background',
       enabled: 'Enable Telegram Remote Control',
       tokenLabel: 'Bot Token',
       tokenPlaceholder: 'Enter Telegram bot token',
@@ -578,7 +578,7 @@ const en: LocaleDefinition = {
       },
       feishu: {
         title: 'Feishu Remote Control',
-        description: 'Control TalkCody from Feishu via WebSocket long connection',
+        description: 'Control BXcOda from Feishu via WebSocket long connection',
         enabled: 'Enable Feishu Remote Control',
         appIdLabel: 'App ID',
         appIdPlaceholder: 'Enter Feishu app ID',
@@ -654,7 +654,7 @@ const en: LocaleDefinition = {
       recentFilesHint: 'Files you recently opened will appear here',
     },
     about: {
-      title: 'About TalkCody',
+      title: 'About BXcOda',
       description: 'Application information and updates',
       version: 'Version',
       checkForUpdates: 'Check for Updates',
@@ -671,7 +671,7 @@ const en: LocaleDefinition = {
       macos: 'macOS',
       softwareUpdates: 'Software Updates',
       softwareUpdatesDescription:
-        'TalkCody automatically checks for updates daily. You can also manually check for updates.',
+        'BXcOda automatically checks for updates daily. You can also manually check for updates.',
       lastChecked: 'Last checked:',
       resources: 'Resources',
       githubRepository: 'GitHub Repository',
@@ -877,7 +877,7 @@ const en: LocaleDefinition = {
       description: 'Manage your code repositories',
       importRepository: 'Import Repository',
       emptyTitle: 'No projects yet',
-      emptyDescription: 'Import your first repository to get started with TalkCody',
+      emptyDescription: 'Import your first repository to get started with BXcOda',
       openInNewWindow: 'Open in New Window',
       noRepositoryPath: 'This project has no repository path',
       openedInNewWindow: (name) => `Opened ${name} in new window`,
@@ -1085,7 +1085,7 @@ const en: LocaleDefinition = {
     settings: 'Settings',
     settingsTooltip: 'Application settings',
     switchTheme: (theme) => `Switch to ${theme} mode`,
-    githubTooltip: 'Star TalkCody on GitHub',
+    githubTooltip: 'Star BXcOda on GitHub',
   },
 
   PptViewer: {
@@ -1146,7 +1146,7 @@ const en: LocaleDefinition = {
   },
 
   Initialization: {
-    title: 'Initializing TalkCody...',
+    title: 'Initializing BXcOda...',
     description: 'Please wait while we set up your workspace',
     failed: 'Initialization Failed',
     reload: 'Reload Application',
@@ -1309,7 +1309,7 @@ const en: LocaleDefinition = {
   },
 
   Onboarding: {
-    title: 'Welcome to TalkCody',
+    title: 'Welcome to BXcOda',
     subtitle: "Let's set up your preferences",
     skip: 'Skip',
     getStarted: 'Get Started',
@@ -1383,7 +1383,7 @@ Note: ChatGPT Plus/Pro subscription is separate from API access.`,
   },
 
   Auth: {
-    loginRequired: 'Sign in required to use TalkCody Free',
+    loginRequired: 'Sign in required to use BXcOda Free',
     signIn: 'Sign In',
     success: {
       signedIn: 'Signed in successfully',
@@ -1394,12 +1394,12 @@ Note: ChatGPT Plus/Pro subscription is separate from API access.`,
       signOutFailed: (message) => `Failed to sign out: ${message}`,
       completionFailed: 'Failed to complete sign in',
       completionFailedWithMessage: (message) => `Failed to complete sign in: ${message}`,
-      invalidCallback: 'Please paste a valid TalkCody callback link or token.',
+      invalidCallback: 'Please paste a valid BXcOda callback link or token.',
     },
   },
 
   TalkCodyFreeDialog: {
-    title: 'TalkCody Free',
+    title: 'BXcOda Free',
     description:
       'To prevent abuse of our free API, we need to verify your GitHub or Google identity. This helps us:',
     signInWithGitHub: 'Sign in with GitHub',
@@ -1413,7 +1413,7 @@ Note: ChatGPT Plus/Pro subscription is separate from API access.`,
       title: 'Manual sign-in (Linux fallback)',
       description:
         'If your browser shows “auth successful” but the app does not open, paste the link from the browser or the token.',
-      placeholder: 'Paste talkcody://auth/callback?token=... or token',
+      placeholder: 'Paste bxcoda://auth/callback?token=... or token',
       copyLink: 'Copy',
       copySuccess: 'Copied to clipboard',
       copyFailed: 'Failed to copy to clipboard',
@@ -1672,7 +1672,7 @@ Note: ChatGPT Plus/Pro subscription is separate from API access.`,
   },
 
   WhatsNew: {
-    title: "What's New in TalkCody",
+    title: "What's New in BXcOda",
     viewFullChangelog: 'View Full Changelog',
     gotIt: 'Got it!',
     added: 'Added',
